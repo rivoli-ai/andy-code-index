@@ -25,6 +25,9 @@ builder.Services.AddScoped<IIndexingTaskRepository, IndexingTaskRepository>();
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddSingleton<IGitService, GitService>();
 
+// Background services
+builder.Services.AddHostedService<PeriodicSyncService>();
+
 // Options
 builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
