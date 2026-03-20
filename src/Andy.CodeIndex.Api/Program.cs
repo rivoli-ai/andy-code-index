@@ -49,6 +49,12 @@ builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("In
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
 
+// MCP Server
+builder.Services
+    .AddMcpServer()
+    .WithHttpTransport()
+    .WithToolsFromAssembly();
+
 // Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -120,6 +126,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// MCP endpoint
+app.MapMcp("/mcp")
+    .RequireCors("AllowMcpClients");
 
 // Health check
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
