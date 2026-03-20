@@ -30,6 +30,8 @@ builder.Services.AddScoped<ITaskQueue, TaskQueueService>();
 builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
 builder.Services.AddScoped<ICodeAnalysisService, CodeAnalysisService>();
 builder.Services.AddScoped<IEnrichmentGeneratorService, EnrichmentGeneratorService>();
+builder.Services.AddScoped<ISearchService, SearchService>();
+builder.Services.AddSingleton<RankFusionService>();
 builder.Services.AddHttpClient<IEmbeddingProvider, OpenAiEmbeddingProvider>();
 
 // Task handlers
