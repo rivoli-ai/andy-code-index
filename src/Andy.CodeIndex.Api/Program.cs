@@ -135,12 +135,13 @@ app.MapMcp("/mcp")
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
     .AllowAnonymous();
 
-// Auto-migrate in development
+// Auto-migrate in development (skip for InMemory provider used in tests)
 if (app.Environment.IsDevelopment() && !string.IsNullOrEmpty(connectionString))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<CodeIndexDbContext>();
-    await db.Database.MigrateAsync();
+    if (db.Database.IsNpgsql())
+        await db.Database.MigrateAsync();
 }
 
 app.Run();
