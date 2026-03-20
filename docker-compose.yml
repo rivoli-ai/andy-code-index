@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: andy-code-index-postgres
+    environment:
+      POSTGRES_DB: andy_code_index
+      POSTGRES_USER: andy_code_index
+      POSTGRES_PASSWORD: andy_code_index_dev_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U andy_code_index -d andy_code_index"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - andy-code-index-network
+
+  # Optional: Ollama for local embeddings and LLM enrichments
+  ollama:
+    image: ollama/ollama:latest
+    container_name: andy-code-index-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - andy-code-index-network
+    profiles:
+      - ollama
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+networks:
+  andy-code-index-network:
+    driver: bridge
