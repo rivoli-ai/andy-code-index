@@ -24,13 +24,19 @@ builder.Services.AddScoped<IIndexingTaskRepository, IndexingTaskRepository>();
 // Services
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddSingleton<IGitService, GitService>();
+builder.Services.AddScoped<IChunkingService, ChunkingService>();
+builder.Services.AddScoped<ITaskQueue, TaskQueueService>();
+builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
+builder.Services.AddHttpClient<IEmbeddingProvider, OpenAiEmbeddingProvider>();
 
 // Background services
+builder.Services.AddHostedService<BackgroundWorkerService>();
 builder.Services.AddHostedService<PeriodicSyncService>();
 
 // Options
 builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
+builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
 
 // Swagger
 builder.Services.AddControllers();
