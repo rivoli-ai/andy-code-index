@@ -1,4 +1,5 @@
 using Andy.CodeIndex.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Andy.CodeIndex.Api.Controllers;
@@ -6,6 +7,7 @@ namespace Andy.CodeIndex.Api.Controllers;
 [ApiController]
 [Route("api/v1/repositories/{repositoryId:guid}")]
 [Produces("application/json")]
+[Authorize]
 public class CommitsController : ControllerBase
 {
     private readonly ICommitRepository _commitRepo;

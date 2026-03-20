@@ -1,9 +1,11 @@
+using Andy.Auth.Extensions;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Data;
 using Andy.CodeIndex.Infrastructure.Handlers;
 using Andy.CodeIndex.Infrastructure.Repositories;
 using Andy.CodeIndex.Infrastructure.Services;
+using Andy.Rbac.Client;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +16,20 @@ if (!string.IsNullOrEmpty(connectionString))
 {
     builder.Services.AddDbContext<CodeIndexDbContext>(options =>
         options.UseNpgsql(connectionString, o => o.UseVector()));
+}
+
+// Authentication (Andy.Auth)
+builder.Services.AddAndyAuth(builder.Configuration);
+
+// RBAC (Andy.Rbac.Client)
+var rbacBaseUrl = builder.Configuration["Rbac:ApiBaseUrl"];
+if (!string.IsNullOrEmpty(rbacBaseUrl))
+{
+    builder.Services.AddRbacClient(options =>
+    {
+        options.ApiBaseUrl = rbacBaseUrl;
+        options.ApplicationCode = "code-index";
+    });
 }
 
 // Repositories

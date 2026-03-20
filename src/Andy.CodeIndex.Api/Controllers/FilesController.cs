@@ -1,5 +1,6 @@
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -8,6 +9,7 @@ namespace Andy.CodeIndex.Api.Controllers;
 [ApiController]
 [Route("api/v1/repositories/{repositoryId:guid}")]
 [Produces("application/json")]
+[Authorize]
 public class FilesController : ControllerBase
 {
     private readonly ICodeRepositoryRepository _repoRepo;

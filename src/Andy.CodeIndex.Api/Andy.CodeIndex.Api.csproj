@@ -11,6 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Andy.Auth" Version="2025.11.17-rc.1" />
+    <PackageReference Include="Andy.Rbac.Client" Version="1.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">

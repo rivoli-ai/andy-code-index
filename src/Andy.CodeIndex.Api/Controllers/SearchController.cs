@@ -1,5 +1,6 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Andy.CodeIndex.Api.Controllers;
@@ -7,6 +8,7 @@ namespace Andy.CodeIndex.Api.Controllers;
 [ApiController]
 [Route("api/v1/search")]
 [Produces("application/json")]
+[Authorize]
 public class SearchController : ControllerBase
 {
     private readonly ISearchService _searchService;

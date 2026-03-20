@@ -1,6 +1,7 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Andy.CodeIndex.Api.Controllers;
@@ -8,6 +9,7 @@ namespace Andy.CodeIndex.Api.Controllers;
 [ApiController]
 [Route("api/v1/enrichments")]
 [Produces("application/json")]
+[Authorize]
 public class EnrichmentsController : ControllerBase
 {
     private readonly IEnrichmentGeneratorService _service;
