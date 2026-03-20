@@ -1,6 +1,7 @@
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Data;
+using Andy.CodeIndex.Infrastructure.Handlers;
 using Andy.CodeIndex.Infrastructure.Repositories;
 using Andy.CodeIndex.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,15 @@ builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();
 builder.Services.AddScoped<ITaskQueue, TaskQueueService>();
 builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
+builder.Services.AddScoped<ICodeAnalysisService, CodeAnalysisService>();
+builder.Services.AddScoped<IEnrichmentGeneratorService, EnrichmentGeneratorService>();
 builder.Services.AddHttpClient<IEmbeddingProvider, OpenAiEmbeddingProvider>();
+
+// Task handlers
+builder.Services.AddScoped<ITaskHandler, CloneRepositoryHandler>();
+builder.Services.AddScoped<ITaskHandler, ScanCommitHandler>();
+builder.Services.AddScoped<ITaskHandler, ExtractSnippetsHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateApiDocsHandler>();
 
 // Background services
 builder.Services.AddHostedService<BackgroundWorkerService>();
