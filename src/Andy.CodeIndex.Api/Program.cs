@@ -1,4 +1,6 @@
+using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Infrastructure.Data;
+using Andy.CodeIndex.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +12,12 @@ if (!string.IsNullOrEmpty(connectionString))
     builder.Services.AddDbContext<CodeIndexDbContext>(options =>
         options.UseNpgsql(connectionString, o => o.UseVector()));
 }
+
+// Repositories
+builder.Services.AddScoped<ICodeRepositoryRepository, CodeRepositoryRepository>();
+builder.Services.AddScoped<ICommitRepository, CommitRepository>();
+builder.Services.AddScoped<IEnrichmentRepository, EnrichmentRepository>();
+builder.Services.AddScoped<IIndexingTaskRepository, IndexingTaskRepository>();
 
 // Swagger
 builder.Services.AddControllers();
