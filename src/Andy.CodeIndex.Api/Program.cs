@@ -1,6 +1,8 @@
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Data;
 using Andy.CodeIndex.Infrastructure.Repositories;
+using Andy.CodeIndex.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +20,14 @@ builder.Services.AddScoped<ICodeRepositoryRepository, CodeRepositoryRepository>(
 builder.Services.AddScoped<ICommitRepository, CommitRepository>();
 builder.Services.AddScoped<IEnrichmentRepository, EnrichmentRepository>();
 builder.Services.AddScoped<IIndexingTaskRepository, IndexingTaskRepository>();
+
+// Services
+builder.Services.AddScoped<IRepositoryService, RepositoryService>();
+builder.Services.AddSingleton<IGitService, GitService>();
+
+// Options
+builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
+builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
 
 // Swagger
 builder.Services.AddControllers();
