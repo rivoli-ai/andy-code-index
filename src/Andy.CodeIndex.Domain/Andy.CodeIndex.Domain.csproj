@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Domain entities and enums for Andy CodeIndex.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="8.0.6" />
+    <PackageReference Include="Pgvector" Version="0.3.0" />
+  </ItemGroup>
+
+</Project>

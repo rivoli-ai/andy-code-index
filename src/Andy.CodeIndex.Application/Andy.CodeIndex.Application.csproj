@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Service interfaces, DTOs, and options for Andy CodeIndex.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Andy.CodeIndex.Domain\Andy.CodeIndex.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

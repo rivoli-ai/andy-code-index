@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Shared DTOs between Andy CodeIndex API and frontend clients.</Description>
+  </PropertyGroup>
+
+</Project>
