@@ -33,12 +33,12 @@ Andy.CodeIndex is a semantic code indexing service for the rivoli-ai ecosystem, 
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| FR-11 | Chunk code files using fixed-size overlap algorithm (1500 chars, 200 overlap, 50 min) | Must |
+| FR-11 | Chunk code files using fixed-size overlap algorithm (1500 runes, 200 overlap, 50 min; line-granular overlap) | Must |
 | FR-12 | Generate vector embeddings for code chunks (code index) | Must |
 | FR-13 | Generate vector embeddings for enrichment summaries (text index) | Must |
 | FR-14 | Create BM25 full-text index using PostgreSQL tsvector | Must |
 | FR-15 | Background task queue with database-backed persistence | Must |
-| FR-16 | Task chaining: clone → sync → scan → chunk → BM25 → embed → enrich | Must |
+| FR-16 | Task chaining: clone → sync → scan → chunk → BM25 → code-embed → summary-enrich → summary-embed → API docs → LLM enrichments | Must |
 | FR-17 | Progress reporting for long-running operations | Must |
 | FR-18 | Configurable worker count for concurrent processing | Should |
 | FR-19 | Support multiple embedding providers (OpenAI, Ollama, compatible APIs) | Must |

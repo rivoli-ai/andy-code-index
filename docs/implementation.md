@@ -337,16 +337,18 @@ public class ChunkingService : IChunkingService
 
         foreach (var line in lines)
         {
-            if (currentChunk.Length + line.Length + 1 > options.Size && currentChunk.Length > 0)
+            // Size measured in runes (Unicode code points), not string.Length
+            var runeCount = currentChunk.ToString().EnumerateRunes().Count();
+            if (runeCount + line.EnumerateRunes().Count() + 1 > options.Size && runeCount > 0)
             {
                 // Emit chunk
                 EmitChunk(chunks, currentChunk, currentStartLine, currentLine - 1);
 
-                // Overlap: keep trailing chars
-                var overlap = GetOverlap(currentChunk.ToString(), options.Overlap);
+                // Overlap: keep trailing whole lines within overlap budget (line-granular)
+                var overlapLines = GetOverlapLines(currentChunk.ToString(), options.Overlap);
                 currentChunk.Clear();
-                currentChunk.Append(overlap);
-                currentStartLine = currentLine - CountLines(overlap);
+                currentChunk.Append(overlapLines);
+                currentStartLine = currentLine - CountLines(overlapLines);
             }
 
             if (line.Length > options.Size)
@@ -387,7 +389,7 @@ public class RankFusionService : IRankFusionService
             for (int rank = 0; rank < resultSet.Results.Count; rank++)
             {
                 var item = resultSet.Results[rank];
-                var rrf = 1.0 / (k + rank + 1);  // +1 for 1-based rank
+                var rrf = 1.0 / (k + rank);  // rank is 0-based (matching Kodit)
 
                 if (!scores.ContainsKey(item.EnrichmentId))
                 {

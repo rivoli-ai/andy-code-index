@@ -250,8 +250,9 @@ enum EnrichmentSubtype {
 
 enum TaskOperation {
     CloneRepository, SyncRepository, DeleteRepository,
-    ScanCommit, ExtractSnippets,
-    CreateBM25Index, CreateCodeEmbeddings, CreateSummaryEmbeddings,
+    ScanCommit, RescanCommit, ExtractSnippets,
+    CreateBM25Index, CreateCodeEmbeddings,
+    CreateSummaryEnrichments, CreateSummaryEmbeddings,
     CreatePublicAPIDocs,
     CreateArchitectureDocs, CreateDatabaseSchema,
     CreateCommitDescription, CreateCookbook, CreateWiki
@@ -276,8 +277,9 @@ Base path: `/api/v1`
 | DELETE | `/repositories/{id}` | Delete repository | `code-index:repository:delete` + instance |
 | POST | `/repositories/{id}/sync` | Trigger sync | `code-index:repository:index` + instance |
 | GET | `/repositories/{id}/commits` | List commits | `code-index:repository:read` + instance |
-| GET | `/repositories/{id}/blob/{sha}/{**path}` | Read file | `code-index:repository:read` + instance |
-| GET | `/repositories/{id}/indexing-status` | Indexing progress | `code-index:repository:read` + instance |
+| GET | `/repositories/{id}/commits/{sha}` | Commit detail | `code-index:repository:read` + instance |
+| GET | `/repositories/{id}/status` | Indexing status & progress | `code-index:repository:read` + instance |
+| GET | `/repositories/{id}/blob/{ref}/{**path}` | Read file (ref=branch/tag/SHA) | `code-index:repository:read` + instance |
 | POST | `/search` | Hybrid search | `code-index:search:read` |
 | GET | `/search/semantic` | Semantic search | `code-index:search:read` |
 | GET | `/search/keyword` | Keyword search | `code-index:search:read` |
@@ -286,7 +288,7 @@ Base path: `/api/v1`
 | GET | `/enrichments` | Query enrichments | `code-index:enrichment:read` |
 | GET | `/enrichments/{id}` | Enrichment detail | `code-index:enrichment:read` |
 | GET | `/queue` | Task queue status | `code-index:task:read` |
-| POST | `/queue` | Enqueue task | `code-index:task:write` |
+| GET | `/queue/{id}` | Task detail | `code-index:task:read` |
 | GET | `/health` | Health check | Anonymous |
 
 ### 4.2 MCP Endpoint
@@ -324,8 +326,8 @@ Base path: `/api/v1`
                           ▼
               ┌───────────────────────┐
               │ Reciprocal Rank Fusion │
-              │  score = Σ 1/(k+rank)  │
-              │  k = 60 (default)      │
+              │ score = Σ 1/(k+rank)   │
+              │ k=60, rank is 0-based  │
               └───────────┬───────────┘
                           ▼
               ┌───────────────────────┐
@@ -370,11 +372,18 @@ class SearchFilter {
 └──────────────────┘             │
     ┌────────────────────────────┘
     ▼
-┌──────────────────────┐    ┌────────────────────────┐
-│ Create Code Embeddings│───►│ Create Summary Embeddings│
-└──────────────────────┘    └────────────┬───────────┘
-                                         │
-    ┌────────────────────────────────────┘
+┌──────────────────────┐    ┌─────────────────────────────┐
+│ Create Code Embeddings│───►│ Create Summary Enrichments   │
+└──────────────────────┘    │ (LLM summarizes snippets)    │
+                            └──────────────┬──────────────┘
+                                           │
+    ┌──────────────────────────────────────┘
+    ▼
+┌────────────────────────┐
+│ Create Summary Embeddings│
+└────────────┬───────────┘
+             │
+    ┌────────┘
     ▼
 ┌──────────────────┐    ┌───────────────────────────┐
 │ Create API Docs   │    │ LLM Enrichments (optional) │
@@ -388,7 +397,8 @@ class SearchFilter {
 Three-tier fixed-size chunking with overlap:
 
 ```
-Parameters: Size=1500 chars, Overlap=200, MinSize=50
+Parameters: Size=1500 runes, Overlap=200 runes, MinSize=50 runes
+(Runes = Unicode code points. In .NET, use StringInfo or enumerate Rune for accuracy.)
 
 Tier 1: Accumulate whole lines until next line exceeds Size
          ┌──────────────────────────┐
@@ -409,7 +419,8 @@ Tier 3: For tokens > Size with no whitespace, split on chars
          │ [exactly Size characters] │  ◄── hard split
          └──────────────────────────┘
 
-Overlap: Last ~200 chars of chunk N become prefix of chunk N+1
+Overlap: Trailing whole lines from chunk N (up to ~200 runes) become prefix of chunk N+1
+         (line-granular overlap, not character-level — walks backward through lines)
 ```
 
 Each chunk tracks: content, byte offset, 1-based start/end line numbers.
