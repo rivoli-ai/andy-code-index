@@ -143,11 +143,43 @@ public class OpenAiEmbeddingProviderTests
     }
 
     [Fact]
-    public void Dimensions_ReturnsConfiguredValue()
+    public void Dimensions_ReturnsModelDimensions()
     {
         var handler = new MockHttpHandler(HttpStatusCode.OK, "{}");
-        var provider = CreateProvider(handler, new EmbeddingOptions { Dimensions = 3072 });
+        var provider = CreateProvider(handler, new EmbeddingOptions { Model = "text-embedding-3-large" });
         provider.Dimensions.Should().Be(3072);
+    }
+
+    [Fact]
+    public void Dimensions_FallsBackToExplicitForUnknownModel()
+    {
+        var handler = new MockHttpHandler(HttpStatusCode.OK, "{}");
+        var provider = CreateProvider(handler, new EmbeddingOptions { Model = "custom-model", Dimensions = 768 });
+        provider.Dimensions.Should().Be(768);
+    }
+
+    [Fact]
+    public void IsAvailable_TrueWhenApiKeySet()
+    {
+        var handler = new MockHttpHandler(HttpStatusCode.OK, "{}");
+        var provider = CreateProvider(handler);
+        provider.IsAvailable.Should().BeTrue(); // test-key is set in CreateProvider
+    }
+
+    [Fact]
+    public void IsAvailable_FalseWhenNoApiKey()
+    {
+        var handler = new MockHttpHandler(HttpStatusCode.OK, "{}");
+        var provider = CreateProvider(handler, new EmbeddingOptions { ApiKey = null });
+        provider.IsAvailable.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ModelName_ReturnsConfiguredModel()
+    {
+        var handler = new MockHttpHandler(HttpStatusCode.OK, "{}");
+        var provider = CreateProvider(handler);
+        provider.ModelName.Should().Be("text-embedding-3-small");
     }
 
     [Fact]

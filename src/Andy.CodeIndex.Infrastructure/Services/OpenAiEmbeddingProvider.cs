@@ -14,7 +14,9 @@ public class OpenAiEmbeddingProvider : IEmbeddingProvider
     private readonly EmbeddingOptions _options;
     private readonly ILogger<OpenAiEmbeddingProvider> _logger;
 
-    public int Dimensions => _options.Dimensions;
+    public int Dimensions => _options.GetDimensions();
+    public string ModelName => _options.Model;
+    public bool IsAvailable => _options.IsConfigured;
 
     public OpenAiEmbeddingProvider(
         HttpClient httpClient,

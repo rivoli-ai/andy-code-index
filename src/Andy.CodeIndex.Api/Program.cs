@@ -81,7 +81,8 @@ builder.Services.AddHostedService<PeriodicSyncService>();
 // Options
 builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
-builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
+builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection(EmbeddingOptions.SectionName));
+builder.Services.Configure<EnrichmentLlmOptions>(builder.Configuration.GetSection(EnrichmentLlmOptions.SectionName));
 
 // MCP Server
 builder.Services

@@ -17,6 +17,8 @@ public class EmbeddingService : IEmbeddingService
     private readonly ILogger<EmbeddingService> _logger;
 
     public int Dimensions => _provider.Dimensions;
+    public string ModelName => _provider.ModelName;
+    public bool IsAvailable => _provider.IsAvailable;
 
     public EmbeddingService(
         IEmbeddingProvider provider,
