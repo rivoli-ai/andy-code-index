@@ -67,8 +67,11 @@ builder.Services.AddHttpClient<IEmbeddingProvider, OpenAiEmbeddingProvider>();
 
 // Task handlers
 builder.Services.AddScoped<ITaskHandler, CloneRepositoryHandler>();
+builder.Services.AddScoped<ITaskHandler, SyncRepositoryHandler>();
 builder.Services.AddScoped<ITaskHandler, ScanCommitHandler>();
 builder.Services.AddScoped<ITaskHandler, ExtractSnippetsHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateBM25IndexHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateCodeEmbeddingsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateApiDocsHandler>();
 
 // Background services

@@ -87,6 +87,12 @@ public class BackgroundWorkerService : BackgroundService
             await successQueue.UpdateStatusAsync(task.Id, IndexingTaskStatus.Completed, ct: ct);
             _logger.LogInformation("Task {Id} completed: {Operation}", task.Id, task.Operation);
             await successQueue.EnqueueNextInChainAsync(task, ct);
+
+            // If chain is finished (no next operation), mark repo as indexed
+            if (task.Operation != TaskOperation.DeleteRepository)
+            {
+                await MarkRepoAsIndexedIfChainDoneAsync(task, ct);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -106,6 +112,39 @@ public class BackgroundWorkerService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update task {Id} status to {Status}", taskId, status);
+        }
+    }
+
+    private async Task MarkRepoAsIndexedIfChainDoneAsync(IndexingTask task, CancellationToken ct)
+    {
+        try
+        {
+            // Check if there are any pending/running tasks for this repo's chain
+            using var scope = _scopeFactory.CreateScope();
+            var taskRepo = scope.ServiceProvider.GetRequiredService<IIndexingTaskRepository>();
+
+            if (task.ChainId is null) return;
+
+            var hasPending = await taskRepo.ExistsAsync(
+                t => t.ChainId == task.ChainId &&
+                     (t.Status == IndexingTaskStatus.Pending || t.Status == IndexingTaskStatus.Running), ct);
+
+            if (!hasPending)
+            {
+                var context = scope.ServiceProvider.GetRequiredService<Data.CodeIndexDbContext>();
+                var repo = await context.Repositories.FindAsync([task.RepositoryId], ct);
+                if (repo is not null && repo.Status != "indexed")
+                {
+                    repo.Status = "indexed";
+                    repo.UpdatedAt = DateTime.UtcNow;
+                    await context.SaveChangesAsync(ct);
+                    _logger.LogInformation("Repository {Name} is now indexed", repo.Name);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to check/update indexed status for repo {RepoId}", task.RepositoryId);
         }
     }
 }

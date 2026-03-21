@@ -155,7 +155,8 @@ public class TaskQueueService : ITaskQueue
         TaskOperation.CreateCommitDescription or
         TaskOperation.CreateCookbook or
         TaskOperation.CreateWiki or
-        TaskOperation.CreateSummaryEnrichments;
+        TaskOperation.CreateSummaryEnrichments or
+        TaskOperation.CreateSummaryEmbeddings;
 
     private static TaskOperation? GetNextNonLlmOperation(TaskOperation current)
     {
