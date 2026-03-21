@@ -50,6 +50,13 @@ public class IndexingTaskRepository : RepositoryBase<IndexingTask>, IIndexingTas
 
     public async Task UpdateStatusAsync(Guid id, IndexingTaskStatus status, string? errorMessage = null, CancellationToken ct = default)
     {
+        // Use direct Find + tracked update (works with both PostgreSQL and InMemory)
+        // Clear any stale tracked entities first
+        var tracked = Context.ChangeTracker.Entries<IndexingTask>()
+            .FirstOrDefault(e => e.Entity.Id == id);
+        if (tracked != null)
+            tracked.State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+
         var task = await DbSet.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Task {id} not found");
 

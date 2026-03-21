@@ -32,9 +32,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("HeadCommitSha")
                         .HasMaxLength(40)
@@ -99,9 +97,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsIndexed")
                         .HasColumnType("boolean");
@@ -137,9 +133,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Vector>("EmbeddingVector")
                         .IsRequired()
@@ -181,9 +175,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("EndLine")
                         .HasColumnType("integer");
@@ -256,9 +248,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(4096)
@@ -310,9 +300,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(2048)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DefaultBranch")
                         .HasMaxLength(256)
@@ -345,9 +333,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(32)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Url")
                         .IsRequired()
@@ -376,9 +362,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Hash")
                         .HasMaxLength(64)
@@ -418,9 +402,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(40)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()

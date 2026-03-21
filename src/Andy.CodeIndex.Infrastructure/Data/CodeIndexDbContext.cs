@@ -57,12 +57,6 @@ public class CodeIndexDbContext : DbContext
             builder.Property(r => r.Status).IsRequired().HasMaxLength(32);
             builder.Property(r => r.Provider).HasConversion<string>().HasMaxLength(32);
 
-            if (isNpgsql)
-            {
-                builder.Property(r => r.CreatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
-                builder.Property(r => r.UpdatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
-            }
-
             builder.HasIndex(r => r.Url).IsUnique();
             builder.HasIndex(r => r.Name);
             builder.HasIndex(r => r.Status);
@@ -82,7 +76,7 @@ public class CodeIndexDbContext : DbContext
 
             if (isNpgsql)
             {
-                builder.Property(c => c.CreatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                // CreatedAt set in application code — no server default to avoid EF concurrency issues
             }
 
             builder.HasOne(c => c.Repository)
@@ -107,7 +101,7 @@ public class CodeIndexDbContext : DbContext
 
             if (isNpgsql)
             {
-                builder.Property(b => b.CreatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                // CreatedAt set in application code
             }
 
             builder.HasOne(b => b.Repository)
@@ -130,7 +124,7 @@ public class CodeIndexDbContext : DbContext
 
             if (isNpgsql)
             {
-                builder.Property(t => t.CreatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                // CreatedAt set in application code
             }
 
             builder.HasOne(t => t.Repository)
@@ -154,7 +148,7 @@ public class CodeIndexDbContext : DbContext
 
             if (isNpgsql)
             {
-                builder.Property(f => f.CreatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                // CreatedAt set in application code
             }
 
             builder.HasOne(f => f.Commit)
@@ -182,7 +176,7 @@ public class CodeIndexDbContext : DbContext
 
             if (isNpgsql)
             {
-                builder.Property(e => e.CreatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                // CreatedAt set in application code
 
                 // tsvector generated column for BM25 full-text search
                 builder.Property(e => e.SearchVector)
@@ -231,7 +225,7 @@ public class CodeIndexDbContext : DbContext
                     .IsRequired()
                     .HasColumnType("vector(1536)");
 
-                builder.Property(e => e.CreatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                // CreatedAt set in application code
 
                 // HNSW index for cosine similarity search
                 builder.HasIndex(e => e.EmbeddingVector)
@@ -265,7 +259,7 @@ public class CodeIndexDbContext : DbContext
 
             if (isNpgsql)
             {
-                builder.Property(t => t.CreatedAt).HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                // CreatedAt set in application code
             }
 
             builder.HasOne(t => t.Repository)

@@ -1,4 +1,5 @@
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -27,45 +28,7 @@ public class BackgroundWorkerService : BackgroundService
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var queue = scope.ServiceProvider.GetRequiredService<ITaskQueue>();
-                var handlers = scope.ServiceProvider.GetServices<ITaskHandler>();
-
-                var task = await queue.DequeueAsync(stoppingToken);
-                if (task is null)
-                {
-                    await Task.Delay(1000, stoppingToken);
-                    continue;
-                }
-
-                _logger.LogInformation("Processing task {Id}: {Operation} for repo {RepoId}",
-                    task.Id, task.Operation, task.RepositoryId);
-
-                var handler = handlers.FirstOrDefault(h => h.Operation == task.Operation);
-                if (handler is null)
-                {
-                    _logger.LogWarning("No handler registered for operation {Operation}", task.Operation);
-                    await queue.UpdateStatusAsync(task.Id, IndexingTaskStatus.Failed,
-                        $"No handler for {task.Operation}", stoppingToken);
-                    continue;
-                }
-
-                try
-                {
-                    await handler.HandleAsync(task, stoppingToken);
-                    await queue.UpdateStatusAsync(task.Id, IndexingTaskStatus.Completed, ct: stoppingToken);
-
-                    _logger.LogInformation("Task {Id} completed: {Operation}", task.Id, task.Operation);
-
-                    // Chain: enqueue next operation
-                    await queue.EnqueueNextInChainAsync(task, stoppingToken);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _logger.LogError(ex, "Task {Id} failed: {Operation}", task.Id, task.Operation);
-                    await queue.UpdateStatusAsync(task.Id, IndexingTaskStatus.Failed,
-                        ex.Message, stoppingToken);
-                }
+                await ProcessNextTaskAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -79,5 +42,70 @@ public class BackgroundWorkerService : BackgroundService
         }
 
         _logger.LogInformation("Background worker stopped");
+    }
+
+    private async Task ProcessNextTaskAsync(CancellationToken ct)
+    {
+        IndexingTask? task;
+
+        // Dequeue in its own scope
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            var queue = scope.ServiceProvider.GetRequiredService<ITaskQueue>();
+            task = await queue.DequeueAsync(ct);
+        }
+
+        if (task is null)
+        {
+            await Task.Delay(1000, ct);
+            return;
+        }
+
+        _logger.LogInformation("Processing task {Id}: {Operation} for repo {RepoId}",
+            task.Id, task.Operation, task.RepositoryId);
+
+        // Execute handler in a fresh scope
+        try
+        {
+            using var handlerScope = _scopeFactory.CreateScope();
+            var handlers = handlerScope.ServiceProvider.GetServices<ITaskHandler>();
+            var handler = handlers.FirstOrDefault(h => h.Operation == task.Operation);
+
+            if (handler is null)
+            {
+                _logger.LogWarning("No handler registered for operation {Operation}", task.Operation);
+                await UpdateTaskStatusAsync(task.Id, IndexingTaskStatus.Failed,
+                    $"No handler for {task.Operation}", ct);
+                return;
+            }
+
+            await handler.HandleAsync(task, ct);
+
+            // Success — mark completed and chain next in a fresh scope
+            using var successScope = _scopeFactory.CreateScope();
+            var successQueue = successScope.ServiceProvider.GetRequiredService<ITaskQueue>();
+            await successQueue.UpdateStatusAsync(task.Id, IndexingTaskStatus.Completed, ct: ct);
+            _logger.LogInformation("Task {Id} completed: {Operation}", task.Id, task.Operation);
+            await successQueue.EnqueueNextInChainAsync(task, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Task {Id} failed: {Operation}", task.Id, task.Operation);
+            await UpdateTaskStatusAsync(task.Id, IndexingTaskStatus.Failed, ex.Message, ct);
+        }
+    }
+
+    private async Task UpdateTaskStatusAsync(Guid taskId, IndexingTaskStatus status, string? errorMessage, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var queue = scope.ServiceProvider.GetRequiredService<ITaskQueue>();
+            await queue.UpdateStatusAsync(taskId, status, errorMessage, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update task {Id} status to {Status}", taskId, status);
+        }
     }
 }

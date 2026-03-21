@@ -19,7 +19,22 @@ if (!string.IsNullOrEmpty(connectionString))
 }
 
 // Authentication (Andy.Auth)
-builder.Services.AddAndyAuth(builder.Configuration);
+var authAuthority = builder.Configuration["AndyAuth:Authority"];
+if (!string.IsNullOrEmpty(authAuthority))
+{
+    builder.Services.AddAndyAuth(builder.Configuration);
+}
+else
+{
+    // Dev fallback: no auth enforcement for local development
+    builder.Services.AddAuthentication();
+    builder.Services.AddAuthorization(options =>
+    {
+        options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAssertion(_ => true) // Allow all requests in dev without auth
+            .Build();
+    });
+}
 
 // RBAC (Andy.Rbac.Client)
 var rbacBaseUrl = builder.Configuration["Rbac:ApiBaseUrl"];

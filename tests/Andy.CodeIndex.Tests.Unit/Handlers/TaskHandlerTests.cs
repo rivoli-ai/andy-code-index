@@ -10,17 +10,18 @@ using Moq;
 
 namespace Andy.CodeIndex.Tests.Unit.Handlers;
 
-public class CloneRepositoryHandlerTests
+public class CloneRepositoryHandlerTests : IDisposable
 {
-    private readonly Mock<ICodeRepositoryRepository> _repoRepoMock = new();
+    private readonly Andy.CodeIndex.Infrastructure.Data.CodeIndexDbContext _context;
     private readonly Mock<IGitService> _gitServiceMock = new();
     private readonly CloneRepositoryHandler _handler;
     private readonly Repository _testRepo;
 
     public CloneRepositoryHandlerTests()
     {
+        _context = Helpers.TestDbContextFactory.Create();
         _handler = new CloneRepositoryHandler(
-            _repoRepoMock.Object,
+            _context,
             _gitServiceMock.Object,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }),
             NullLogger<CloneRepositoryHandler>.Instance);
@@ -30,7 +31,11 @@ public class CloneRepositoryHandlerTests
             Id = Guid.NewGuid(), Name = "test-repo", Url = "https://github.com/t/r",
             Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
         };
+        _context.Repositories.Add(_testRepo);
+        _context.SaveChanges();
     }
+
+    public void Dispose() => _context.Dispose();
 
     [Fact]
     public void Operation_IsCloneRepository()
@@ -41,10 +46,7 @@ public class CloneRepositoryHandlerTests
     [Fact]
     public async Task HandleAsync_ClonesAndUpdatesBranches()
     {
-        _repoRepoMock.Setup(r => r.GetByIdAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(_testRepo);
-        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id))
-            .Returns("/tmp/test/repos/x");
+        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
         _gitServiceMock.Setup(g => g.CloneAsync(_testRepo.Url, "/tmp/test/repos/x", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync("/tmp/test/repos/x");
         _gitServiceMock.Setup(g => g.GetBranchesAsync("/tmp/test/repos/x", It.IsAny<CancellationToken>()))
@@ -52,6 +54,8 @@ public class CloneRepositoryHandlerTests
                 new GitBranchInfo { Name = "main", HeadCommitSha = "abc123", IsDefault = true },
                 new GitBranchInfo { Name = "develop", HeadCommitSha = "def456", IsDefault = false }
             ]);
+        _gitServiceMock.Setup(g => g.GetTagsAsync("/tmp/test/repos/x", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new GitTagInfo { Name = "v1.0", CommitSha = "abc123" }]);
 
         var task = new IndexingTask
         {
@@ -61,22 +65,65 @@ public class CloneRepositoryHandlerTests
 
         await _handler.HandleAsync(task);
 
-        _gitServiceMock.Verify(g => g.CloneAsync(_testRepo.Url, "/tmp/test/repos/x", null, It.IsAny<CancellationToken>()), Times.Once);
-        _repoRepoMock.Verify(r => r.Update(It.IsAny<Repository>()), Times.Exactly(2)); // "cloning" then "cloned"
-        _repoRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
-        _testRepo.Status.Should().Be("cloned");
-        _testRepo.Branches.Should().HaveCount(2);
+        var repo = await _context.Repositories.FindAsync(_testRepo.Id);
+        repo!.Status.Should().Be("cloned");
+        repo.DefaultBranch.Should().Be("main");
+        repo.LastSyncedAt.Should().NotBeNull();
+
+        var branches = _context.Branches.Where(b => b.RepositoryId == _testRepo.Id).ToList();
+        branches.Should().HaveCount(2);
+        var tags = _context.Tags.Where(t => t.RepositoryId == _testRepo.Id).ToList();
+        tags.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CloneFails_SetsStatusToError()
+    {
+        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
+        _gitServiceMock.Setup(g => g.CloneAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("git clone failed: auth required"));
+
+        var task = new IndexingTask
+        {
+            Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+            Operation = TaskOperation.CloneRepository, CreatedAt = DateTime.UtcNow
+        };
+
+        var act = () => _handler.HandleAsync(task);
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*auth required*");
+
+        var repo = await _context.Repositories.FindAsync(_testRepo.Id);
+        repo!.Status.Should().Be("error");
+    }
+
+    [Fact]
+    public async Task HandleAsync_BranchFetchFails_SetsStatusToError()
+    {
+        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
+        _gitServiceMock.Setup(g => g.CloneAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("/tmp/test/repos/x");
+        _gitServiceMock.Setup(g => g.GetBranchesAsync("/tmp/test/repos/x", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("git branch failed"));
+
+        var task = new IndexingTask
+        {
+            Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+            Operation = TaskOperation.CloneRepository, CreatedAt = DateTime.UtcNow
+        };
+
+        var act = () => _handler.HandleAsync(task);
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        var repo = await _context.Repositories.FindAsync(_testRepo.Id);
+        repo!.Status.Should().Be("error");
     }
 
     [Fact]
     public async Task HandleAsync_NonExistentRepo_Throws()
     {
-        _repoRepoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Repository?)null);
-
         var task = new IndexingTask
         {
-            Id = Guid.NewGuid(), RepositoryId = Guid.NewGuid(),
+            Id = Guid.NewGuid(), RepositoryId = Guid.NewGuid(), // Not in DB
             Operation = TaskOperation.CloneRepository, CreatedAt = DateTime.UtcNow
         };
 

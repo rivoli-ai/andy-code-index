@@ -30,8 +30,8 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     LastIndexedCommitSha = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: true),
                     LastSyncedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -47,7 +47,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     HeadCommitSha = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: true),
                     IsDefault = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -72,7 +72,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     AuthorEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     CommittedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     IsIndexed = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -98,7 +98,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     ErrorMessage = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: true),
                     ChainId = table.Column<Guid>(type: "uuid", nullable: true),
                     Priority = table.Column<int>(type: "integer", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
@@ -121,7 +121,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     RepositoryId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     CommitSha = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -150,7 +150,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     EndLine = table.Column<int>(type: "integer", nullable: true),
                     Language = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true, computedColumnSql: "to_tsvector('english', coalesce(\"Content\", ''))", stored: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -179,7 +179,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     Language = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     Size = table.Column<long>(type: "bigint", nullable: false),
                     Hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -220,7 +220,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     EnrichmentId = table.Column<Guid>(type: "uuid", nullable: false),
                     EmbeddingVector = table.Column<Vector>(type: "vector(1536)", nullable: false),
                     IndexType = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
