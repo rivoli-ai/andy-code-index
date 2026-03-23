@@ -88,6 +88,9 @@ builder.Services.AddScoped<IEnrichmentRepository, EnrichmentRepository>();
 builder.Services.AddScoped<IIndexingTaskRepository, IndexingTaskRepository>();
 
 // --- Services ---
+builder.Services.AddDataProtection();
+builder.Services.AddScoped<IEncryptionService, EncryptionService>();
+builder.Services.AddScoped<IApiKeyResolver, ApiKeyResolver>();
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();

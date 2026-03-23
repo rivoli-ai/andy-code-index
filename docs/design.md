@@ -498,6 +498,31 @@ HTTP Request
     │
     ├── allowed ──► Process request
     └── denied  ──► 403 { allowed: false, reason: "..." }
+
+### 7.4 API Key Resolution Chain
+
+For embedding operations, the API key is resolved via a 3-tier chain:
+
+```
+Request with User JWT
+    │
+    ▼
+[IApiKeyResolver.ResolveEmbeddingKeyAsync(userId)]
+    │
+    ├── Tier 1: User-specific key (UserSettings.EmbeddingApiKey, encrypted)
+    │           → source: "user"
+    │
+    ├── Tier 2: System-level key (EmbeddingOptions.ApiKey from appsettings)
+    │           → source: "system"
+    │
+    └── Tier 3: No key available
+                → source: "none" (embedding skipped)
+```
+
+User settings managed via:
+- `GET /api/v1/settings` — view (keys masked: sk-...last4)
+- `PUT /api/v1/settings` — update (keys encrypted at rest)
+- `DELETE /api/v1/settings/embedding-key` — remove (falls back to system)
 ```
 
 ## 8. External Integrations

@@ -19,6 +19,7 @@ public class CodeIndexDbContext : DbContext
     public DbSet<ContentEmbedding> ContentEmbeddings => Set<ContentEmbedding>();
     public DbSet<IndexingTask> IndexingTasks => Set<IndexingTask>();
     public DbSet<ChunkLineRange> ChunkLineRanges => Set<ChunkLineRange>();
+    public DbSet<UserSettings> UserSettings => Set<UserSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +41,7 @@ public class CodeIndexDbContext : DbContext
         ConfigureContentEmbedding(modelBuilder, isNpgsql);
         ConfigureIndexingTask(modelBuilder, isNpgsql);
         ConfigureChunkLineRange(modelBuilder, isNpgsql);
+        ConfigureUserSettings(modelBuilder);
     }
 
     private static void ConfigureRepository(ModelBuilder modelBuilder, bool isNpgsql)
@@ -285,6 +287,21 @@ public class CodeIndexDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasIndex(c => c.EnrichmentId);
+        });
+    }
+
+    private static void ConfigureUserSettings(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserSettings>(builder =>
+        {
+            builder.HasKey(s => s.Id);
+
+            builder.Property(s => s.UserId).IsRequired().HasMaxLength(256);
+            builder.Property(s => s.EmbeddingApiKey).HasMaxLength(1024);
+            builder.Property(s => s.EmbeddingModel).HasMaxLength(128);
+            builder.Property(s => s.LlmApiKey).HasMaxLength(1024);
+
+            builder.HasIndex(s => s.UserId).IsUnique();
         });
     }
 }
