@@ -368,7 +368,8 @@ class SearchFilter {
     ▼
 ┌──────────────────┐    ┌──────────────────┐
 │ Extract Snippets  │───►│ Create BM25 Index │
-│ (chunking)        │    └────────┬─────────┘
+│ (merge: add/update│    └────────┬─────────┘
+│  /delete chunks)  │
 └──────────────────┘             │
     ┌────────────────────────────┘
     ▼
@@ -392,7 +393,22 @@ class SearchFilter {
                         └───────────────────────────┘
 ```
 
-### 6.2 Chunking Algorithm (Ported from Kodit)
+### 6.2 Incremental Snippet Extraction
+
+On re-index, ExtractSnippetsHandler performs a **merge** instead of delete-and-recreate:
+
+1. Build new chunks from current file state
+2. Load existing chunk enrichments from DB
+3. Match by key: `(filePath, startLine, endLine)`
+4. For each new chunk:
+   - **Unchanged** (same content hash): skip — preserves ID and attached embeddings
+   - **Modified** (different content hash): update content in-place — preserves ID
+   - **New** (no matching key): insert new enrichment
+5. For each existing chunk with no match in new set: **delete** (file removed or restructured)
+
+Content identity is determined by SHA-256 hash of the chunk content (first 8 bytes).
+
+### 6.3 Chunking Algorithm (Ported from Kodit)
 
 Three-tier fixed-size chunking with overlap:
 

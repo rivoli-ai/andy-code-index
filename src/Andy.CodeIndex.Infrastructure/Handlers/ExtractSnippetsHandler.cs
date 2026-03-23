@@ -1,7 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.CodeIndex.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,8 +13,7 @@ namespace Andy.CodeIndex.Infrastructure.Handlers;
 
 public class ExtractSnippetsHandler : ITaskHandler
 {
-    private readonly ICodeRepositoryRepository _repoRepo;
-    private readonly IEnrichmentRepository _enrichmentRepo;
+    private readonly CodeIndexDbContext _context;
     private readonly IGitService _gitService;
     private readonly IChunkingService _chunkingService;
     private readonly IndexingOptions _indexingOptions;
@@ -19,15 +22,13 @@ public class ExtractSnippetsHandler : ITaskHandler
     public TaskOperation Operation => TaskOperation.ExtractSnippets;
 
     public ExtractSnippetsHandler(
-        ICodeRepositoryRepository repoRepo,
-        IEnrichmentRepository enrichmentRepo,
+        CodeIndexDbContext context,
         IGitService gitService,
         IChunkingService chunkingService,
         IOptions<IndexingOptions> indexingOptions,
         ILogger<ExtractSnippetsHandler> logger)
     {
-        _repoRepo = repoRepo;
-        _enrichmentRepo = enrichmentRepo;
+        _context = context;
         _gitService = gitService;
         _chunkingService = chunkingService;
         _indexingOptions = indexingOptions.Value;
@@ -36,18 +37,15 @@ public class ExtractSnippetsHandler : ITaskHandler
 
     public async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
-        var repo = await _repoRepo.GetByIdAsync(task.RepositoryId, ct)
+        var repo = await _context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
-
-        // Delete existing chunks to prevent duplication on re-index
-        await _enrichmentRepo.DeleteByRepositoryAndTypeAsync(repo.Id, EnrichmentType.Development, ct: ct);
-        _logger.LogInformation("Cleared existing Development enrichments for {Name}", repo.Name);
 
         var cloneDir = _gitService.GetCloneDir(_indexingOptions.DataDir, repo.Id);
         var commitSha = repo.LastIndexedCommitSha ?? "HEAD";
         var files = await _gitService.ListFilesAsync(cloneDir, commitSha, ct: ct);
 
-        var totalChunks = 0;
+        // Build new chunks from current file state
+        var newChunks = new List<(string filePath, string language, CodeChunk chunk, string contentHash)>();
         foreach (var file in files.Where(f => f.Language is not null))
         {
             var content = await _gitService.ReadFileAsync(cloneDir, commitSha, file.Path, ct);
@@ -56,7 +54,50 @@ public class ExtractSnippetsHandler : ITaskHandler
             var chunks = _chunkingService.ChunkText(content, file.Path);
             foreach (var chunk in chunks)
             {
-                await _enrichmentRepo.AddAsync(new Enrichment
+                newChunks.Add((file.Path, file.Language!, chunk, ComputeHash(chunk.Content)));
+            }
+        }
+
+        // Load existing chunk enrichments for this repo
+        var existingChunks = await _context.Enrichments
+            .Where(e => e.RepositoryId == repo.Id &&
+                        e.Type == EnrichmentType.Development &&
+                        e.Subtype == EnrichmentSubtype.Chunk)
+            .ToListAsync(ct);
+
+        // Build lookup: (filePath, startLine, endLine) → existing enrichment
+        var existingByKey = new Dictionary<string, Enrichment>();
+        foreach (var e in existingChunks)
+            existingByKey[$"{e.FilePath}:{e.StartLine}:{e.EndLine}"] = e;
+
+        int added = 0, updated = 0, deleted = 0, unchanged = 0;
+
+        // Process new chunks: add or update
+        var processedKeys = new HashSet<string>();
+        foreach (var (filePath, language, chunk, contentHash) in newChunks)
+        {
+            var key = $"{filePath}:{chunk.StartLine}:{chunk.EndLine}";
+            processedKeys.Add(key);
+
+            if (existingByKey.TryGetValue(key, out var existing))
+            {
+                var existingHash = ComputeHash(existing.Content);
+                if (existingHash != contentHash)
+                {
+                    // Modified — update content, preserve ID and embeddings
+                    existing.Content = chunk.Content;
+                    existing.Language = language;
+                    updated++;
+                }
+                else
+                {
+                    unchanged++;
+                }
+            }
+            else
+            {
+                // New chunk
+                _context.Enrichments.Add(new Enrichment
                 {
                     Id = Guid.NewGuid(),
                     RepositoryId = repo.Id,
@@ -66,21 +107,38 @@ public class ExtractSnippetsHandler : ITaskHandler
                     FilePath = chunk.FilePath,
                     StartLine = chunk.StartLine,
                     EndLine = chunk.EndLine,
-                    Language = file.Language,
+                    Language = language,
                     CreatedAt = DateTime.UtcNow
-                }, ct);
-                totalChunks++;
+                });
+                added++;
             }
         }
 
-        await _enrichmentRepo.SaveChangesAsync(ct);
+        // Delete chunks that no longer exist (file removed or chunk boundaries changed)
+        foreach (var existing in existingChunks)
+        {
+            var key = $"{existing.FilePath}:{existing.StartLine}:{existing.EndLine}";
+            if (!processedKeys.Contains(key))
+            {
+                _context.Enrichments.Remove(existing);
+                deleted++;
+            }
+        }
+
+        await _context.SaveChangesAsync(ct);
 
         repo.Status = "indexing";
         repo.UpdatedAt = DateTime.UtcNow;
-        _repoRepo.Update(repo);
-        await _repoRepo.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Extracted {Chunks} snippets from {Files} files for {Name}",
-            totalChunks, files.Count, repo.Name);
+        _logger.LogInformation(
+            "Snippets for {Name}: {Added} added, {Updated} updated, {Deleted} deleted, {Unchanged} unchanged",
+            repo.Name, added, updated, deleted, unchanged);
+    }
+
+    internal static string ComputeHash(string content)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
+        return Convert.ToHexString(bytes[..8]).ToLowerInvariant();
     }
 }
