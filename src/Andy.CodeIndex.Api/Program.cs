@@ -6,11 +6,18 @@ using Andy.CodeIndex.Infrastructure.Handlers;
 using Andy.CodeIndex.Infrastructure.Repositories;
 using Andy.CodeIndex.Infrastructure.Services;
 using Andy.Rbac.Client;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Database
+// --- Server URLs for MCP metadata ---
+var serverUrl = builder.Configuration["Urls"]?.Split(';').FirstOrDefault()
+    ?? (builder.Environment.IsDevelopment() ? "https://localhost:5101" : "https://localhost:5101");
+var protectedResourceUrl = $"{serverUrl}/mcp";
+var andyAuthAuthority = builder.Configuration["AndyAuth:Authority"] ?? "";
+
+// --- Database ---
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (!string.IsNullOrEmpty(connectionString))
 {
@@ -18,11 +25,38 @@ if (!string.IsNullOrEmpty(connectionString))
         options.UseNpgsql(connectionString, o => o.UseVector()));
 }
 
-// Authentication (Andy.Auth)
-var authAuthority = builder.Configuration["AndyAuth:Authority"];
-if (!string.IsNullOrEmpty(authAuthority))
+// --- Authentication (Andy.Auth) ---
+if (!string.IsNullOrEmpty(andyAuthAuthority))
 {
     builder.Services.AddAndyAuth(builder.Configuration);
+
+    // Post-configure JWT bearer to accept MCP resource URLs as valid audiences (RFC 8707)
+    builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        var existingAudiences = options.TokenValidationParameters.ValidAudiences?.ToList() ?? [];
+        if (!string.IsNullOrEmpty(options.TokenValidationParameters.ValidAudience) &&
+            !existingAudiences.Contains(options.TokenValidationParameters.ValidAudience))
+        {
+            existingAudiences.Add(options.TokenValidationParameters.ValidAudience);
+        }
+        existingAudiences.Add(protectedResourceUrl);
+        options.TokenValidationParameters.ValidAudiences = existingAudiences;
+        options.TokenValidationParameters.ValidAudience = null;
+    });
+
+    // MCP OAuth Protected Resource Metadata (RFC 8707)
+    builder.Services.AddAuthentication()
+        .AddMcp(mcpOptions =>
+        {
+            mcpOptions.ResourceMetadataUri = new Uri($"{serverUrl}/mcp/.well-known/oauth-protected-resource");
+            mcpOptions.ResourceMetadata = new()
+            {
+                Resource = new Uri(protectedResourceUrl),
+                ResourceDocumentation = new Uri("https://github.com/rivoli-ai/andy-code-index"),
+                AuthorizationServers = { new Uri(andyAuthAuthority) },
+                ScopesSupported = ["openid", "profile", "email"],
+            };
+        });
 }
 else
 {
@@ -31,12 +65,12 @@ else
     builder.Services.AddAuthorization(options =>
     {
         options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-            .RequireAssertion(_ => true) // Allow all requests in dev without auth
+            .RequireAssertion(_ => true)
             .Build();
     });
 }
 
-// RBAC (Andy.Rbac.Client)
+// --- RBAC (Andy.Rbac.Client) ---
 var rbacBaseUrl = builder.Configuration["Rbac:ApiBaseUrl"];
 if (!string.IsNullOrEmpty(rbacBaseUrl))
 {
@@ -47,13 +81,13 @@ if (!string.IsNullOrEmpty(rbacBaseUrl))
     });
 }
 
-// Repositories
+// --- Repositories ---
 builder.Services.AddScoped<ICodeRepositoryRepository, CodeRepositoryRepository>();
 builder.Services.AddScoped<ICommitRepository, CommitRepository>();
 builder.Services.AddScoped<IEnrichmentRepository, EnrichmentRepository>();
 builder.Services.AddScoped<IIndexingTaskRepository, IndexingTaskRepository>();
 
-// Services
+// --- Services ---
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();
@@ -65,7 +99,7 @@ builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddSingleton<RankFusionService>();
 builder.Services.AddHttpClient<IEmbeddingProvider, OpenAiEmbeddingProvider>();
 
-// Task handlers
+// --- Task handlers ---
 builder.Services.AddScoped<ITaskHandler, CloneRepositoryHandler>();
 builder.Services.AddScoped<ITaskHandler, SyncRepositoryHandler>();
 builder.Services.AddScoped<ITaskHandler, ScanCommitHandler>();
@@ -74,23 +108,23 @@ builder.Services.AddScoped<ITaskHandler, CreateBM25IndexHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateCodeEmbeddingsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateApiDocsHandler>();
 
-// Background services
+// --- Background services ---
 builder.Services.AddHostedService<BackgroundWorkerService>();
 builder.Services.AddHostedService<PeriodicSyncService>();
 
-// Options
+// --- Options ---
 builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection(EmbeddingOptions.SectionName));
 builder.Services.Configure<EnrichmentLlmOptions>(builder.Configuration.GetSection(EnrichmentLlmOptions.SectionName));
 
-// MCP Server
+// --- MCP Server ---
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
     .WithToolsFromAssembly();
 
-// Swagger
+// --- Swagger ---
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -126,14 +160,16 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// CORS
+// --- CORS ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularApp", policy =>
     {
         policy.WithOrigins(
                 "http://localhost:4200",
-                "https://localhost:4200")
+                "https://localhost:4200",
+                "http://localhost:4201",
+                "https://localhost:4201")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials();
@@ -149,7 +185,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Middleware
+// --- Middleware ---
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -162,15 +198,44 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// MCP endpoint
+// --- MCP endpoint ---
 app.MapMcp("/mcp")
-    .RequireCors("AllowMcpClients");
+    .RequireCors("AllowMcpClients")
+    .RequireAuthorization();
 
-// Health check
+// --- OAuth Protected Resource Metadata (RFC 8707) ---
+if (!string.IsNullOrEmpty(andyAuthAuthority))
+{
+    var oauthMetadataJsonOptions = new System.Text.Json.JsonSerializerOptions
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    app.MapGet("/.well-known/oauth-protected-resource", (IServiceProvider sp) =>
+    {
+        var optionsMonitor = sp.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationOptions>>();
+        var options = optionsMonitor.Get(
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationDefaults.AuthenticationScheme);
+        return Results.Json(options.ResourceMetadata, oauthMetadataJsonOptions);
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapGet("/mcp/.well-known/oauth-protected-resource", (IServiceProvider sp) =>
+    {
+        var optionsMonitor = sp.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationOptions>>();
+        var options = optionsMonitor.Get(
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationDefaults.AuthenticationScheme);
+        return Results.Json(options.ResourceMetadata, oauthMetadataJsonOptions);
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+}
+
+// --- Health check ---
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
     .AllowAnonymous();
 
-// Auto-migrate in development (skip for InMemory provider used in tests)
+// --- Auto-migrate in development ---
 if (app.Environment.IsDevelopment() && !string.IsNullOrEmpty(connectionString))
 {
     using var scope = app.Services.CreateScope();
