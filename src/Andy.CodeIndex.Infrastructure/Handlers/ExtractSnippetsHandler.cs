@@ -125,7 +125,29 @@ public class ExtractSnippetsHandler : ITaskHandler
             }
         }
 
+        // Record indexing run stats
+        _context.IndexingRuns.Add(new IndexingRun
+        {
+            Id = Guid.NewGuid(),
+            RepositoryId = repo.Id,
+            ChainId = task.ChainId,
+            StartedAt = task.StartedAt ?? DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow,
+            Status = "completed",
+            SnippetsAdded = added,
+            SnippetsUpdated = updated,
+            SnippetsDeleted = deleted,
+            SnippetsUnchanged = unchanged,
+            CreatedAt = DateTime.UtcNow
+        });
+
         await _context.SaveChangesAsync(ct);
+
+        // Emit telemetry
+        Telemetry.CodeIndexTelemetry.SnippetsAdded.Add(added, new KeyValuePair<string, object?>("repository", repo.Name));
+        Telemetry.CodeIndexTelemetry.SnippetsUpdated.Add(updated, new KeyValuePair<string, object?>("repository", repo.Name));
+        Telemetry.CodeIndexTelemetry.SnippetsDeleted.Add(deleted, new KeyValuePair<string, object?>("repository", repo.Name));
+        Telemetry.CodeIndexTelemetry.SnippetsUnchanged.Add(unchanged, new KeyValuePair<string, object?>("repository", repo.Name));
 
         repo.Status = "indexing";
         repo.UpdatedAt = DateTime.UtcNow;

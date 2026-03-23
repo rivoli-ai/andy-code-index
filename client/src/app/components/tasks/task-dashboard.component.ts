@@ -2,15 +2,18 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
 import { IndexingTask } from '../../models/task.model';
+import { SyncStatusComponent } from './sync-status.component';
 
 @Component({
   selector: 'app-task-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, SyncStatusComponent],
   template: `
     <div class="page-header">
       <h1>Task Queue</h1>
     </div>
+
+    <app-sync-status />
 
     <div *ngIf="loading" style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
 

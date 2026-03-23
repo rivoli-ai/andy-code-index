@@ -115,6 +115,13 @@ builder.Services.AddScoped<ITaskHandler, CreateApiDocsHandler>();
 builder.Services.AddHostedService<BackgroundWorkerService>();
 builder.Services.AddHostedService<PeriodicSyncService>();
 
+// --- OpenTelemetry ---
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .AddSource(Andy.CodeIndex.Infrastructure.Telemetry.CodeIndexTelemetry.ServiceName))
+    .WithMetrics(metrics => metrics
+        .AddMeter(Andy.CodeIndex.Infrastructure.Telemetry.CodeIndexTelemetry.ServiceName));
+
 // --- Options ---
 builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));

@@ -79,7 +79,19 @@ public class BackgroundWorkerService : BackgroundService
                 return;
             }
 
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using var activity = Telemetry.CodeIndexTelemetry.ActivitySource.StartActivity($"Task:{task.Operation}");
+            activity?.SetTag("task.id", task.Id.ToString());
+            activity?.SetTag("task.operation", task.Operation.ToString());
+            activity?.SetTag("task.repository_id", task.RepositoryId.ToString());
+
             await handler.HandleAsync(task, ct);
+
+            sw.Stop();
+            Telemetry.CodeIndexTelemetry.TasksCompleted.Add(1,
+                new KeyValuePair<string, object?>("operation", task.Operation.ToString()));
+            Telemetry.CodeIndexTelemetry.TaskDuration.Record(sw.Elapsed.TotalSeconds,
+                new KeyValuePair<string, object?>("operation", task.Operation.ToString()));
 
             // Success — mark completed and chain next in a fresh scope
             using var successScope = _scopeFactory.CreateScope();
@@ -97,6 +109,8 @@ public class BackgroundWorkerService : BackgroundService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Task {Id} failed: {Operation}", task.Id, task.Operation);
+            Telemetry.CodeIndexTelemetry.TasksFailed.Add(1,
+                new KeyValuePair<string, object?>("operation", task.Operation.ToString()));
             await UpdateTaskStatusAsync(task.Id, IndexingTaskStatus.Failed, ex.Message, ct);
         }
     }

@@ -3,11 +3,12 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
 import { Repository } from '../../models/repository.model';
+import { RepositoryHistoryComponent } from './repository-history.component';
 
 @Component({
   selector: 'app-repository-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, RepositoryHistoryComponent],
   template: `
     <div *ngIf="loading" style="display:flex;justify-content:center;padding:3rem"><div class="spinner"></div></div>
 
@@ -51,6 +52,8 @@ import { Repository } from '../../models/repository.model';
           </span>
         </div>
       </div>
+
+      <app-repository-history [repositoryId]="repo.id" style="margin-top:1.5rem;display:block" />
     </div>
 
     <div *ngIf="!loading && !repo" class="empty-state card">

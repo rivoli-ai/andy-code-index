@@ -1,4 +1,6 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TaskDashboardComponent } from './task-dashboard.component';
 import { ApiService } from '../../services/api.service';
 import { of } from 'rxjs';
@@ -12,7 +14,11 @@ describe('TaskDashboardComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [TaskDashboardComponent],
-      providers: [{ provide: ApiService, useValue: apiServiceSpy }]
+      providers: [
+        { provide: ApiService, useValue: apiServiceSpy },
+        provideHttpClient(),
+        provideHttpClientTesting()
+      ]
     }).compileComponents();
   });
 

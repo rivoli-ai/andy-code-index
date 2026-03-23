@@ -20,6 +20,7 @@ public class CodeIndexDbContext : DbContext
     public DbSet<IndexingTask> IndexingTasks => Set<IndexingTask>();
     public DbSet<ChunkLineRange> ChunkLineRanges => Set<ChunkLineRange>();
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
+    public DbSet<IndexingRun> IndexingRuns => Set<IndexingRun>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,7 @@ public class CodeIndexDbContext : DbContext
         ConfigureIndexingTask(modelBuilder, isNpgsql);
         ConfigureChunkLineRange(modelBuilder, isNpgsql);
         ConfigureUserSettings(modelBuilder);
+        ConfigureIndexingRun(modelBuilder);
     }
 
     private static void ConfigureRepository(ModelBuilder modelBuilder, bool isNpgsql)
@@ -302,6 +304,26 @@ public class CodeIndexDbContext : DbContext
             builder.Property(s => s.LlmApiKey).HasMaxLength(1024);
 
             builder.HasIndex(s => s.UserId).IsUnique();
+        });
+    }
+
+    private static void ConfigureIndexingRun(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<IndexingRun>(builder =>
+        {
+            builder.HasKey(r => r.Id);
+
+            builder.Property(r => r.Status).IsRequired().HasMaxLength(32);
+            builder.Property(r => r.ErrorMessage).HasMaxLength(4096);
+
+            builder.HasOne(r => r.Repository)
+                .WithMany()
+                .HasForeignKey(r => r.RepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(r => r.RepositoryId);
+            builder.HasIndex(r => r.ChainId);
+            builder.HasIndex(r => r.StartedAt);
         });
     }
 }
