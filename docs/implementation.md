@@ -1,8 +1,26 @@
-# Andy.CodeIndex — Implementation Guide
+# Andy.CodeIndex -- Implementation Guide
+
+## Status
+
+| Phase | Stories | Status |
+|-------|---------|--------|
+| 1: Foundation | 10 | Complete |
+| 2: Repository Management | 11 | Complete |
+| 3: Code Indexing Pipeline | 19 | Complete |
+| 4: Search + Enrichment API | 12 | Complete |
+| 5: MCP Server | 7 | Complete |
+| 6: Auth + RBAC | 8 | Complete |
+| 7: Frontend | 17 | Complete |
+| 8: CLI + Ecosystem | 10 | Partial (CLI scaffolded, ecosystem stories open) |
+| Additional | 5 | Complete (configurable embeddings, user API keys, auth, telemetry, indexing history) |
+
+Tests: 338 total (252 backend unit + 27 integration + 59 frontend).
+Coverage: 81.4% line coverage (excluding auto-generated migrations).
+Issues: 123 closed, 14 open (CLI commands + ecosystem integration).
 
 ## 1. Implementation Order
 
-The epics should be implemented in dependency order. Within each epic, features and stories follow the sequence below.
+Phases 1-7 are complete. Phase 8 and additional stories follow below.
 
 ### Phase 1: Foundation (Epic #1)
 **Goal:** Buildable solution with database, Docker, and health check.
