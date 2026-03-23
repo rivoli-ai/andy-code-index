@@ -1,0 +1,144 @@
+import { Component } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
+
+interface DiscoveredRepo {
+  name: string;
+  fullName: string;
+  cloneUrl: string;
+  provider: string;
+  defaultBranch?: string;
+  description?: string;
+  alreadyTracked: boolean;
+  selected?: boolean;
+}
+
+@Component({
+  selector: 'app-discovery',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
+    <div class="page-header">
+      <h1>Discover Repositories</h1>
+    </div>
+
+    <div class="card mb-2">
+      <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap">
+        <div class="form-group" style="margin-bottom:0">
+          <label>Provider</label>
+          <select class="form-control" [(ngModel)]="provider" style="width:180px">
+            <option value="github">GitHub</option>
+            <option value="azure-devops">Azure DevOps</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;flex:1">
+          <label>Organization</label>
+          <input class="form-control" [(ngModel)]="org" placeholder="e.g., rivoli-ai">
+        </div>
+        <div class="form-group" style="margin-bottom:0" *ngIf="provider === 'azure-devops'">
+          <label>Project (optional)</label>
+          <input class="form-control" [(ngModel)]="project" placeholder="e.g., MyProject" style="width:200px">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>PAT (optional)</label>
+          <input class="form-control" type="password" [(ngModel)]="pat" placeholder="For private orgs" style="width:200px">
+        </div>
+        <button class="btn btn-primary" (click)="discover()" [disabled]="discovering || !org">
+          {{ discovering ? 'Discovering...' : 'Discover' }}
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="discovering" style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
+
+    <div *ngIf="!discovering && repos.length > 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <span class="text-muted">{{ repos.length }} repositories found ({{ trackedCount }} already tracked)</span>
+        <button class="btn btn-primary btn-sm" (click)="addSelected()" [disabled]="adding || selectedCount === 0">
+          Add {{ selectedCount }} Selected
+        </button>
+      </div>
+
+      <div class="card" *ngFor="let repo of repos" style="margin-bottom:0.5rem;padding:1rem">
+        <div style="display:flex;align-items:center;gap:0.75rem">
+          <input type="checkbox" [(ngModel)]="repo.selected" [disabled]="repo.alreadyTracked" style="width:18px;height:18px">
+          <div style="flex:1">
+            <strong>{{ repo.name }}</strong>
+            <span class="text-muted" style="margin-left:0.5rem;font-size:0.8125rem">{{ repo.fullName }}</span>
+            <span class="badge badge-success" style="margin-left:0.5rem" *ngIf="repo.alreadyTracked">Tracked</span>
+          </div>
+          <span class="badge badge-muted">{{ repo.provider }}</span>
+          <span class="text-muted" style="font-size:0.8125rem" *ngIf="repo.defaultBranch">{{ repo.defaultBranch }}</span>
+        </div>
+        <div class="text-muted" style="font-size:0.8125rem;margin-top:0.25rem" *ngIf="repo.description">{{ repo.description }}</div>
+      </div>
+    </div>
+
+    <div *ngIf="!discovering && repos.length === 0 && searched" class="empty-state card">
+      <i class="bi bi-search"></i>
+      <h3>No repositories found</h3>
+      <p>Check the organization name and try again.</p>
+    </div>
+
+    <div *ngIf="error" class="card" style="color:var(--danger);margin-top:1rem">{{ error }}</div>
+    <div *ngIf="addMessage" class="card" style="color:var(--success);margin-top:1rem">{{ addMessage }}</div>
+  `
+})
+export class DiscoveryComponent {
+  provider = 'github';
+  org = '';
+  project = '';
+  pat = '';
+  repos: DiscoveredRepo[] = [];
+  discovering = false;
+  adding = false;
+  searched = false;
+  error = '';
+  addMessage = '';
+
+  constructor(private http: HttpClient) {}
+
+  get selectedCount(): number {
+    return this.repos.filter(r => r.selected && !r.alreadyTracked).length;
+  }
+
+  get trackedCount(): number {
+    return this.repos.filter(r => r.alreadyTracked).length;
+  }
+
+  discover() {
+    this.discovering = true;
+    this.error = '';
+    this.repos = [];
+    this.searched = true;
+
+    let url = `${environment.apiUrl}/discover/${this.provider}?org=${encodeURIComponent(this.org)}`;
+    if (this.provider === 'azure-devops' && this.project) url += `&project=${encodeURIComponent(this.project)}`;
+    if (this.pat) url += `&pat=${encodeURIComponent(this.pat)}`;
+
+    this.http.get<DiscoveredRepo[]>(url).subscribe({
+      next: repos => { this.repos = repos; this.discovering = false; },
+      error: err => { this.error = 'Discovery failed: ' + (err.error?.message || err.message); this.discovering = false; }
+    });
+  }
+
+  addSelected() {
+    this.adding = true;
+    this.addMessage = '';
+    const urls = this.repos.filter(r => r.selected && !r.alreadyTracked).map(r => r.cloneUrl);
+
+    this.http.post<any>(`${environment.apiUrl}/discover/sync`, {
+      repositoryUrls: urls,
+      pat: this.pat || undefined
+    }).subscribe({
+      next: res => {
+        this.addMessage = `Added ${res.added?.length || 0} repositories, skipped ${res.skipped?.length || 0}`;
+        this.repos.filter(r => r.selected).forEach(r => { r.alreadyTracked = true; r.selected = false; });
+        this.adding = false;
+      },
+      error: () => { this.error = 'Failed to add repositories'; this.adding = false; }
+    });
+  }
+}

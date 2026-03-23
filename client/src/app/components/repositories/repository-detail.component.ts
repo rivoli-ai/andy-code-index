@@ -4,11 +4,12 @@ import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
 import { Repository } from '../../models/repository.model';
 import { RepositoryHistoryComponent } from './repository-history.component';
+import { RepositoryAnalyticsComponent } from './repository-analytics.component';
 
 @Component({
   selector: 'app-repository-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, RepositoryHistoryComponent],
+  imports: [CommonModule, RouterLink, RepositoryHistoryComponent, RepositoryAnalyticsComponent],
   template: `
     <div *ngIf="loading" style="display:flex;justify-content:center;padding:3rem"><div class="spinner"></div></div>
 
@@ -54,6 +55,7 @@ import { RepositoryHistoryComponent } from './repository-history.component';
       </div>
 
       <app-repository-history [repositoryId]="repo.id" style="margin-top:1.5rem;display:block" />
+      <app-repository-analytics [repositoryId]="repo.id" />
     </div>
 
     <div *ngIf="!loading && !repo" class="empty-state card">

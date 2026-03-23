@@ -20,6 +20,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           <a routerLink="/search" routerLinkActive="active" class="nav-item">
             <i class="bi bi-search"></i><span>Search</span>
           </a>
+          <a routerLink="/discover" routerLinkActive="active" class="nav-item">
+            <i class="bi bi-globe"></i><span>Discover</span>
+          </a>
         </div>
         <div class="nav-section">
           <div class="nav-section-title">Intelligence</div>
@@ -28,6 +31,12 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           </a>
           <a routerLink="/tasks" routerLinkActive="active" class="nav-item">
             <i class="bi bi-list-task"></i><span>Tasks</span>
+          </a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">Account</div>
+          <a routerLink="/settings" routerLinkActive="active" class="nav-item">
+            <i class="bi bi-gear"></i><span>Settings</span>
           </a>
         </div>
       </nav>

@@ -11,4 +11,6 @@ export const routes: Routes = [
   { path: 'search', loadComponent: () => import('./components/search/search.component').then(m => m.SearchComponent), canActivate: [authGuard] },
   { path: 'enrichments', loadComponent: () => import('./components/enrichments/enrichment-browser.component').then(m => m.EnrichmentBrowserComponent), canActivate: [authGuard] },
   { path: 'tasks', loadComponent: () => import('./components/tasks/task-dashboard.component').then(m => m.TaskDashboardComponent), canActivate: [authGuard] },
+  { path: 'discover', loadComponent: () => import('./components/discovery/discovery.component').then(m => m.DiscoveryComponent), canActivate: [authGuard] },
+  { path: 'settings', loadComponent: () => import('./components/settings/settings.component').then(m => m.SettingsComponent), canActivate: [authGuard] },
 ];
