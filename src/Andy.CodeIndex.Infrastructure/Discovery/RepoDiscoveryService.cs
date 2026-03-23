@@ -30,6 +30,8 @@ public class RepoDiscoveryService : IRepoDiscoveryService
         bool excludeArchived = true, bool excludeForks = true,
         CancellationToken ct = default)
     {
+        organization = ParseGitHubOrg(organization);
+
         var client = _httpClientFactory.CreateClient("Discovery");
         client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Andy.CodeIndex", "1.0"));
         if (pat is not null)
@@ -85,6 +87,8 @@ public class RepoDiscoveryService : IRepoDiscoveryService
         string organization, string? project = null, string? pat = null,
         CancellationToken ct = default)
     {
+        organization = ParseAzureDevOpsOrg(organization);
+
         var client = _httpClientFactory.CreateClient("Discovery");
         if (pat is not null)
         {
@@ -145,6 +149,34 @@ public class RepoDiscoveryService : IRepoDiscoveryService
         await MarkTracked(repos, ct);
         _logger.LogInformation("Discovered {Count} Azure DevOps repos in {Org}", repos.Count, organization);
         return repos;
+    }
+
+    /// <summary>Extract org name from input that may be a full URL or just the org name.</summary>
+    internal static string ParseGitHubOrg(string input)
+    {
+        input = input.Trim();
+        // Handle: https://github.com/rivoli-ai or github.com/rivoli-ai
+        if (input.Contains("github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            var uri = input.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? new Uri(input) : new Uri("https://" + input);
+            var segments = uri.AbsolutePath.Trim('/').Split('/');
+            return segments[0];
+        }
+        return input;
+    }
+
+    /// <summary>Extract org name from input that may be a full URL or just the org name.</summary>
+    internal static string ParseAzureDevOpsOrg(string input)
+    {
+        input = input.Trim();
+        // Handle: https://dev.azure.com/myorg or dev.azure.com/myorg
+        if (input.Contains("dev.azure.com", StringComparison.OrdinalIgnoreCase))
+        {
+            var uri = input.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? new Uri(input) : new Uri("https://" + input);
+            var segments = uri.AbsolutePath.Trim('/').Split('/');
+            return segments[0];
+        }
+        return input;
     }
 
     private async Task MarkTracked(List<DiscoveredRepo> repos, CancellationToken ct)
