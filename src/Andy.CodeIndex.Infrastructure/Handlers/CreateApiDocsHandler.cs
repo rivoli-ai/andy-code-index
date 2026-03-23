@@ -39,8 +39,8 @@ public class CreateApiDocsHandler : ITaskHandler
         var repo = await _repoRepo.GetByIdAsync(task.RepositoryId, ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
-        // Delete old API docs
-        await _enrichmentRepo.DeleteByRepositoryAndTypeAsync(repo.Id, EnrichmentType.Usage, ct: ct);
+        // Delete old API docs (only APIDocs subtype, not Cookbook/Wiki)
+        await _enrichmentRepo.DeleteByRepositoryAndSubtypeAsync(repo.Id, EnrichmentSubtype.APIDocs, ct);
 
         var cloneDir = _gitService.GetCloneDir(_options.DataDir, repo.Id);
         var commitSha = repo.LastIndexedCommitSha ?? "HEAD";

@@ -39,6 +39,10 @@ public class ExtractSnippetsHandler : ITaskHandler
         var repo = await _repoRepo.GetByIdAsync(task.RepositoryId, ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
+        // Delete existing chunks to prevent duplication on re-index
+        await _enrichmentRepo.DeleteByRepositoryAndTypeAsync(repo.Id, EnrichmentType.Development, ct: ct);
+        _logger.LogInformation("Cleared existing Development enrichments for {Name}", repo.Name);
+
         var cloneDir = _gitService.GetCloneDir(_indexingOptions.DataDir, repo.Id);
         var commitSha = repo.LastIndexedCommitSha ?? "HEAD";
         var files = await _gitService.ListFilesAsync(cloneDir, commitSha, ct: ct);

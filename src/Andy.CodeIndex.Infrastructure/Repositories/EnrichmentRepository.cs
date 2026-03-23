@@ -65,6 +65,16 @@ public class EnrichmentRepository : RepositoryBase<Enrichment>, IEnrichmentRepos
         await Context.SaveChangesAsync(ct);
     }
 
+    public async Task DeleteByRepositoryAndSubtypeAsync(
+        Guid repositoryId, EnrichmentSubtype subtype, CancellationToken ct = default)
+    {
+        var enrichments = await DbSet
+            .Where(e => e.RepositoryId == repositoryId && e.Subtype == subtype)
+            .ToListAsync(ct);
+        DbSet.RemoveRange(enrichments);
+        await Context.SaveChangesAsync(ct);
+    }
+
     private IQueryable<Enrichment> BuildQuery(
         EnrichmentType? type,
         EnrichmentSubtype? subtype,

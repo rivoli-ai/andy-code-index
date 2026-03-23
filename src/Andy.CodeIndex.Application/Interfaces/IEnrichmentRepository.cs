@@ -30,4 +30,7 @@ public interface IEnrichmentRepository : IRepository<Enrichment>
 
     Task DeleteByRepositoryAndTypeAsync(
         Guid repositoryId, EnrichmentType type, Guid? commitId = null, CancellationToken ct = default);
+
+    Task DeleteByRepositoryAndSubtypeAsync(
+        Guid repositoryId, EnrichmentSubtype subtype, CancellationToken ct = default);
 }

@@ -278,6 +278,34 @@ public class ExtractSnippetsHandlerTests
             It.IsAny<CancellationToken>()), Times.Once);
         _enrichmentRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task HandleAsync_DeletesExistingChunks_BeforeReExtracting()
+    {
+        _repoRepoMock.Setup(r => r.GetByIdAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_testRepo);
+        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
+        _gitServiceMock.Setup(g => g.ListFilesAsync("/tmp/test/repos/x", "abc123", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new GitFileInfo { Path = "A.cs", Size = 50, Language = "csharp" }]);
+        _gitServiceMock.Setup(g => g.ReadFileAsync("/tmp/test/repos/x", "abc123", "A.cs", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("class A { }");
+        _chunkingServiceMock.Setup(c => c.ChunkText("class A { }", "A.cs", null))
+            .Returns([new CodeChunk { Content = "class A { }", StartLine = 1, EndLine = 1, FilePath = "A.cs" }]);
+
+        var task = new IndexingTask
+        {
+            Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+            Operation = TaskOperation.ExtractSnippets, CreatedAt = DateTime.UtcNow
+        };
+
+        await _handler.HandleAsync(task);
+
+        // Must delete existing chunks before adding new ones
+        _enrichmentRepoMock.Verify(r => r.DeleteByRepositoryAndTypeAsync(
+            _testRepo.Id, EnrichmentType.Development, null, It.IsAny<CancellationToken>()),
+            Times.Once,
+            "ExtractSnippetsHandler must delete existing Development enrichments before re-extracting to prevent duplicates");
+    }
 }
 
 public class CreateApiDocsHandlerTests
