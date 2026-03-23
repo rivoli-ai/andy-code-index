@@ -101,6 +101,9 @@ builder.Services.AddScoped<IEnrichmentGeneratorService, EnrichmentGeneratorServi
 builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddSingleton<RankFusionService>();
 builder.Services.AddHttpClient<IEmbeddingProvider, OpenAiEmbeddingProvider>();
+builder.Services.AddHttpClient("Discovery");
+builder.Services.AddScoped<IRepoDiscoveryService, Andy.CodeIndex.Infrastructure.Discovery.RepoDiscoveryService>();
+builder.Services.AddHostedService<Andy.CodeIndex.Infrastructure.Discovery.SeedService>();
 
 // --- Task handlers ---
 builder.Services.AddScoped<ITaskHandler, CloneRepositoryHandler>();
@@ -127,6 +130,7 @@ builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("In
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection(EmbeddingOptions.SectionName));
 builder.Services.Configure<EnrichmentLlmOptions>(builder.Configuration.GetSection(EnrichmentLlmOptions.SectionName));
+builder.Services.Configure<DiscoveryOptions>(builder.Configuration.GetSection(DiscoveryOptions.SectionName));
 
 // --- MCP Server ---
 builder.Services
