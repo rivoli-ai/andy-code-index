@@ -26,6 +26,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         </div>
         <div class="nav-section">
           <div class="nav-section-title">Intelligence</div>
+          <a routerLink="/chat" routerLinkActive="active" class="nav-item">
+            <i class="bi bi-chat-dots"></i><span>Chat</span>
+          </a>
           <a routerLink="/enrichments" routerLinkActive="active" class="nav-item">
             <i class="bi bi-file-earmark-text"></i><span>Enrichments</span>
           </a>

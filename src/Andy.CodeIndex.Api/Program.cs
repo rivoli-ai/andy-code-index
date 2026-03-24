@@ -102,6 +102,8 @@ builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddSingleton<RankFusionService>();
 builder.Services.AddHttpClient<IEmbeddingProvider, OpenAiEmbeddingProvider>();
 builder.Services.AddHttpClient("Discovery");
+builder.Services.AddHttpClient("Chat");
+builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IRepoDiscoveryService, Andy.CodeIndex.Infrastructure.Discovery.RepoDiscoveryService>();
 builder.Services.AddHostedService<Andy.CodeIndex.Infrastructure.Discovery.SeedService>();
 

@@ -16,6 +16,7 @@ public class CodeIndexTools
     private readonly ISearchService _searchService;
     private readonly IEnrichmentGeneratorService _enrichmentService;
     private readonly IGitService _gitService;
+    private readonly IChatService _chatService;
     private readonly IndexingOptions _options;
 
     public CodeIndexTools(
@@ -23,12 +24,14 @@ public class CodeIndexTools
         ISearchService searchService,
         IEnrichmentGeneratorService enrichmentService,
         IGitService gitService,
+        IChatService chatService,
         IOptions<IndexingOptions> options)
     {
         _repoService = repoService;
         _searchService = searchService;
         _enrichmentService = enrichmentService;
         _gitService = gitService;
+        _chatService = chatService;
         _options = options.Value;
     }
 
@@ -210,6 +213,38 @@ public class CodeIndexTools
         var commitSha = repo.LastIndexedCommitSha ?? "HEAD";
         var files = await _gitService.ListFilesAsync(cloneDir, commitSha, pattern);
         return new { total = files.Count, files = files.Select(f => new { f.Path, f.Size, f.Language }) };
+    }
+
+    [McpServerTool(Name = "code_index_chat"), Description("Chat with the indexed codebase - ask questions about code structure, patterns, complexity")]
+    public async Task<object> Chat(
+        [Description("Your question about the codebase")] string message,
+        [Description("Repository name to scope the conversation (optional)")] string? repository = null,
+        [Description("Conversation ID for follow-up messages")] string? conversation_id = null)
+    {
+        Guid? repoId = null;
+        if (repository is not null)
+        {
+            var repo = await ResolveRepo(repository);
+            if (repo is not null) repoId = repo.Id;
+        }
+
+        var response = await _chatService.ChatAsync(new ChatRequest
+        {
+            Message = message,
+            RepositoryId = repoId,
+            ConversationId = conversation_id
+        });
+
+        return new
+        {
+            reply = response.Reply,
+            conversationId = response.ConversationId,
+            model = response.Model,
+            sources = response.Sources.Select(s => new
+            {
+                s.FilePath, s.RepositoryName, s.StartLine, s.EndLine, s.Language
+            })
+        };
     }
 
     // --- Helpers ---

@@ -13,4 +13,5 @@ export const routes: Routes = [
   { path: 'tasks', loadComponent: () => import('./components/tasks/task-dashboard.component').then(m => m.TaskDashboardComponent), canActivate: [authGuard] },
   { path: 'discover', loadComponent: () => import('./components/discovery/discovery.component').then(m => m.DiscoveryComponent), canActivate: [authGuard] },
   { path: 'settings', loadComponent: () => import('./components/settings/settings.component').then(m => m.SettingsComponent), canActivate: [authGuard] },
+  { path: 'chat', loadComponent: () => import('./components/chat/chat.component').then(m => m.ChatComponent), canActivate: [authGuard] },
 ];
