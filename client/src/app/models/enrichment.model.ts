@@ -1,6 +1,7 @@
 export interface Enrichment {
   id: string;
   repositoryId: string;
+  repositoryName?: string;
   commitId?: string;
   type: string;
   subtype: string;

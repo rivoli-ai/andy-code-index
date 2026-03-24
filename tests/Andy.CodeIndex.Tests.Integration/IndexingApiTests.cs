@@ -44,7 +44,7 @@ public class IndexingApiTests : IClassFixture<CustomWebApplicationFactory>
         // Create a repo first
         var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories",
             new { url = "https://github.com/test/history-" + Guid.NewGuid() });
-        var repo = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>();
+        var repo = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
 
         var response = await _client.GetAsync($"/api/v1/repositories/{repo!.Id}/history");
         response.StatusCode.Should().Be(HttpStatusCode.OK);

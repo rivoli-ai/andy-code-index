@@ -6,6 +6,7 @@ public class EnrichmentDto
 {
     public Guid Id { get; set; }
     public Guid RepositoryId { get; set; }
+    public string? RepositoryName { get; set; }
     public Guid? CommitId { get; set; }
     public EnrichmentType Type { get; set; }
     public EnrichmentSubtype Subtype { get; set; }

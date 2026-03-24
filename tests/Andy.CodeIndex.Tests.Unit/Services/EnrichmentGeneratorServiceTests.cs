@@ -14,7 +14,7 @@ public class EnrichmentGeneratorServiceTests
 
     public EnrichmentGeneratorServiceTests()
     {
-        _service = new EnrichmentGeneratorService(_enrichmentRepoMock.Object);
+        _service = new EnrichmentGeneratorService(_enrichmentRepoMock.Object, Helpers.TestDbContextFactory.Create());
     }
 
     [Fact]

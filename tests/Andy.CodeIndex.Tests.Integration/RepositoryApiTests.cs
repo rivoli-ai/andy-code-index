@@ -37,7 +37,7 @@ public class RepositoryApiTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.PostAsJsonAsync("/api/v1/repositories", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var repo = await response.Content.ReadFromJsonAsync<RepositoryDto>();
+        var repo = await response.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
         repo.Should().NotBeNull();
         repo!.Status.Should().Be("pending");
     }
@@ -47,7 +47,7 @@ public class RepositoryApiTests : IClassFixture<CustomWebApplicationFactory>
     {
         var url = "https://github.com/rivoli-ai/gettest-" + Guid.NewGuid();
         var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories", new CreateRepositoryRequest { Url = url });
-        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>();
+        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
 
         var getResponse = await _client.GetAsync($"/api/v1/repositories/{created!.Id}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -65,7 +65,7 @@ public class RepositoryApiTests : IClassFixture<CustomWebApplicationFactory>
     {
         var url = "https://github.com/rivoli-ai/deltest-" + Guid.NewGuid();
         var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories", new CreateRepositoryRequest { Url = url });
-        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>();
+        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
 
         var deleteResponse = await _client.DeleteAsync($"/api/v1/repositories/{created!.Id}");
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -97,7 +97,7 @@ public class RepositoryApiTests : IClassFixture<CustomWebApplicationFactory>
     {
         var url = "https://github.com/rivoli-ai/synctest-" + Guid.NewGuid();
         var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories", new CreateRepositoryRequest { Url = url });
-        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>();
+        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
 
         var syncResponse = await _client.PostAsync($"/api/v1/repositories/{created!.Id}/sync", null);
         syncResponse.StatusCode.Should().Be(HttpStatusCode.Accepted);

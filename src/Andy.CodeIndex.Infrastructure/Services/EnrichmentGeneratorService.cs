@@ -2,16 +2,20 @@ using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.CodeIndex.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace Andy.CodeIndex.Infrastructure.Services;
 
 public class EnrichmentGeneratorService : IEnrichmentGeneratorService
 {
     private readonly IEnrichmentRepository _enrichmentRepo;
+    private readonly CodeIndexDbContext _context;
 
-    public EnrichmentGeneratorService(IEnrichmentRepository enrichmentRepo)
+    public EnrichmentGeneratorService(IEnrichmentRepository enrichmentRepo, CodeIndexDbContext context)
     {
         _enrichmentRepo = enrichmentRepo;
+        _context = context;
     }
 
     public async Task<List<EnrichmentDto>> QueryAsync(
@@ -24,7 +28,13 @@ public class EnrichmentGeneratorService : IEnrichmentGeneratorService
         var enrichments = await _enrichmentRepo.QueryAsync(
             type, subtype, repositoryId, commitId, language, filePath, offset, limit, ct);
 
-        return enrichments.Select(MapToDto).ToList();
+        // Build repo name lookup
+        var repoIds = enrichments.Select(e => e.RepositoryId).Distinct().ToList();
+        var repoNames = await _context.Repositories
+            .Where(r => repoIds.Contains(r.Id))
+            .ToDictionaryAsync(r => r.Id, r => r.Name, ct);
+
+        return enrichments.Select(e => MapToDto(e, repoNames)).ToList();
     }
 
     public async Task<int> QueryCountAsync(
@@ -40,7 +50,13 @@ public class EnrichmentGeneratorService : IEnrichmentGeneratorService
     public async Task<EnrichmentDto?> GetByIdAsync(Guid id, CancellationToken ct)
     {
         var enrichment = await _enrichmentRepo.GetByIdAsync(id, ct);
-        return enrichment is null ? null : MapToDto(enrichment);
+        if (enrichment is null) return null;
+
+        var repo = await _context.Repositories.FindAsync([enrichment.RepositoryId], ct);
+        var names = new Dictionary<Guid, string>();
+        if (repo is not null) names[repo.Id] = repo.Name;
+
+        return MapToDto(enrichment, names);
     }
 
     public async Task DeleteByRepositoryAndTypeAsync(
@@ -49,10 +65,11 @@ public class EnrichmentGeneratorService : IEnrichmentGeneratorService
         await _enrichmentRepo.DeleteByRepositoryAndTypeAsync(repositoryId, type, commitId, ct);
     }
 
-    private static EnrichmentDto MapToDto(Enrichment e) => new()
+    private static EnrichmentDto MapToDto(Enrichment e, Dictionary<Guid, string> repoNames) => new()
     {
         Id = e.Id,
         RepositoryId = e.RepositoryId,
+        RepositoryName = repoNames.TryGetValue(e.RepositoryId, out var name) ? name : null,
         CommitId = e.CommitId,
         Type = e.Type,
         Subtype = e.Subtype,
