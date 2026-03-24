@@ -1,4 +1,7 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { SearchComponent } from './search.component';
 import { ApiService } from '../../services/api.service';
 import { of } from 'rxjs';
@@ -11,7 +14,12 @@ describe('SearchComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [SearchComponent],
-      providers: [{ provide: ApiService, useValue: apiServiceSpy }]
+      providers: [
+        { provide: ApiService, useValue: apiServiceSpy },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([])
+      ]
     }).compileComponents();
   });
 
@@ -30,7 +38,7 @@ describe('SearchComponent', () => {
     const fixture = TestBed.createComponent(SearchComponent);
     fixture.componentInstance.query = 'test';
     fixture.componentInstance.mode = 'hybrid';
-    fixture.componentInstance.search();
+    fixture.componentInstance.search(true);
     expect(apiServiceSpy.hybridSearch).toHaveBeenCalled();
   });
 
@@ -39,7 +47,7 @@ describe('SearchComponent', () => {
     const fixture = TestBed.createComponent(SearchComponent);
     fixture.componentInstance.query = 'test';
     fixture.componentInstance.mode = 'semantic';
-    fixture.componentInstance.search();
+    fixture.componentInstance.search(true);
     expect(apiServiceSpy.semanticSearch).toHaveBeenCalled();
   });
 
@@ -48,14 +56,14 @@ describe('SearchComponent', () => {
     const fixture = TestBed.createComponent(SearchComponent);
     fixture.componentInstance.query = 'test';
     fixture.componentInstance.mode = 'keyword';
-    fixture.componentInstance.search();
+    fixture.componentInstance.search(true);
     expect(apiServiceSpy.keywordSearch).toHaveBeenCalled();
   });
 
   it('should not search with empty query', () => {
     const fixture = TestBed.createComponent(SearchComponent);
     fixture.componentInstance.query = '  ';
-    fixture.componentInstance.search();
+    fixture.componentInstance.search(true);
     expect(apiServiceSpy.hybridSearch).not.toHaveBeenCalled();
   });
 
@@ -64,7 +72,25 @@ describe('SearchComponent', () => {
     apiServiceSpy.hybridSearch.and.returnValue(of(mockResults as any));
     const fixture = TestBed.createComponent(SearchComponent);
     fixture.componentInstance.query = 'test';
-    fixture.componentInstance.search();
+    fixture.componentInstance.search(true);
     expect(fixture.componentInstance.results?.totalCount).toBe(1);
+  });
+
+  it('should reset offset on new search', () => {
+    const fixture = TestBed.createComponent(SearchComponent);
+    fixture.componentInstance.offset = 20;
+    apiServiceSpy.hybridSearch.and.returnValue(of({ results: [], totalCount: 0, searchMode: 'hybrid', durationMs: 0 }));
+    fixture.componentInstance.query = 'test';
+    fixture.componentInstance.search(true);
+    expect(fixture.componentInstance.offset).toBe(0);
+  });
+
+  it('should calculate page numbers', () => {
+    const fixture = TestBed.createComponent(SearchComponent);
+    fixture.componentInstance.results = { results: [], totalCount: 35, searchMode: 'hybrid', durationMs: 0 };
+    fixture.componentInstance.pageSize = 10;
+    fixture.componentInstance.offset = 10;
+    expect(fixture.componentInstance.currentPage).toBe(2);
+    expect(fixture.componentInstance.totalPages).toBe(4);
   });
 });

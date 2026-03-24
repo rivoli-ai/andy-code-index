@@ -65,12 +65,22 @@ public class SearchController : ControllerBase
         var results = await _searchService.KeywordSearchAsync(keywords, filter, limit, ct);
         return Ok(results);
     }
+
+    /// <summary>Get available languages and repositories for search filters.</summary>
+    [HttpGet("filters")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFilters(CancellationToken ct = default)
+    {
+        var repos = await _searchService.GetFilterOptionsAsync(ct);
+        return Ok(repos);
+    }
 }
 
 public class SearchRequest
 {
     public required string Query { get; set; }
     public int Limit { get; set; } = 10;
+    public int Offset { get; set; } = 0;
     public List<string>? Languages { get; set; }
     public List<Guid>? RepositoryIds { get; set; }
     public string? CommitSha { get; set; }

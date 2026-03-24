@@ -1,33 +1,52 @@
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { ApiService } from '../../services/api.service';
-import { SearchResults, SearchResultItem } from '../../models/search.model';
-import { Repository } from '../../models/repository.model';
+import { SearchResults } from '../../models/search.model';
+import { environment } from '../../../environments/environment';
+
+interface FilterOptions {
+  repositories: { id: string; name: string }[];
+  languages: string[];
+}
 
 @Component({
   selector: 'app-search',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="page-header">
       <h1>Search</h1>
     </div>
 
     <div class="card mb-2">
-      <div style="display:flex;gap:1rem;align-items:end">
-        <div class="form-group" style="flex:1;margin-bottom:0">
+      <div style="display:flex;gap:0.75rem;align-items:end;flex-wrap:wrap">
+        <div class="form-group" style="flex:1;margin-bottom:0;min-width:250px">
           <input class="form-control" [(ngModel)]="query" placeholder="Search code..."
-                 (keyup.enter)="search()" style="font-size:1rem;padding:0.75rem 1rem">
+                 (keyup.enter)="search(true)" style="font-size:1rem;padding:0.75rem 1rem">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <select class="form-control" [(ngModel)]="mode" style="width:140px">
+          <select class="form-control" [(ngModel)]="mode" style="width:130px">
             <option value="hybrid">Hybrid</option>
             <option value="semantic">Semantic</option>
             <option value="keyword">Keyword</option>
           </select>
         </div>
-        <button class="btn btn-primary" (click)="search()" [disabled]="searching || !query">
+        <div class="form-group" style="margin-bottom:0" *ngIf="filters">
+          <select class="form-control" [(ngModel)]="selectedRepo" style="width:160px">
+            <option value="">All Repos</option>
+            <option *ngFor="let r of filters.repositories" [value]="r.id">{{ r.name }}</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0" *ngIf="filters">
+          <select class="form-control" [(ngModel)]="selectedLang" style="width:140px">
+            <option value="">All Languages</option>
+            <option *ngFor="let l of filters.languages" [value]="l">{{ l }}</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" (click)="search(true)" [disabled]="searching || !query">
           <i class="bi bi-search"></i> Search
         </button>
       </div>
@@ -36,55 +55,129 @@ import { Repository } from '../../models/repository.model';
     <div *ngIf="searching" style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
 
     <div *ngIf="results && !searching">
-      <div class="text-muted mb-2" style="font-size:0.875rem">
-        {{ results.totalCount }} results in {{ results.durationMs }}ms ({{ results.searchMode }})
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <span class="text-muted" style="font-size:0.875rem">
+          {{ results.totalCount }} results in {{ results.durationMs }}ms ({{ results.searchMode }})
+        </span>
+        <div style="display:flex;gap:0.5rem;align-items:center" *ngIf="results.totalCount > pageSize">
+          <button class="btn btn-sm btn-secondary" (click)="prevPage()" [disabled]="offset === 0">Previous</button>
+          <span class="text-muted" style="font-size:0.8125rem">
+            {{ offset + 1 }}-{{ Math.min(offset + pageSize, results.totalCount) }} of {{ results.totalCount }}
+          </span>
+          <button class="btn btn-sm btn-secondary" (click)="nextPage()" [disabled]="offset + pageSize >= results.totalCount">Next</button>
+        </div>
       </div>
-      <div class="card" *ngFor="let item of results.results" style="margin-bottom:1rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
-          <div>
+
+      <div class="card search-result" *ngFor="let item of results.results" style="margin-bottom:0.75rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+            <a [routerLink]="['/repositories', item.repositoryId]" class="badge badge-primary" style="text-decoration:none" *ngIf="item.repositoryName">
+              {{ item.repositoryName }}
+            </a>
             <code style="font-size:0.8125rem">{{ item.filePath }}</code>
-            <span class="badge badge-muted" style="margin-left:0.5rem" *ngIf="item.language">{{ item.language }}</span>
+            <span class="badge badge-muted" *ngIf="item.language">{{ item.language }}</span>
           </div>
-          <div>
-            <span class="badge badge-primary">{{ (item.score * 100).toFixed(1) }}%</span>
-            <span class="text-muted" style="margin-left:0.5rem;font-size:0.8125rem">{{ item.repositoryName }}</span>
-          </div>
+          <span class="badge badge-info">{{ formatScore(item.score) }}</span>
         </div>
-        <pre><code>{{ item.content }}</code></pre>
-        <div class="text-muted" style="font-size:0.75rem;margin-top:0.5rem" *ngIf="item.startLine">
-          Lines {{ item.startLine }}–{{ item.endLine }}
+        <pre style="margin:0;max-height:200px;overflow:hidden"><code>{{ truncateContent(item.content) }}</code></pre>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem">
+          <span class="text-muted" style="font-size:0.75rem" *ngIf="item.startLine">
+            Lines {{ item.startLine }}-{{ item.endLine }}
+          </span>
+          <a [routerLink]="['/enrichments']" [queryParams]="{repositoryId: item.repositoryId}"
+             class="text-muted" style="font-size:0.75rem">
+            View enrichments
+          </a>
         </div>
+      </div>
+
+      <!-- Pagination at bottom -->
+      <div style="display:flex;justify-content:center;gap:0.75rem;margin-top:1.5rem" *ngIf="results.totalCount > pageSize">
+        <button class="btn btn-secondary" (click)="prevPage()" [disabled]="offset === 0">Previous</button>
+        <span class="text-muted" style="align-self:center;font-size:0.875rem">
+          Page {{ currentPage }} of {{ totalPages }}
+        </span>
+        <button class="btn btn-secondary" (click)="nextPage()" [disabled]="offset + pageSize >= results.totalCount">Next</button>
       </div>
     </div>
 
     <div *ngIf="results && results.results.length === 0 && !searching" class="empty-state card">
       <i class="bi bi-search"></i>
       <h3>No results found</h3>
-      <p>Try different keywords or search mode.</p>
+      <p>Try different keywords, a broader search mode, or remove filters.</p>
     </div>
-  `
+  `,
+  styles: [`
+    .search-result:hover { border-color: var(--primary-light); }
+    pre { font-size: 0.8rem; }
+  `]
 })
-export class SearchComponent {
+export class SearchComponent implements OnInit {
   query = '';
   mode = 'hybrid';
+  selectedRepo = '';
+  selectedLang = '';
   results: SearchResults | null = null;
+  filters: FilterOptions | null = null;
   searching = false;
+  offset = 0;
+  pageSize = 10;
+  Math = Math;
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private http: HttpClient) {}
 
-  search() {
+  ngOnInit() {
+    this.http.get<FilterOptions>(`${environment.apiUrl}/search/filters`).subscribe({
+      next: f => this.filters = f
+    });
+  }
+
+  get currentPage(): number { return Math.floor(this.offset / this.pageSize) + 1; }
+  get totalPages(): number { return this.results ? Math.ceil(this.results.totalCount / this.pageSize) : 0; }
+
+  search(resetPage = false) {
     if (!this.query.trim()) return;
+    if (resetPage) this.offset = 0;
     this.searching = true;
 
-    const obs = this.mode === 'semantic'
-      ? this.api.semanticSearch(this.query)
-      : this.mode === 'keyword'
-        ? this.api.keywordSearch(this.query)
-        : this.api.hybridSearch({ query: this.query });
+    const repoId = this.selectedRepo || undefined;
+    const lang = this.selectedLang || undefined;
 
-    obs.subscribe({
-      next: results => { this.results = results; this.searching = false; },
-      error: () => { this.searching = false; }
-    });
+    if (this.mode === 'hybrid') {
+      const body: any = { query: this.query, limit: this.pageSize, offset: this.offset };
+      if (repoId) body.repositoryIds = [repoId];
+      if (lang) body.languages = [lang];
+      this.api.hybridSearch(body).subscribe({
+        next: r => { this.results = r; this.searching = false; },
+        error: () => this.searching = false
+      });
+    } else {
+      const searchFn = this.mode === 'semantic'
+        ? this.api.semanticSearch(this.query, lang, repoId, this.pageSize)
+        : this.api.keywordSearch(this.query, lang, repoId, this.pageSize);
+      searchFn.subscribe({
+        next: r => { this.results = r; this.searching = false; },
+        error: () => this.searching = false
+      });
+    }
+  }
+
+  nextPage() {
+    this.offset += this.pageSize;
+    this.search();
+  }
+
+  prevPage() {
+    this.offset = Math.max(0, this.offset - this.pageSize);
+    this.search();
+  }
+
+  formatScore(score: number): string {
+    if (score < 0.01) return '<1%';
+    return (score * 100).toFixed(1) + '%';
+  }
+
+  truncateContent(content: string): string {
+    return content.length > 500 ? content.substring(0, 500) + '...' : content;
   }
 }

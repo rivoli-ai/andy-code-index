@@ -282,6 +282,22 @@ public class SearchService : ISearchService
         return query;
     }
 
+    public async Task<SearchFilterOptions> GetFilterOptionsAsync(CancellationToken ct = default)
+    {
+        var repos = await _context.Repositories
+            .Select(r => new FilterOption { Id = r.Id.ToString(), Name = r.Name })
+            .ToListAsync(ct);
+
+        var languages = await _context.Enrichments
+            .Where(e => e.Language != null)
+            .Select(e => e.Language!)
+            .Distinct()
+            .OrderBy(l => l)
+            .ToListAsync(ct);
+
+        return new SearchFilterOptions { Repositories = repos, Languages = languages };
+    }
+
     private static SearchResultsDto EmptyResult(string mode, Stopwatch sw) => new()
     {
         Results = [],
