@@ -42,7 +42,10 @@ import { Repository } from '../../models/repository.model';
           <tr *ngFor="let repo of repositories">
             <td><a [routerLink]="['/repositories', repo.id]">{{ repo.name }}</a></td>
             <td><span class="badge badge-muted">{{ repo.provider }}</span></td>
-            <td><span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span></td>
+            <td>
+              <span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span>
+              <span class="badge badge-muted" style="margin-left:0.25rem" *ngIf="repo.status === 'indexed' && repo.stats && !repo.stats.hasEmbeddings">no embeddings</span>
+            </td>
             <td class="text-muted">{{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'short') : 'Never' }}</td>
             <td>
               <button class="btn btn-sm btn-secondary" (click)="sync(repo)" [disabled]="syncing[repo.id]">

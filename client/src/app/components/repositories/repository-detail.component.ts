@@ -40,7 +40,17 @@ import { RepositoryAnalyticsComponent } from './repository-analytics.component';
           <div class="stat-grid">
             <div class="stat"><div class="stat-value">{{ repo.stats.commitCount }}</div><div class="stat-label">Commits</div></div>
             <div class="stat"><div class="stat-value">{{ repo.stats.enrichmentCount }}</div><div class="stat-label">Enrichments</div></div>
+            <div class="stat">
+              <div class="stat-value" [style.color]="repo.stats.hasEmbeddings ? 'var(--primary)' : 'var(--text-muted)'">
+                {{ repo.stats.embeddingCount }}
+              </div>
+              <div class="stat-label">Embeddings</div>
+            </div>
             <div class="stat"><div class="stat-value">{{ repo.stats.pendingTaskCount }}</div><div class="stat-label">Pending Tasks</div></div>
+          </div>
+          <div *ngIf="!repo.stats.hasEmbeddings && repo.status === 'indexed'"
+               style="margin-top:0.75rem;padding:0.5rem 0.75rem;background:rgba(255,193,7,0.08);border-radius:var(--radius);font-size:0.8125rem;color:#856404">
+            <i class="bi bi-info-circle"></i> No embeddings -- semantic search unavailable. Configure an embedding API key in Settings.
           </div>
         </div>
       </div>
@@ -68,7 +78,7 @@ import { RepositoryAnalyticsComponent } from './repository-analytics.component';
     .detail-row { display: flex; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
     .detail-row:last-child { border-bottom: none; }
     .detail-row .label { width: 140px; font-size: 0.875rem; color: var(--text-muted); font-weight: 500; }
-    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
     .stat { text-align: center; }
     .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
     .stat-label { font-size: 0.8125rem; color: var(--text-muted); }

@@ -22,7 +22,8 @@ public class RepositoryServiceTests
             _repoRepoMock.Object,
             _commitRepoMock.Object,
             _enrichmentRepoMock.Object,
-            _taskRepoMock.Object);
+            _taskRepoMock.Object,
+            Helpers.TestDbContextFactory.Create());
     }
 
     [Fact]

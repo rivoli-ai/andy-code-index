@@ -157,6 +157,50 @@ public class SettingsController : ControllerBase
         return Ok(logs);
     }
 
+    /// <summary>Queue re-embedding for all indexed repositories. Requires explicit approval.</summary>
+    [HttpPost("re-embed")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReEmbed(CancellationToken ct = default)
+    {
+        var userId = GetUserId();
+        var repos = await _context.Repositories
+            .Where(r => r.Status == "indexed")
+            .ToListAsync(ct);
+
+        var queued = 0;
+        foreach (var repo in repos)
+        {
+            // Delete existing embeddings for this repo
+            var enrichmentIds = await _context.Enrichments
+                .Where(e => e.RepositoryId == repo.Id)
+                .Select(e => e.Id)
+                .ToListAsync(ct);
+
+            var embeddings = await _context.ContentEmbeddings
+                .Where(ce => enrichmentIds.Contains(ce.EnrichmentId))
+                .ToListAsync(ct);
+            _context.ContentEmbeddings.RemoveRange(embeddings);
+
+            // Queue embedding task
+            _context.IndexingTasks.Add(new IndexingTask
+            {
+                Id = Guid.NewGuid(),
+                RepositoryId = repo.Id,
+                Operation = Domain.Enums.TaskOperation.CreateCodeEmbeddings,
+                Status = Domain.Enums.IndexingTaskStatus.Pending,
+                Priority = 5,
+                ChainId = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            });
+            queued++;
+        }
+
+        LogChange(userId, "ReEmbed", null, $"{queued} repos queued", "triggered");
+        await _context.SaveChangesAsync(ct);
+
+        return Ok(new { message = $"Re-embedding queued for {queued} repositories", queued });
+    }
+
     private void LogChange(string userId, string field, string? oldValue, string? newValue, string action)
     {
         _context.SettingsChangeLogs.Add(new SettingsChangeLog

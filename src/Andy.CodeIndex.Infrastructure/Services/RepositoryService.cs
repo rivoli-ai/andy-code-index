@@ -2,6 +2,8 @@ using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.CodeIndex.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace Andy.CodeIndex.Infrastructure.Services;
 
@@ -11,17 +13,20 @@ public class RepositoryService : IRepositoryService
     private readonly ICommitRepository _commitRepo;
     private readonly IEnrichmentRepository _enrichmentRepo;
     private readonly IIndexingTaskRepository _taskRepo;
+    private readonly CodeIndexDbContext _context;
 
     public RepositoryService(
         ICodeRepositoryRepository repositoryRepo,
         ICommitRepository commitRepo,
         IEnrichmentRepository enrichmentRepo,
-        IIndexingTaskRepository taskRepo)
+        IIndexingTaskRepository taskRepo,
+        CodeIndexDbContext context)
     {
         _repositoryRepo = repositoryRepo;
         _commitRepo = commitRepo;
         _enrichmentRepo = enrichmentRepo;
         _taskRepo = taskRepo;
+        _context = context;
     }
 
     public async Task<RepositoryDto> AddAsync(CreateRepositoryRequest request, CancellationToken ct = default)
@@ -89,10 +94,18 @@ public class RepositoryService : IRepositoryService
             Name = t.Name,
             CommitSha = t.CommitSha
         }).ToList();
+        var embeddingCount = await _context.ContentEmbeddings
+            .CountAsync(ce => _context.Enrichments
+                .Where(e => e.RepositoryId == id)
+                .Select(e => e.Id)
+                .Contains(ce.EnrichmentId), ct);
+
         dto.Stats = new RepositoryStatsDto
         {
             CommitCount = await _commitRepo.CountAsync(c => c.RepositoryId == id, ct),
             EnrichmentCount = await _enrichmentRepo.CountAsync(e => e.RepositoryId == id, ct),
+            EmbeddingCount = embeddingCount,
+            HasEmbeddings = embeddingCount > 0,
             PendingTaskCount = await _taskRepo.CountAsync(
                 t => t.RepositoryId == id && t.Status == IndexingTaskStatus.Pending, ct)
         };

@@ -24,7 +24,9 @@ public class RepositoryStatsDto
     public int CommitCount { get; set; }
     public int FileCount { get; set; }
     public int EnrichmentCount { get; set; }
+    public int EmbeddingCount { get; set; }
     public int PendingTaskCount { get; set; }
+    public bool HasEmbeddings { get; set; }
 }
 
 public class BranchDto

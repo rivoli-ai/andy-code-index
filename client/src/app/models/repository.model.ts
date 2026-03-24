@@ -18,6 +18,8 @@ export interface RepositoryStats {
   commitCount: number;
   fileCount: number;
   enrichmentCount: number;
+  embeddingCount: number;
+  hasEmbeddings: boolean;
   pendingTaskCount: number;
 }
 
