@@ -93,14 +93,15 @@ public class RepositoryApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task CreateAndSync_Returns202()
+    public async Task CreateAndSync_WhenTasksPending_Returns409()
     {
+        // Creating a repo auto-queues a CloneRepository task, so sync should be blocked
         var url = "https://github.com/rivoli-ai/synctest-" + Guid.NewGuid();
         var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories", new CreateRepositoryRequest { Url = url });
         var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
 
         var syncResponse = await _client.PostAsync($"/api/v1/repositories/{created!.Id}/sync", null);
-        syncResponse.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        syncResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     [Fact]
