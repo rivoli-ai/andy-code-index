@@ -77,10 +77,12 @@ public class ChatService : IChatService
         var wantsDb = messageLower.Contains("database") || messageLower.Contains("schema") || messageLower.Contains("table") || messageLower.Contains("migration");
         var wantsWiki = messageLower.Contains("wiki") || messageLower.Contains("document") || messageLower.Contains("guide") || messageLower.Contains("overview");
         var wantsCookbook = messageLower.Contains("cookbook") || messageLower.Contains("example") || messageLower.Contains("getting started") || messageLower.Contains("how to");
+        var wantsHistory = messageLower.Contains("history") || messageLower.Contains("commit") || messageLower.Contains("changelog") || messageLower.Contains("tag") || messageLower.Contains("release") || messageLower.Contains("version");
 
         if (wantsArchitecture) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Physical || e.Subtype == EnrichmentSubtype.DatabaseSchema);
         else if (wantsDeps) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Dependencies);
         else if (wantsDb) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.DatabaseSchema);
+        else if (wantsHistory) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.CommitHistory || e.Subtype == EnrichmentSubtype.CommitDescription);
         else if (wantsCookbook) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Cookbook);
         else if (wantsWiki) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Wiki);
         // If no specific type detected, include all non-chunk enrichments (limited)

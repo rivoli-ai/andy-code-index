@@ -89,6 +89,7 @@ public class RepositoriesController : ControllerBase
     [HttpPost("{id:guid}/sync")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Sync(Guid id, CancellationToken ct = default)
     {
         try
@@ -99,6 +100,10 @@ public class RepositoriesController : ControllerBase
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
         }
     }
 }

@@ -22,5 +22,8 @@ public enum EnrichmentSubtype
     Wiki,
 
     // Architecture
-    Dependencies
+    Dependencies,
+
+    // History
+    CommitHistory
 }

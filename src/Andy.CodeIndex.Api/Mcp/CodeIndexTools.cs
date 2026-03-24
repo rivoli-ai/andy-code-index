@@ -247,6 +247,13 @@ public class CodeIndexTools
         };
     }
 
+    [McpServerTool(Name = "code_index_commit_history"), Description("Get full commit log and tags for a repository")]
+    public async Task<object> GetCommitHistory(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.CommitHistory, "Commit history");
+    }
+
     [McpServerTool(Name = "code_index_dependencies"), Description("Get package dependencies for a repository")]
     public async Task<object> GetDependencies(
         [Description("Repository URL or name")] string repo_url)

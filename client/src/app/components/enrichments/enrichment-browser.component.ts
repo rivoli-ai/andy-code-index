@@ -24,13 +24,18 @@ import { environment } from '../../../environments/environment';
       <details style="font-size:0.8125rem">
         <summary style="cursor:pointer;color:var(--primary);font-weight:500;margin-bottom:0.5rem">Type descriptions</summary>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;margin-top:0.5rem">
-          <div><strong>Chunk</strong> -- Parsed code segments with context (functions, classes, blocks)</div>
-          <div><strong>API Docs</strong> -- Auto-generated documentation for public APIs and endpoints</div>
-          <div><strong>Cookbook</strong> -- How-to recipes derived from real usage patterns in the codebase</div>
-          <div><strong>Wiki</strong> -- High-level explanations of modules, features, and design decisions</div>
           <div><strong>Architecture</strong> -- System structure, component diagrams, and dependency maps</div>
           <div><strong>DB Schema</strong> -- Database table definitions and relationships</div>
-          <div><strong>Commit Desc</strong> -- Summarized commit history and changelog entries</div>
+          <div><strong>Chunk</strong> -- Parsed code segments with context (functions, classes, blocks)</div>
+          <div><strong>Snippet</strong> -- Key code snippets extracted from the repository</div>
+          <div><strong>Snippet Summary</strong> -- Natural language summaries of code snippets</div>
+          <div><strong>Example</strong> -- Usage examples found in tests and documentation</div>
+          <div><strong>Commit Desc</strong> -- LLM-generated summary of development history and purpose</div>
+          <div><strong>Commit History</strong> -- Full commit log with authors, dates, and tags</div>
+          <div><strong>API Docs</strong> -- Auto-generated documentation for public APIs and endpoints</div>
+          <div><strong>Cookbook</strong> -- How-to recipes derived from real usage patterns</div>
+          <div><strong>Wiki</strong> -- High-level explanations of modules, features, and design decisions</div>
+          <div><strong>Dependencies</strong> -- Package dependencies extracted from manifest files</div>
         </div>
       </details>
     </div>
@@ -69,6 +74,7 @@ import { environment } from '../../../environments/environment';
             <option value="Example">Example</option>
             <option value="ExampleSummary">Example Summary</option>
             <option value="CommitDescription">Commit Desc</option>
+            <option value="CommitHistory">Commit History</option>
             <option value="Cookbook">Cookbook</option>
             <option value="APIDocs">API Docs</option>
             <option value="Wiki">Wiki</option>
@@ -150,6 +156,7 @@ export class EnrichmentBrowserComponent implements OnInit {
     'Physical': 'Architecture',
     'DatabaseSchema': 'DB Schema',
     'CommitDescription': 'Commit Desc',
+    'CommitHistory': 'Commit History',
     'Dependencies': 'Dependencies',
   };
 

@@ -159,6 +159,13 @@ public class RepositoryService : IRepositoryService
         var repo = await _repositoryRepo.GetByIdAsync(id, ct)
             ?? throw new KeyNotFoundException($"Repository {id} not found.");
 
+        // Block duplicate sync if tasks are already pending or running for this repo
+        var existingTasks = await _taskRepo.GetByRepositoryAsync(repo.Id, ct);
+        var hasActiveTasks = existingTasks.Any(t =>
+            t.Status is IndexingTaskStatus.Pending or IndexingTaskStatus.Running);
+        if (hasActiveTasks)
+            throw new InvalidOperationException($"Repository '{repo.Name}' already has active tasks. Wait for them to complete before syncing again.");
+
         var chainId = Guid.NewGuid();
         await _taskRepo.AddAsync(new IndexingTask
         {

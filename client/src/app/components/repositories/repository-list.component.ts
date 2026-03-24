@@ -54,8 +54,9 @@ import { Repository } from '../../models/repository.model';
             </td>
             <td class="text-muted">{{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'short') : 'Never' }}</td>
             <td>
-              <button class="btn btn-sm btn-secondary" (click)="sync(repo)" [disabled]="syncing[repo.id]">
-                <i class="bi bi-arrow-repeat"></i> Sync
+              <button class="btn btn-sm btn-secondary" (click)="sync(repo)" [disabled]="isBusy(repo.id)">
+                <span *ngIf="!isBusy(repo.id)"><i class="bi bi-arrow-repeat"></i> Sync</span>
+                <span *ngIf="isBusy(repo.id)"><div class="spinner" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></div> Syncing...</span>
               </button>
             </td>
           </tr>
@@ -74,10 +75,14 @@ export class RepositoryListComponent implements OnInit {
   loading = true;
   error = '';
   syncing: Record<string, boolean> = {};
+  busyRepos: Set<string> = new Set();
 
   constructor(private api: ApiService) {}
 
-  ngOnInit() { this.loadRepositories(); }
+  ngOnInit() {
+    this.loadRepositories();
+    this.loadPipelines();
+  }
 
   loadRepositories() {
     this.loading = true;
@@ -87,11 +92,29 @@ export class RepositoryListComponent implements OnInit {
     });
   }
 
+  loadPipelines() {
+    this.api.getPipelines().subscribe({
+      next: pipelines => {
+        this.busyRepos = new Set(pipelines.map((p: any) => p.repositoryId));
+      }
+    });
+  }
+
+  isBusy(repoId: string): boolean {
+    return this.busyRepos.has(repoId) || this.syncing[repoId];
+  }
+
   sync(repo: Repository) {
     this.syncing[repo.id] = true;
+    this.error = '';
     this.api.syncRepository(repo.id).subscribe({
-      next: () => { this.syncing[repo.id] = false; },
-      error: () => { this.syncing[repo.id] = false; }
+      next: () => { this.syncing[repo.id] = false; this.loadPipelines(); },
+      error: (err) => {
+        this.syncing[repo.id] = false;
+        if (err.status === 409) {
+          this.error = err.error?.error || 'Sync already in progress for this repository.';
+        }
+      }
     });
   }
 

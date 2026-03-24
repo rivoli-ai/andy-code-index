@@ -82,4 +82,8 @@ export class ApiService {
   getTasks(): Observable<IndexingTask[]> {
     return this.http.get<IndexingTask[]>(`${this.baseUrl}/queue`);
   }
+
+  getPipelines(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/queue/pipelines`);
+  }
 }

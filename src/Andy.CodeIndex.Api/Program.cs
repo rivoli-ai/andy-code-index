@@ -133,6 +133,7 @@ builder.Services.AddScoped<ITaskHandler, CreateWikiHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateSummaryEnrichmentsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateSummaryEmbeddingsHandler>();
 builder.Services.AddScoped<ITaskHandler, ExtractDependenciesHandler>();
+builder.Services.AddScoped<ITaskHandler, ExtractCommitHistoryHandler>();
 builder.Services.AddScoped<IDependencyParserService, Andy.CodeIndex.Infrastructure.Parsers.DependencyParserService>();
 
 // --- Background services ---

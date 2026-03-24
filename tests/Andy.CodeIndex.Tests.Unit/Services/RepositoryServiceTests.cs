@@ -152,6 +152,8 @@ public class RepositoryServiceTests
                 Id = repoId, Name = "test", Url = "https://github.com/t/r",
                 Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
             });
+        _taskRepoMock.Setup(t => t.GetByRepositoryAsync(repoId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<IndexingTask>());
 
         await _service.SyncAsync(repoId);
 
@@ -170,6 +172,51 @@ public class RepositoryServiceTests
 
         var act = () => _service.SyncAsync(Guid.NewGuid());
         await act.Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task SyncAsync_ActiveTasksExist_ThrowsInvalidOperation()
+    {
+        var repoId = Guid.NewGuid();
+        _repoRepoMock.Setup(r => r.GetByIdAsync(repoId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Repository
+            {
+                Id = repoId, Name = "test", Url = "https://github.com/t/r",
+                Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            });
+        _taskRepoMock.Setup(t => t.GetByRepositoryAsync(repoId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<IndexingTask>
+            {
+                new() { Id = Guid.NewGuid(), RepositoryId = repoId, Operation = TaskOperation.ExtractSnippets,
+                    Status = IndexingTaskStatus.Running, CreatedAt = DateTime.UtcNow }
+            });
+
+        var act = () => _service.SyncAsync(repoId);
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already has active tasks*");
+    }
+
+    [Fact]
+    public async Task SyncAsync_OnlyCompletedTasks_Succeeds()
+    {
+        var repoId = Guid.NewGuid();
+        _repoRepoMock.Setup(r => r.GetByIdAsync(repoId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Repository
+            {
+                Id = repoId, Name = "test", Url = "https://github.com/t/r",
+                Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            });
+        _taskRepoMock.Setup(t => t.GetByRepositoryAsync(repoId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<IndexingTask>
+            {
+                new() { Id = Guid.NewGuid(), RepositoryId = repoId, Operation = TaskOperation.SyncRepository,
+                    Status = IndexingTaskStatus.Completed, CreatedAt = DateTime.UtcNow }
+            });
+
+        await _service.SyncAsync(repoId);
+
+        _taskRepoMock.Verify(t => t.AddAsync(
+            It.Is<IndexingTask>(task => task.Operation == TaskOperation.SyncRepository),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

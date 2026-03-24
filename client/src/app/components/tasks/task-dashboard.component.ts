@@ -90,6 +90,7 @@ export class TaskDashboardComponent implements OnInit, OnDestroy {
     'CreateCookbook': 'Generate Cookbook',
     'CreateWiki': 'Generate Wiki',
     'ExtractDependencies': 'Extract Dependencies',
+    'ExtractCommitHistory': 'Extract Commit History',
   };
 
   constructor(private api: ApiService) {}
