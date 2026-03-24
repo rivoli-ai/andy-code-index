@@ -29,4 +29,7 @@ public interface IEnrichmentGeneratorService
 
     Task DeleteByRepositoryAndTypeAsync(
         Guid repositoryId, EnrichmentType type, Guid? commitId = null, CancellationToken ct = default);
+
+    Task<Dictionary<string, int>> GetCountsBySubtypeAsync(
+        EnrichmentType? type = null, Guid? repositoryId = null, CancellationToken ct = default);
 }

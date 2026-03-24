@@ -45,6 +45,18 @@ public class EnrichmentsController : ControllerBase
         });
     }
 
+    /// <summary>Get per-subtype counts, optionally filtered by type and repository.</summary>
+    [HttpGet("counts")]
+    [ProducesResponseType(typeof(Dictionary<string, int>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCounts(
+        [FromQuery] EnrichmentType? type = null,
+        [FromQuery] Guid? repositoryId = null,
+        CancellationToken ct = default)
+    {
+        var counts = await _service.GetCountsBySubtypeAsync(type, repositoryId, ct);
+        return Ok(counts);
+    }
+
     /// <summary>Get enrichment by ID with full content.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(EnrichmentDto), StatusCodes.Status200OK)]

@@ -64,6 +64,16 @@ export class ApiService {
     return this.http.get<EnrichmentListResponse>(`${this.baseUrl}/enrichments`, { params: httpParams });
   }
 
+  getEnrichmentCounts(params?: Record<string, string>): Observable<Record<string, number>> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) httpParams = httpParams.set(key, value);
+      });
+    }
+    return this.http.get<Record<string, number>>(`${this.baseUrl}/enrichments/counts`, { params: httpParams });
+  }
+
   getEnrichment(id: string): Observable<Enrichment> {
     return this.http.get<Enrichment>(`${this.baseUrl}/enrichments/${id}`);
   }

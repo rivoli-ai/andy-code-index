@@ -61,13 +61,18 @@ import { environment } from '../../../environments/environment';
         <div class="form-group" style="margin-bottom:0">
           <select class="form-control" [(ngModel)]="subtypeFilter" (change)="loadEnrichments()" style="width:180px">
             <option value="">All Subtypes</option>
-            <option value="Chunk">Chunk</option>
-            <option value="APIDocs">API Docs</option>
-            <option value="Cookbook">Cookbook</option>
-            <option value="Wiki">Wiki</option>
             <option value="Physical">Architecture</option>
             <option value="DatabaseSchema">DB Schema</option>
+            <option value="Chunk">Chunk</option>
+            <option value="Snippet">Snippet</option>
+            <option value="SnippetSummary">Snippet Summary</option>
+            <option value="Example">Example</option>
+            <option value="ExampleSummary">Example Summary</option>
             <option value="CommitDescription">Commit Desc</option>
+            <option value="Cookbook">Cookbook</option>
+            <option value="APIDocs">API Docs</option>
+            <option value="Wiki">Wiki</option>
+            <option value="Dependencies">Dependencies</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
@@ -135,12 +140,17 @@ export class EnrichmentBrowserComponent implements OnInit {
 
   private subtypeLabels: Record<string, string> = {
     'Chunk': 'Chunk',
+    'Snippet': 'Snippet',
+    'SnippetSummary': 'Snippet Summary',
+    'Example': 'Example',
+    'ExampleSummary': 'Example Summary',
     'APIDocs': 'API Docs',
     'Cookbook': 'Cookbook',
     'Wiki': 'Wiki',
     'Physical': 'Architecture',
     'DatabaseSchema': 'DB Schema',
     'CommitDescription': 'Commit Desc',
+    'Dependencies': 'Dependencies',
   };
 
   constructor(private api: ApiService, private http: HttpClient) {}
@@ -165,9 +175,19 @@ export class EnrichmentBrowserComponent implements OnInit {
         this.enrichments = res.results;
         this.totalCount = res.totalCount;
         this.loading = false;
-        this.buildTypeCounts(res.results);
       },
       error: () => this.loading = false
+    });
+
+    // Fetch accurate per-subtype counts from backend
+    const countParams: Record<string, string> = {};
+    if (this.typeFilter) countParams['type'] = this.typeFilter;
+    if (this.repoFilter) countParams['repositoryId'] = this.repoFilter;
+    this.api.getEnrichmentCounts(countParams).subscribe({
+      next: counts => {
+        this.typeCounts = Object.entries(counts).map(([subtype, count]) => ({ subtype, count }));
+        this.totalCount = Object.values(counts).reduce((sum, c) => sum + c, 0);
+      }
     });
   }
 
@@ -198,11 +218,4 @@ export class EnrichmentBrowserComponent implements OnInit {
     return repo?.name || '';
   }
 
-  private buildTypeCounts(enrichments: Enrichment[]) {
-    const counts = new Map<string, number>();
-    for (const e of enrichments) {
-      counts.set(e.subtype, (counts.get(e.subtype) || 0) + 1);
-    }
-    this.typeCounts = Array.from(counts.entries()).map(([subtype, count]) => ({ subtype, count }));
-  }
 }

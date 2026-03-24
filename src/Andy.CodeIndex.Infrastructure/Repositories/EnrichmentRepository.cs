@@ -75,6 +75,21 @@ public class EnrichmentRepository : RepositoryBase<Enrichment>, IEnrichmentRepos
         await Context.SaveChangesAsync(ct);
     }
 
+    public async Task<Dictionary<string, int>> QueryCountsBySubtypeAsync(
+        EnrichmentType? type = null,
+        Guid? repositoryId = null,
+        CancellationToken ct = default)
+    {
+        IQueryable<Enrichment> query = DbSet;
+        if (type.HasValue) query = query.Where(e => e.Type == type.Value);
+        if (repositoryId.HasValue) query = query.Where(e => e.RepositoryId == repositoryId.Value);
+
+        return await query
+            .GroupBy(e => e.Subtype)
+            .Select(g => new { Subtype = g.Key.ToString(), Count = g.Count() })
+            .ToDictionaryAsync(g => g.Subtype, g => g.Count, ct);
+    }
+
     private IQueryable<Enrichment> BuildQuery(
         EnrichmentType? type,
         EnrichmentSubtype? subtype,

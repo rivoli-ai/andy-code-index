@@ -33,4 +33,9 @@ public interface IEnrichmentRepository : IRepository<Enrichment>
 
     Task DeleteByRepositoryAndSubtypeAsync(
         Guid repositoryId, EnrichmentSubtype subtype, CancellationToken ct = default);
+
+    Task<Dictionary<string, int>> QueryCountsBySubtypeAsync(
+        EnrichmentType? type = null,
+        Guid? repositoryId = null,
+        CancellationToken ct = default);
 }

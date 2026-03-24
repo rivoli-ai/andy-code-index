@@ -65,6 +65,12 @@ public class EnrichmentGeneratorService : IEnrichmentGeneratorService
         await _enrichmentRepo.DeleteByRepositoryAndTypeAsync(repositoryId, type, commitId, ct);
     }
 
+    public async Task<Dictionary<string, int>> GetCountsBySubtypeAsync(
+        EnrichmentType? type = null, Guid? repositoryId = null, CancellationToken ct = default)
+    {
+        return await _enrichmentRepo.QueryCountsBySubtypeAsync(type, repositoryId, ct);
+    }
+
     private static EnrichmentDto MapToDto(Enrichment e, Dictionary<Guid, string> repoNames) => new()
     {
         Id = e.Id,
