@@ -19,5 +19,8 @@ public enum EnrichmentSubtype
     // Usage
     Cookbook,
     APIDocs,
-    Wiki
+    Wiki,
+
+    // Architecture
+    Dependencies
 }

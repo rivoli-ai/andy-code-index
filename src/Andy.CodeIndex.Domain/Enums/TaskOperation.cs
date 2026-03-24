@@ -17,5 +17,6 @@ public enum TaskOperation
     CreateDatabaseSchema,
     CreateCommitDescription,
     CreateCookbook,
-    CreateWiki
+    CreateWiki,
+    ExtractDependencies
 }

@@ -13,81 +13,99 @@ import { environment } from '../../../environments/environment';
       <h1>Settings</h1>
     </div>
 
-    <div class="card mb-2" style="max-width:640px">
-      <h3 style="font-size:1rem;margin-bottom:0.75rem">Embedding API Key</h3>
-      <p class="text-muted" style="font-size:0.875rem;margin:0">
-        The embedding API key is used to generate <strong>vector representations</strong> of your code.
-        These embeddings power <strong>semantic search</strong> -- finding code by meaning rather than exact keywords.
-        Without an embedding key, only keyword-based search is available.
-      </p>
-    </div>
+    <div *ngIf="settings" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+      <!-- Embedding Section -->
+      <div class="card">
+        <h3 style="font-size:1.125rem;margin-bottom:0.75rem">Embedding API Key</h3>
+        <p class="text-muted" style="font-size:0.8125rem;margin-bottom:1rem">
+          Generates <strong>vector representations</strong> of your code for <strong>semantic search</strong> --
+          finding code by meaning, not just keywords. Also used for re-embedding when code changes.
+          Without this key, only keyword search (BM25) is available.
+        </p>
 
-    <div class="card mb-2" style="max-width:640px">
-      <h3 style="font-size:1rem;margin-bottom:0.75rem">LLM / Chat Model</h3>
-      <p class="text-muted" style="font-size:0.875rem;margin-bottom:0.5rem">
-        The LLM powers the <strong>Chat</strong> feature and generates enrichments such as architecture docs, wiki pages, and cookbook recipes.
-        It is configured server-side via environment variables.
-      </p>
-      <p class="text-muted" style="font-size:0.8125rem;margin:0">
-        <strong>Supported models:</strong> OpenAI GPT-4o, GPT-4o-mini, GPT-3.5 Turbo; Azure OpenAI equivalents; any OpenAI-compatible API.
-      </p>
-    </div>
-
-    <div class="card" style="max-width:640px" *ngIf="settings">
-      <h3 style="font-size:1rem;margin-bottom:1rem">Embedding Configuration</h3>
-
-      <!-- Key status indicator -->
-      <div class="key-status" *ngIf="settings.embedding.hasKey">
-        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--background-alt);border-radius:var(--radius);margin-bottom:1rem">
+        <div *ngIf="settings.embedding.hasKey" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--background-alt);border-radius:var(--radius);margin-bottom:1rem">
           <i class="bi bi-key-fill" style="color:var(--success);font-size:1.25rem"></i>
           <div style="flex:1">
-            <div style="font-weight:500">API key configured</div>
+            <div style="font-weight:500;font-size:0.875rem">Key configured</div>
             <div class="text-muted" style="font-size:0.8125rem">
               <code>{{ settings.embedding.maskedKey }}</code>
-              <span class="badge" [ngClass]="settings.embedding.source === 'user' ? 'badge-primary' : 'badge-muted'" style="margin-left:0.5rem">
+              <span class="badge" [ngClass]="settings.embedding.source === 'user' ? 'badge-primary' : 'badge-muted'" style="margin-left:0.375rem">
                 {{ settings.embedding.source }}
               </span>
             </div>
           </div>
-          <button class="btn btn-sm btn-secondary" (click)="deleteKey()" *ngIf="settings.embedding.source === 'user'">
-            Remove
-          </button>
+          <button class="btn btn-sm btn-secondary" (click)="deleteEmbeddingKey()" *ngIf="settings.embedding.source === 'user'">Remove</button>
         </div>
+
+        <div *ngIf="!settings.embedding.hasKey" style="padding:0.625rem 0.75rem;background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:var(--radius);margin-bottom:1rem;font-size:0.8125rem;color:#856404">
+          <i class="bi bi-exclamation-triangle"></i> No embedding key configured. Semantic search unavailable.
+        </div>
+
+        <div class="form-group">
+          <label>API Key</label>
+          <input class="form-control" type="password" [(ngModel)]="embeddingKey" placeholder="sk-...">
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select class="form-control" [(ngModel)]="embeddingModel">
+            <option value="">Default ({{ settings.embedding.model }})</option>
+            <option value="text-embedding-3-small">text-embedding-3-small (1536 dims)</option>
+            <option value="text-embedding-3-large">text-embedding-3-large (3072 dims)</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" (click)="saveEmbedding()" [disabled]="savingEmbed || !embeddingKey">
+          {{ savingEmbed ? 'Saving...' : 'Save Embedding Key' }}
+        </button>
+        <span *ngIf="embedMessage" style="margin-left:0.75rem;color:var(--success);font-size:0.8125rem">{{ embedMessage }}</span>
       </div>
 
-      <div class="key-status" *ngIf="!settings.embedding.hasKey" style="padding:0.75rem;background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:var(--radius);margin-bottom:1rem">
-        <div style="display:flex;align-items:center;gap:0.75rem">
-          <i class="bi bi-exclamation-triangle" style="color:#856404;font-size:1.25rem"></i>
-          <div>
-            <div style="font-weight:500;color:#856404">No embedding key configured</div>
-            <div class="text-muted" style="font-size:0.8125rem">Semantic search and code embeddings require an API key.</div>
+      <!-- LLM / Chat Section -->
+      <div class="card">
+        <h3 style="font-size:1.125rem;margin-bottom:0.75rem">LLM / Chat Model</h3>
+        <p class="text-muted" style="font-size:0.8125rem;margin-bottom:1rem">
+          Powers the <strong>Chat</strong> feature (ask questions about your codebase) and generates
+          <strong>enrichments</strong>: architecture docs, wiki pages, cookbook guides, database schema docs,
+          and code summaries. Uses the same key as embedding if no separate LLM key is set.
+        </p>
+
+        <div *ngIf="settings.llm.hasKey" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--background-alt);border-radius:var(--radius);margin-bottom:1rem">
+          <i class="bi bi-key-fill" style="color:var(--success);font-size:1.25rem"></i>
+          <div style="flex:1">
+            <div style="font-weight:500;font-size:0.875rem">LLM key configured</div>
+            <code class="text-muted" style="font-size:0.8125rem">{{ settings.llm.maskedKey }}</code>
+          </div>
+          <button class="btn btn-sm btn-secondary" (click)="deleteLlmKey()">Remove</button>
+        </div>
+
+        <div *ngIf="!settings.llm.hasKey && settings.embedding.hasKey" style="padding:0.625rem 0.75rem;background:rgba(0,164,220,0.08);border:1px solid rgba(0,164,220,0.2);border-radius:var(--radius);margin-bottom:1rem;font-size:0.8125rem;color:var(--accent)">
+          <i class="bi bi-info-circle"></i> Using embedding key as fallback for chat and enrichments.
+        </div>
+
+        <div *ngIf="!settings.llm.hasKey && !settings.embedding.hasKey" style="padding:0.625rem 0.75rem;background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:var(--radius);margin-bottom:1rem;font-size:0.8125rem;color:#856404">
+          <i class="bi bi-exclamation-triangle"></i> No LLM key configured. Chat and enrichment generation unavailable.
+        </div>
+
+        <div class="form-group">
+          <label>LLM API Key (optional, separate from embedding)</label>
+          <input class="form-control" type="password" [(ngModel)]="llmKey" placeholder="sk-... (leave empty to use embedding key)">
+        </div>
+        <div class="form-group">
+          <label>Supported Models</label>
+          <div class="text-muted" style="font-size:0.8125rem">
+            OpenAI: gpt-4o, gpt-4o-mini, gpt-3.5-turbo.
+            Azure OpenAI, Ollama, or any OpenAI-compatible API.
+            Model is configured server-side via Enrichment:Model.
           </div>
         </div>
-      </div>
-
-      <div class="form-group">
-        <label>{{ settings.embedding.hasKey && settings.embedding.source === 'user' ? 'Update' : 'Set' }} Embedding API Key</label>
-        <input class="form-control" type="password" [(ngModel)]="embeddingKey"
-               placeholder="sk-...">
-      </div>
-      <div class="form-group">
-        <label>Model</label>
-        <select class="form-control" [(ngModel)]="embeddingModel">
-          <option value="">Default ({{ settings.embedding.model }})</option>
-          <option value="text-embedding-3-small">text-embedding-3-small (1536 dims)</option>
-          <option value="text-embedding-3-large">text-embedding-3-large (3072 dims)</option>
-        </select>
-      </div>
-      <div style="margin-top:1.5rem">
-        <button class="btn btn-primary" (click)="save()" [disabled]="saving || !embeddingKey">
-          {{ saving ? 'Saving...' : 'Save' }}
+        <button class="btn btn-primary btn-sm" (click)="saveLlm()" [disabled]="savingLlm || !llmKey">
+          {{ savingLlm ? 'Saving...' : 'Save LLM Key' }}
         </button>
+        <span *ngIf="llmMessage" style="margin-left:0.75rem;color:var(--success);font-size:0.8125rem">{{ llmMessage }}</span>
       </div>
-      <div *ngIf="message" style="margin-top:1rem;color:var(--success);font-size:0.875rem">{{ message }}</div>
     </div>
 
     <!-- Change History -->
-    <div class="card" style="max-width:640px;margin-top:1.5rem" *ngIf="history.length > 0">
+    <div class="card" style="margin-top:1.5rem" *ngIf="history.length > 0">
       <h3 style="font-size:1rem;margin-bottom:1rem">Change History</h3>
       <div class="history-item" *ngFor="let entry of history">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -115,14 +133,19 @@ import { environment } from '../../../environments/environment';
 export class SettingsComponent implements OnInit {
   embeddingKey = '';
   embeddingModel = '';
+  llmKey = '';
   settings: any = null;
   history: any[] = [];
-  saving = false;
-  message = '';
+  savingEmbed = false;
+  savingLlm = false;
+  embedMessage = '';
+  llmMessage = '';
 
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
+    this.embedMessage = '';
+    this.llmMessage = '';
     this.http.get(`${environment.apiUrl}/settings`).subscribe({
       next: (s: any) => {
         this.settings = s;
@@ -134,22 +157,37 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  save() {
-    this.saving = true;
-    this.message = '';
+  saveEmbedding() {
+    this.savingEmbed = true;
+    this.embedMessage = '';
     const body: any = {};
     if (this.embeddingKey) body.embeddingApiKey = this.embeddingKey;
     if (this.embeddingModel) body.embeddingModel = this.embeddingModel;
 
     this.http.put(`${environment.apiUrl}/settings`, body).subscribe({
-      next: () => { this.message = 'Settings saved'; this.saving = false; this.embeddingKey = ''; this.ngOnInit(); },
-      error: () => { this.saving = false; }
+      next: () => { this.embedMessage = 'Saved'; this.savingEmbed = false; this.embeddingKey = ''; this.ngOnInit(); },
+      error: () => this.savingEmbed = false
     });
   }
 
-  deleteKey() {
+  saveLlm() {
+    this.savingLlm = true;
+    this.llmMessage = '';
+    this.http.put(`${environment.apiUrl}/settings`, { llmApiKey: this.llmKey }).subscribe({
+      next: () => { this.llmMessage = 'Saved'; this.savingLlm = false; this.llmKey = ''; this.ngOnInit(); },
+      error: () => this.savingLlm = false
+    });
+  }
+
+  deleteEmbeddingKey() {
     this.http.delete(`${environment.apiUrl}/settings/embedding-key`).subscribe({
-      next: () => { this.message = 'Key removed'; this.ngOnInit(); }
+      next: () => { this.embedMessage = 'Key removed'; this.ngOnInit(); }
+    });
+  }
+
+  deleteLlmKey() {
+    this.http.put(`${environment.apiUrl}/settings`, { llmApiKey: '' }).subscribe({
+      next: () => { this.llmMessage = 'Key removed'; this.ngOnInit(); }
     });
   }
 }
