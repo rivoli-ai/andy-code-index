@@ -25,29 +25,32 @@ interface DiscoveredRepo {
     </div>
 
     <div class="card mb-2">
-      <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap">
-        <div class="form-group" style="margin-bottom:0">
+      <div class="discover-form">
+        <div class="discover-field">
           <label>Provider</label>
-          <select class="form-control" [(ngModel)]="provider" style="width:180px">
+          <select class="form-control" [(ngModel)]="provider">
             <option value="github">GitHub</option>
             <option value="azure-devops">Azure DevOps</option>
           </select>
         </div>
-        <div class="form-group" style="margin-bottom:0;flex:1">
+        <div class="discover-field" style="flex:1">
           <label>Organization</label>
           <input class="form-control" [(ngModel)]="org" placeholder="e.g., rivoli-ai">
         </div>
-        <div class="form-group" style="margin-bottom:0" *ngIf="provider === 'azure-devops'">
+        <div class="discover-field" *ngIf="provider === 'azure-devops'">
           <label>Project (optional)</label>
-          <input class="form-control" [(ngModel)]="project" placeholder="e.g., MyProject" style="width:200px">
+          <input class="form-control" [(ngModel)]="project" placeholder="e.g., MyProject">
         </div>
-        <div class="form-group" style="margin-bottom:0">
+        <div class="discover-field">
           <label>PAT (optional)</label>
-          <input class="form-control" type="password" [(ngModel)]="pat" placeholder="For private orgs" style="width:200px">
+          <input class="form-control" type="password" [(ngModel)]="pat" placeholder="For private orgs">
         </div>
-        <button class="btn btn-primary" (click)="discover()" [disabled]="discovering || !org">
-          {{ discovering ? 'Discovering...' : 'Discover' }}
-        </button>
+        <div class="discover-field discover-action">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" (click)="discover()" [disabled]="discovering || !org" style="width:100%">
+            {{ discovering ? 'Discovering...' : 'Discover' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -94,7 +97,15 @@ interface DiscoveredRepo {
 
     <div *ngIf="error" class="card" style="color:var(--danger);margin-top:1rem">{{ error }}</div>
     <div *ngIf="addMessage" class="card" style="color:var(--success);margin-top:1rem">{{ addMessage }}</div>
-  `
+  `,
+  styles: [`
+    .discover-form { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+    .discover-field { display: flex; flex-direction: column; min-width: 160px; }
+    .discover-field label { margin-bottom: 0.375rem; font-weight: 500; font-size: var(--font-sm); }
+    .discover-field .form-control,
+    .discover-field .btn { height: 42px; }
+    .discover-action { justify-content: flex-end; }
+  `]
 })
 export class DiscoveryComponent {
   provider = 'github';
