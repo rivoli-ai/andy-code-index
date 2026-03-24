@@ -247,6 +247,46 @@ public class CodeIndexTools
         };
     }
 
+    [McpServerTool(Name = "code_index_dependencies"), Description("Get package dependencies for a repository")]
+    public async Task<object> GetDependencies(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.Dependencies, "Dependencies");
+    }
+
+    [McpServerTool(Name = "code_index_analytics"), Description("Get repository analytics: languages, file types, top terms, complex files")]
+    public async Task<object> GetAnalytics(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null) return new { error = $"Repository '{repo_url}' not found" };
+
+        var details = await _repoService.GetDetailsByIdAsync(repo.Id);
+        return new
+        {
+            repository = repo.Name,
+            status = repo.Status,
+            stats = details?.Stats,
+            branches = details?.Branches?.Select(b => b.Name),
+            hint = "Use code_index_semantic_search or code_index_keyword_search to find specific code"
+        };
+    }
+
+    [McpServerTool(Name = "code_index_sync_status"), Description("Get periodic sync schedule and repository count")]
+    public async Task<object> GetSyncStatus()
+    {
+        var repos = await _repoService.ListAsync();
+        return new
+        {
+            repositoryCount = repos.Count,
+            indexed = repos.Count(r => r.Status == "indexed"),
+            repositories = repos.Select(r => new { r.Name, r.Status, r.LastSyncedAt,
+                enrichments = r.Stats?.EnrichmentCount ?? 0,
+                embeddings = r.Stats?.EmbeddingCount ?? 0,
+                hasEmbeddings = r.Stats?.HasEmbeddings ?? false })
+        };
+    }
+
     // --- Helpers ---
 
     private async Task<RepositoryDto?> ResolveRepo(string urlOrName)
@@ -293,6 +333,7 @@ public class CodeIndexTools
             total = results.TotalCount,
             mode = results.SearchMode,
             duration_ms = results.DurationMs,
+            truncated = results.Results.Count < results.TotalCount,
             results = results.Results.Select(r => new
             {
                 r.FilePath,
@@ -305,7 +346,13 @@ public class CodeIndexTools
                 resource_uri = r.RepositoryName is not null
                     ? $"code-index://{r.RepositoryName}/{r.CommitSha ?? "HEAD"}/{r.FilePath}"
                     : null
-            })
+            }),
+            hints = new
+            {
+                read_file = "Use code_index_read_resource with the resource_uri to view the full file",
+                more_results = results.Results.Count < results.TotalCount ? "Increase limit to see more results" : null,
+                related = "Use code_index_api_docs or code_index_architecture_docs to understand the repository structure"
+            }
         };
     }
 }
