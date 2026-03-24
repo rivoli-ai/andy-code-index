@@ -45,10 +45,13 @@ interface Repository {
       </div>
 
       <div class="chat-messages" #messagesContainer>
-        <div *ngIf="messages.length === 0" class="empty-state" style="padding:3rem">
+        <div *ngIf="messages.length === 0" class="empty-state" style="padding:3rem 3rem 1rem">
           <i class="bi bi-chat-dots" style="font-size:2.5rem;display:block;margin-bottom:1rem;color:var(--primary)"></i>
           <h3>Ask about your codebase</h3>
-          <p class="text-muted" style="margin-bottom:1.5rem">Select a category to explore suggested questions:</p>
+          <p class="text-muted">Select a category below, or type your own question.</p>
+        </div>
+
+        <div class="quick-queries" style="padding:0.75rem 0;border-bottom:1px solid var(--border);margin-bottom:1rem">
           <div class="suggestion-tabs">
             <button *ngFor="let cat of suggestionCategories" class="suggestion-tab"
                     [class.active]="activeCategory === cat.name"
