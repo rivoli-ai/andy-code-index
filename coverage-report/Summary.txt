@@ -1,0 +1,149 @@
+Summary
+  Generated on: 3/24/2026 - 3:55:52 PM
+  Coverage date: 3/24/2026 - 3:53:02 PM - 3/24/2026 - 3:55:14 PM
+  Parser: MultiReport (2x Cobertura)
+  Assemblies: 4
+  Classes: 121
+  Files: 90
+  Line coverage: 37.9%
+  Covered lines: 3364
+  Uncovered lines: 5509
+  Coverable lines: 8873
+  Total lines: 12056
+  Branch coverage: 55.1% (663 of 1202)
+  Covered branches: 663
+  Total branches: 1202
+  Method coverage: 77.4% (576 of 744)
+  Full method coverage: 70.4% (524 of 744)
+  Covered methods: 576
+  Fully covered methods: 524
+  Total methods: 744
+
+Andy.CodeIndex.Api                                                                67.5%
+  Andy.CodeIndex.Api.Controllers.AnalyticsController                                 0%
+  Andy.CodeIndex.Api.Controllers.ChatController                                      0%
+  Andy.CodeIndex.Api.Controllers.CommitsController                                 100%
+  Andy.CodeIndex.Api.Controllers.DiscoveryController                              73.3%
+  Andy.CodeIndex.Api.Controllers.EnrichmentListResponse                            100%
+  Andy.CodeIndex.Api.Controllers.EnrichmentsController                             100%
+  Andy.CodeIndex.Api.Controllers.FilesController                                  63.1%
+  Andy.CodeIndex.Api.Controllers.IndexingController                               98.1%
+  Andy.CodeIndex.Api.Controllers.QueueController                                   100%
+  Andy.CodeIndex.Api.Controllers.RepositoriesController                           97.7%
+  Andy.CodeIndex.Api.Controllers.SearchController                                  100%
+  Andy.CodeIndex.Api.Controllers.SearchRequest                                     100%
+  Andy.CodeIndex.Api.Controllers.SettingsController                                 71%
+  Andy.CodeIndex.Api.Controllers.SyncDiscoveryRequest                              100%
+  Andy.CodeIndex.Api.Controllers.SyncDiscoveryResponse                             100%
+  Andy.CodeIndex.Api.Controllers.UpdateSettingsRequest                             100%
+  Andy.CodeIndex.Api.Mcp.CodeIndexTools                                           59.5%
+  Program                                                                         79.7%
+
+Andy.CodeIndex.Application                                                        86.3%
+  Andy.CodeIndex.Application.DTOs.BranchDto                                        100%
+  Andy.CodeIndex.Application.DTOs.ChatRequest                                        0%
+  Andy.CodeIndex.Application.DTOs.ChatResponse                                       0%
+  Andy.CodeIndex.Application.DTOs.ChatSource                                         0%
+  Andy.CodeIndex.Application.DTOs.CreateRepositoryRequest                          100%
+  Andy.CodeIndex.Application.DTOs.EnrichmentDto                                    100%
+  Andy.CodeIndex.Application.DTOs.IndexingRunDto                                   100%
+  Andy.CodeIndex.Application.DTOs.RepositoryDto                                    100%
+  Andy.CodeIndex.Application.DTOs.RepositoryStatsDto                               100%
+  Andy.CodeIndex.Application.DTOs.SearchResultItem                                 100%
+  Andy.CodeIndex.Application.DTOs.SearchResultsDto                                 100%
+  Andy.CodeIndex.Application.DTOs.SyncStatusDto                                    100%
+  Andy.CodeIndex.Application.DTOs.TagDto                                             0%
+  Andy.CodeIndex.Application.Interfaces.ApiClass                                   100%
+  Andy.CodeIndex.Application.Interfaces.ApiEnum                                    100%
+  Andy.CodeIndex.Application.Interfaces.ApiFunction                                100%
+  Andy.CodeIndex.Application.Interfaces.ApiInterface                               100%
+  Andy.CodeIndex.Application.Interfaces.ApiMethod                                  100%
+  Andy.CodeIndex.Application.Interfaces.ApiParameter                               100%
+  Andy.CodeIndex.Application.Interfaces.ApiProperty                                100%
+  Andy.CodeIndex.Application.Interfaces.CodeAnalysisResult                         100%
+  Andy.CodeIndex.Application.Interfaces.CodeChunk                                  100%
+  Andy.CodeIndex.Application.Interfaces.DiscoveredRepo                             100%
+  Andy.CodeIndex.Application.Interfaces.FilterOption                               100%
+  Andy.CodeIndex.Application.Interfaces.GitBranchInfo                              100%
+  Andy.CodeIndex.Application.Interfaces.GitCommitInfo                              100%
+  Andy.CodeIndex.Application.Interfaces.GitFileInfo                                100%
+  Andy.CodeIndex.Application.Interfaces.GitTagInfo                                 100%
+  Andy.CodeIndex.Application.Interfaces.GrepResult                                 100%
+  Andy.CodeIndex.Application.Interfaces.PackageDependency                          100%
+  Andy.CodeIndex.Application.Interfaces.SearchFilter                              85.7%
+  Andy.CodeIndex.Application.Interfaces.SearchFilterOptions                        100%
+  Andy.CodeIndex.Application.Options.AzureDevOpsDiscoveryOptions                     0%
+  Andy.CodeIndex.Application.Options.ChunkingOptions                               100%
+  Andy.CodeIndex.Application.Options.DiscoveryOptions                                0%
+  Andy.CodeIndex.Application.Options.EmbeddingOptions                              100%
+  Andy.CodeIndex.Application.Options.EnrichmentLlmOptions                          100%
+  Andy.CodeIndex.Application.Options.GitHubDiscoveryOptions                          0%
+  Andy.CodeIndex.Application.Options.IndexingOptions                               100%
+  Andy.CodeIndex.Application.Options.SeedRepository                                  0%
+  Andy.CodeIndex.Application.Options.SyncOptions                                   100%
+
+Andy.CodeIndex.Domain                                                             92.5%
+  Andy.CodeIndex.Domain.Entities.Branch                                            100%
+  Andy.CodeIndex.Domain.Entities.ChunkLineRange                                    100%
+  Andy.CodeIndex.Domain.Entities.Commit                                            100%
+  Andy.CodeIndex.Domain.Entities.ContentEmbedding                                    0%
+  Andy.CodeIndex.Domain.Entities.Enrichment                                       88.8%
+  Andy.CodeIndex.Domain.Entities.IndexingRun                                      93.3%
+  Andy.CodeIndex.Domain.Entities.IndexingTask                                      100%
+  Andy.CodeIndex.Domain.Entities.Repository                                        100%
+  Andy.CodeIndex.Domain.Entities.RepositoryFile                                    100%
+  Andy.CodeIndex.Domain.Entities.SettingsChangeLog                                 100%
+  Andy.CodeIndex.Domain.Entities.Tag                                               100%
+  Andy.CodeIndex.Domain.Entities.UserSettings                                      100%
+
+Andy.CodeIndex.Infrastructure                                                     31.3%
+  Andy.CodeIndex.Infrastructure.Data.CodeIndexDbContext                           90.5%
+  Andy.CodeIndex.Infrastructure.Data.Migrations.AddEnrichmentQuality                 0%
+  Andy.CodeIndex.Infrastructure.Data.Migrations.AddIndexingRun                       0%
+  Andy.CodeIndex.Infrastructure.Data.Migrations.AddSettingsChangeLog                 0%
+  Andy.CodeIndex.Infrastructure.Data.Migrations.AddUserSettings                      0%
+  Andy.CodeIndex.Infrastructure.Data.Migrations.CodeIndexDbContextModelSnapshot      0%
+  Andy.CodeIndex.Infrastructure.Data.Migrations.InitialCreate                        0%
+  Andy.CodeIndex.Infrastructure.Discovery.RepoDiscoveryService                      93%
+  Andy.CodeIndex.Infrastructure.Discovery.SeedService                                0%
+  Andy.CodeIndex.Infrastructure.Handlers.BaseLlmEnrichmentHandler                 19.3%
+  Andy.CodeIndex.Infrastructure.Handlers.CloneRepositoryHandler                   94.1%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateApiDocsHandler                       98%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateArchitectureDocsHandler               0%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateBM25IndexHandler                    100%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateCodeEmbeddingsHandler              92.3%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateCommitDescriptionHandler              0%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateCookbookHandler                       0%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateDatabaseSchemaHandler                 0%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateSummaryEmbeddingsHandler              0%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateSummaryEnrichmentsHandler             0%
+  Andy.CodeIndex.Infrastructure.Handlers.CreateWikiHandler                           0%
+  Andy.CodeIndex.Infrastructure.Handlers.ExtractCommitHistoryHandler                 0%
+  Andy.CodeIndex.Infrastructure.Handlers.ExtractDependenciesHandler                  0%
+  Andy.CodeIndex.Infrastructure.Handlers.ExtractSnippetsHandler                    100%
+  Andy.CodeIndex.Infrastructure.Handlers.ScanCommitHandler                         100%
+  Andy.CodeIndex.Infrastructure.Handlers.SyncRepositoryHandler                     100%
+  Andy.CodeIndex.Infrastructure.Parsers.DependencyParserService                   78.7%
+  Andy.CodeIndex.Infrastructure.Repositories.CodeRepositoryRepository              100%
+  Andy.CodeIndex.Infrastructure.Repositories.CommitRepository                      100%
+  Andy.CodeIndex.Infrastructure.Repositories.EnrichmentRepository                 82.6%
+  Andy.CodeIndex.Infrastructure.Repositories.IndexingTaskRepository               98.3%
+  Andy.CodeIndex.Infrastructure.Repositories.RepositoryBase<T>                    84.2%
+  Andy.CodeIndex.Infrastructure.Services.ApiKeyResolver                           96.9%
+  Andy.CodeIndex.Infrastructure.Services.BackgroundWorkerService                  76.1%
+  Andy.CodeIndex.Infrastructure.Services.ChatService                                 0%
+  Andy.CodeIndex.Infrastructure.Services.ChunkingService                          96.8%
+  Andy.CodeIndex.Infrastructure.Services.CodeAnalysisService                      82.6%
+  Andy.CodeIndex.Infrastructure.Services.EmbeddingService                         72.3%
+  Andy.CodeIndex.Infrastructure.Services.EncryptionService                        88.8%
+  Andy.CodeIndex.Infrastructure.Services.EnrichmentGeneratorService                100%
+  Andy.CodeIndex.Infrastructure.Services.FusedResult                               100%
+  Andy.CodeIndex.Infrastructure.Services.GitService                                5.2%
+  Andy.CodeIndex.Infrastructure.Services.OpenAiEmbeddingProvider                  95.8%
+  Andy.CodeIndex.Infrastructure.Services.PeriodicSyncService                      73.7%
+  Andy.CodeIndex.Infrastructure.Services.RankedResultSet                           100%
+  Andy.CodeIndex.Infrastructure.Services.RankFusionService                         100%
+  Andy.CodeIndex.Infrastructure.Services.RepositoryService                        98.8%
+  Andy.CodeIndex.Infrastructure.Services.SearchService                            60.4%
+  Andy.CodeIndex.Infrastructure.Services.TaskQueueService                           86%
+  Andy.CodeIndex.Infrastructure.Telemetry.CodeIndexTelemetry                       100%

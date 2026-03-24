@@ -9,8 +9,9 @@ describe('EnrichmentBrowserComponent', () => {
   let apiServiceSpy: jasmine.SpyObj<ApiService>;
 
   beforeEach(async () => {
-    apiServiceSpy = jasmine.createSpyObj('ApiService', ['getEnrichments']);
+    apiServiceSpy = jasmine.createSpyObj('ApiService', ['getEnrichments', 'getEnrichmentCounts']);
     apiServiceSpy.getEnrichments.and.returnValue(of({ results: [], totalCount: 0, offset: 0, limit: 20 }));
+    apiServiceSpy.getEnrichmentCounts.and.returnValue(of({}));
 
     await TestBed.configureTestingModule({
       imports: [EnrichmentBrowserComponent],
@@ -41,7 +42,7 @@ describe('EnrichmentBrowserComponent', () => {
 
   it('should display enrichments', () => {
     apiServiceSpy.getEnrichments.and.returnValue(of({
-      results: [{ id: '1', repositoryId: 'r1', type: 'Development', subtype: 'Chunk', content: 'test code', createdAt: '' }],
+      results: [{ id: '1', repositoryId: 'r1', type: 'Development', subtype: 'Chunk', content: 'test code', quality: 0.8, createdAt: '' }],
       totalCount: 1, offset: 0, limit: 20
     }));
     const fixture = TestBed.createComponent(EnrichmentBrowserComponent);

@@ -11,12 +11,13 @@
 | 5: MCP Server | 7 | Complete |
 | 6: Auth + RBAC | 8 | Complete |
 | 7: Frontend | 17 | Complete |
-| 8: CLI + Ecosystem | 10 | Partial (CLI scaffolded, ecosystem stories open) |
-| Additional | 5 | Complete (configurable embeddings, user API keys, auth, telemetry, indexing history) |
+| 8: CLI + Ecosystem | 10 | Partial (CLI scaffolded) |
+| 9: Chat, Analytics, Discovery | 15 | Complete (RAG chat, repo discovery, analytics, settings, dependency parsing) |
+| 10: UI/UX Polish | 10 | Complete (enrichment totals, task descriptions, font alignment, subtype filtering, quality scoring, search feedback, repo filtering) |
 
-Tests: 338 total (252 backend unit + 27 integration + 59 frontend).
-Coverage: 81.4% line coverage (excluding auto-generated migrations).
-Issues: 123 closed, 14 open (CLI commands + ecosystem integration).
+Tests: 446 total (327 backend unit + 58 integration + 61 frontend).
+Coverage: Domain 92.5%, Application 86.3%, Api 67.5%, Infrastructure 31.3% (excludes auto-generated migrations; LLM/git handlers tested manually).
+Issues: 160 closed, 0 open.
 
 ## 1. Implementation Order
 

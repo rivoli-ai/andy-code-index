@@ -271,24 +271,30 @@ Base path: `/api/v1`
 
 | Method | Path | Description | Auth |
 |--------|------|-------------|------|
-| GET | `/repositories` | List repositories | `code-index:repository:read` |
+| GET | `/repositories` | List repositories (filter by provider, status) | `code-index:repository:read` |
 | POST | `/repositories` | Add repository | `code-index:repository:write` |
-| GET | `/repositories/{id}` | Repository detail | `code-index:repository:read` + instance |
+| GET | `/repositories/{id}` | Repository detail with stats | `code-index:repository:read` + instance |
 | DELETE | `/repositories/{id}` | Delete repository | `code-index:repository:delete` + instance |
-| POST | `/repositories/{id}/sync` | Trigger sync | `code-index:repository:index` + instance |
+| POST | `/repositories/{id}/sync` | Trigger sync (409 if active tasks) | `code-index:repository:index` + instance |
 | GET | `/repositories/{id}/commits` | List commits | `code-index:repository:read` + instance |
 | GET | `/repositories/{id}/commits/{sha}` | Commit detail | `code-index:repository:read` + instance |
-| GET | `/repositories/{id}/status` | Indexing status & progress | `code-index:repository:read` + instance |
 | GET | `/repositories/{id}/blob/{ref}/{**path}` | Read file (ref=branch/tag/SHA) | `code-index:repository:read` + instance |
-| POST | `/search` | Hybrid search | `code-index:search:read` |
+| POST | `/search` | Hybrid search (RRF) | `code-index:search:read` |
 | GET | `/search/semantic` | Semantic search | `code-index:search:read` |
-| GET | `/search/keyword` | Keyword search | `code-index:search:read` |
-| GET | `/search/ls` | File listing | `code-index:search:read` |
-| GET | `/search/grep` | Regex grep | `code-index:search:read` |
-| GET | `/enrichments` | Query enrichments | `code-index:enrichment:read` |
+| GET | `/search/keyword` | Keyword search (BM25) | `code-index:search:read` |
+| GET | `/search/filters` | Available repos and languages | `code-index:search:read` |
+| GET | `/enrichments` | Query enrichments (filter by type, subtype, repo) | `code-index:enrichment:read` |
 | GET | `/enrichments/{id}` | Enrichment detail | `code-index:enrichment:read` |
+| GET | `/enrichments/counts` | Per-subtype enrichment counts | `code-index:enrichment:read` |
 | GET | `/queue` | Task queue status | `code-index:task:read` |
 | GET | `/queue/{id}` | Task detail | `code-index:task:read` |
+| GET | `/queue/pipelines` | Active pipeline progress per repo | `code-index:task:read` |
+| POST | `/chat` | RAG chat with indexed code | `code-index:search:read` |
+| GET | `/discover/{provider}` | Discover repos in GitHub/Azure org | `code-index:repository:read` |
+| POST | `/discover/sync` | Import discovered repositories | `code-index:repository:write` |
+| GET | `/settings` | User settings (API keys masked) | Authenticated |
+| PUT | `/settings` | Update user settings | Authenticated |
+| GET | `/sync/status` | Periodic sync schedule | `code-index:task:read` |
 | GET | `/health` | Health check | Anonymous |
 
 ### 4.2 MCP Endpoint
@@ -297,7 +303,7 @@ Base path: `/api/v1`
 - **Auth:** JWT Bearer via Andy.Auth, MCP authentication scheme
 - **CORS:** AllowMcpClients policy (any origin)
 - **Metadata:** `/.well-known/oauth-protected-resource` (RFC 8707)
-- **Tools:** 14 tools with `code_index_` prefix (see Requirements §3.5)
+- **Tools:** 19 tools with `code_index_` prefix (see Requirements §3.5), including chat, analytics, dependencies, commit history, and sync status
 
 ### 4.3 Swagger/OpenAPI
 
