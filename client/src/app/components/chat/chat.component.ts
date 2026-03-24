@@ -34,7 +34,7 @@ interface Repository {
   template: `
     <div class="chat-container">
       <div class="chat-header">
-        <h1 style="font-size:1.25rem;margin:0">Chat with Code</h1>
+        <h1 style="font-size:var(--font-2xl);margin:0">Chat with Code</h1>
         <div style="display:flex;gap:0.75rem;align-items:center">
           <select class="form-control" [(ngModel)]="selectedRepo" style="width:180px;padding:0.375rem 0.75rem">
             <option value="">All Repositories</option>
@@ -109,7 +109,7 @@ interface Repository {
     .message-bubble { max-width: 80%; padding: 0.75rem 1rem; border-radius: var(--radius-lg); overflow: hidden; }
     .message.user .message-bubble { background: var(--primary); color: white; border-bottom-right-radius: 4px; }
     .message.assistant .message-bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-    .message-content { word-wrap: break-word; font-size: 0.9375rem; line-height: 1.6; }
+    .message-content { word-wrap: break-word; font-size: var(--font-base); line-height: 1.6; }
     .message-content p { margin: 0 0 0.5rem 0; }
     .message-content p:last-child { margin-bottom: 0; }
     .message-content ul,
@@ -119,11 +119,11 @@ interface Repository {
     .message-content ol > li { counter-increment: item; }
     .message-content ol > li::before { content: counter(item) "."; position: absolute; left: 0; color: var(--text-muted); font-weight: 500; }
     .message-content ul > li::before { content: "\\2022"; position: absolute; left: 0.375rem; color: var(--text-muted); font-size: 1.1em; }
-    .message-content h1,
-    .message-content h2,
-    .message-content h3 { font-size: 1rem; font-weight: 600; margin: 0.75rem 0 0.25rem 0; }
-    .message-content code { background: rgba(0,0,0,0.06); padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.85em; }
-    .message-content pre { background: #1e1e1e; color: #d4d4d4; padding: 0.75rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; font-size: 0.8rem; }
+    .message-content h1 { font-size: var(--font-xl); font-weight: 600; margin: 0.75rem 0 0.25rem 0; }
+    .message-content h2 { font-size: var(--font-lg); font-weight: 600; margin: 0.75rem 0 0.25rem 0; }
+    .message-content h3 { font-size: var(--font-md); font-weight: 600; margin: 0.75rem 0 0.25rem 0; }
+    .message-content code { background: rgba(0,0,0,0.06); padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.9em; }
+    .message-content pre { background: #1e1e1e; color: #d4d4d4; padding: 0.75rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; font-size: var(--font-xs); }
     .message-content pre code { background: none; padding: 0; color: inherit; }
     .message-content strong { font-weight: 600; }
     .message-content blockquote { border-left: 3px solid var(--border); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--text-muted); }
@@ -131,12 +131,12 @@ interface Repository {
     .message.user .message-content pre { background: rgba(0,0,0,0.2); color: white; }
     .sources-toggle { margin-top: 0.5rem; }
     .sources-list { margin-top: 0.5rem; }
-    .source-item { font-size: 0.75rem; padding: 0.25rem 0; color: var(--text-muted); }
+    .source-item { font-size: var(--font-xs); padding: 0.25rem 0; color: var(--text-muted); }
     .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; justify-content: center; }
-    .suggestion { padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: 0.8125rem; cursor: pointer; transition: all var(--transition); color: var(--text); }
+    .suggestion { padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: var(--font-sm); cursor: pointer; transition: all var(--transition); color: var(--text); }
     .suggestion:hover { border-color: var(--primary); color: var(--primary); }
     .suggestion-tabs { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-bottom: 1rem; justify-content: center; }
-    .suggestion-tab { padding: 0.375rem 0.875rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: 0.75rem; cursor: pointer; transition: all var(--transition); color: var(--text-muted); font-weight: 500; }
+    .suggestion-tab { padding: 0.375rem 0.875rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: var(--font-xs); cursor: pointer; transition: all var(--transition); color: var(--text-muted); font-weight: 500; }
     .suggestion-tab:hover { border-color: var(--primary); color: var(--primary); }
     .suggestion-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
   `]
