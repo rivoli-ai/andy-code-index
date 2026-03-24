@@ -1,4 +1,5 @@
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
 using Andy.CodeIndex.Infrastructure.Data;
@@ -12,6 +13,8 @@ public class CreateCodeEmbeddingsHandler : ITaskHandler
 {
     private readonly CodeIndexDbContext _context;
     private readonly IEmbeddingService _embeddingService;
+    private readonly IApiKeyResolver _apiKeyResolver;
+    private readonly EmbeddingOptions _embeddingOptions;
     private readonly ILogger<CreateCodeEmbeddingsHandler> _logger;
 
     public TaskOperation Operation => TaskOperation.CreateCodeEmbeddings;
@@ -19,10 +22,14 @@ public class CreateCodeEmbeddingsHandler : ITaskHandler
     public CreateCodeEmbeddingsHandler(
         CodeIndexDbContext context,
         IEmbeddingService embeddingService,
+        IApiKeyResolver apiKeyResolver,
+        IOptions<EmbeddingOptions> embeddingOptions,
         ILogger<CreateCodeEmbeddingsHandler> logger)
     {
         _context = context;
         _embeddingService = embeddingService;
+        _apiKeyResolver = apiKeyResolver;
+        _embeddingOptions = embeddingOptions.Value;
         _logger = logger;
     }
 
@@ -31,12 +38,15 @@ public class CreateCodeEmbeddingsHandler : ITaskHandler
         var repo = await _context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
-        // Skip if embedding provider not configured
-        if (!_embeddingService.IsAvailable)
+        // Check if any embedding key is available (user "anonymous" in dev, or system config)
+        var (apiKey, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync("anonymous", ct);
+        if (string.IsNullOrEmpty(apiKey))
         {
-            _logger.LogInformation("Skipping code embeddings for {Name}: embedding provider not configured (set Embedding:ApiKey)", repo.Name);
+            _logger.LogInformation("Skipping code embeddings for {Name}: no embedding API key available (set one in Settings or Embedding:ApiKey)", repo.Name);
             return;
         }
+
+        _logger.LogInformation("Using embedding key from {Source} for {Name}", source, repo.Name);
 
         var chunks = await _context.Enrichments
             .Where(e => e.RepositoryId == repo.Id &&

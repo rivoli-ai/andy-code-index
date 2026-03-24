@@ -8,6 +8,7 @@ using Andy.CodeIndex.Infrastructure.Services;
 using Andy.Rbac.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -100,7 +101,16 @@ builder.Services.AddScoped<ICodeAnalysisService, CodeAnalysisService>();
 builder.Services.AddScoped<IEnrichmentGeneratorService, EnrichmentGeneratorService>();
 builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddSingleton<RankFusionService>();
-builder.Services.AddHttpClient<IEmbeddingProvider, OpenAiEmbeddingProvider>();
+builder.Services.AddHttpClient("EmbeddingService");
+builder.Services.AddScoped<IEmbeddingProvider>(sp =>
+{
+    var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("EmbeddingService");
+    return new Andy.CodeIndex.Infrastructure.Services.OpenAiEmbeddingProvider(
+        httpClient,
+        sp.GetRequiredService<IOptions<EmbeddingOptions>>(),
+        sp.GetRequiredService<IApiKeyResolver>(),
+        sp.GetRequiredService<ILogger<Andy.CodeIndex.Infrastructure.Services.OpenAiEmbeddingProvider>>());
+});
 builder.Services.AddHttpClient("Discovery");
 builder.Services.AddHttpClient("Chat");
 builder.Services.AddScoped<IChatService, ChatService>();

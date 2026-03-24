@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Services;
 using FluentAssertions;
@@ -22,10 +23,16 @@ public class OpenAiEmbeddingProviderTests
             TimeoutSeconds = 5
         };
 
+        // Mock resolver that returns the API key from options
+        var resolverMock = new Moq.Mock<IApiKeyResolver>();
+        resolverMock.Setup(r => r.ResolveEmbeddingKeyAsync(Moq.It.IsAny<string?>(), Moq.It.IsAny<CancellationToken>()))
+            .Returns(Task.FromResult<(string?, string)>((opts.ApiKey ?? "test-key", "test")));
+
         var httpClient = new HttpClient(handler);
         return new OpenAiEmbeddingProvider(
             httpClient,
             Options.Create(opts),
+            resolverMock.Object,
             NullLogger<OpenAiEmbeddingProvider>.Instance);
     }
 

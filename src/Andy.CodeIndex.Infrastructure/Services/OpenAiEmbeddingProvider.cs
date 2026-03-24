@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,33 +13,39 @@ public class OpenAiEmbeddingProvider : IEmbeddingProvider
 {
     private readonly HttpClient _httpClient;
     private readonly EmbeddingOptions _options;
+    private readonly IApiKeyResolver _apiKeyResolver;
     private readonly ILogger<OpenAiEmbeddingProvider> _logger;
 
     public int Dimensions => _options.GetDimensions();
     public string ModelName => _options.Model;
-    public bool IsAvailable => _options.IsConfigured;
+    public bool IsAvailable => _options.IsConfigured; // Checked dynamically via resolver in handlers
 
     public OpenAiEmbeddingProvider(
         HttpClient httpClient,
         IOptions<EmbeddingOptions> options,
+        IApiKeyResolver apiKeyResolver,
         ILogger<OpenAiEmbeddingProvider> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _apiKeyResolver = apiKeyResolver;
         _logger = logger;
 
         _httpClient.BaseAddress = new Uri(_options.BaseUrl.TrimEnd('/') + "/");
         _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
-
-        if (!string.IsNullOrEmpty(_options.ApiKey))
-            _httpClient.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _options.ApiKey);
     }
 
     public async Task<float[][]> GenerateEmbeddingsAsync(string[] texts, CancellationToken ct = default)
     {
         if (texts.Length == 0)
             return [];
+
+        // Resolve API key dynamically (user "anonymous" in dev, or system config)
+        var (apiKey, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync("anonymous", ct);
+        if (string.IsNullOrEmpty(apiKey))
+            throw new InvalidOperationException("No embedding API key available");
+
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         var request = new EmbeddingRequest
         {
@@ -66,11 +73,16 @@ public class OpenAiEmbeddingProvider : IEmbeddingProvider
 
                     await Task.Delay(retryAfter, ct);
                     retryCount++;
-                    delay *= 2; // Exponential backoff
+                    delay *= 2;
                     continue;
                 }
 
-                response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+                    _logger.LogWarning("Embedding API returned {Status}: {Body}", response.StatusCode, errorBody);
+                    response.EnsureSuccessStatusCode();
+                }
 
                 var result = await response.Content.ReadFromJsonAsync<EmbeddingResponse>(cancellationToken: ct)
                     ?? throw new InvalidOperationException("Empty response from embedding API");

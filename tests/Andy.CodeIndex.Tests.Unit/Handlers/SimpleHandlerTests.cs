@@ -113,13 +113,18 @@ public class CreateCodeEmbeddingsHandlerTests : IDisposable
     private readonly CreateCodeEmbeddingsHandler _handler;
     private readonly Repository _testRepo;
 
+    private readonly Mock<IApiKeyResolver> _resolverMock = new();
+
     public CreateCodeEmbeddingsHandlerTests()
     {
         _context = TestDbContextFactory.Create();
         _embeddingServiceMock.Setup(e => e.IsAvailable).Returns(false);
+        _resolverMock.Setup(r => r.ResolveEmbeddingKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(((string?)null, "none"));
 
         _handler = new CreateCodeEmbeddingsHandler(
-            _context, _embeddingServiceMock.Object,
+            _context, _embeddingServiceMock.Object, _resolverMock.Object,
+            Options.Create(new EmbeddingOptions()),
             NullLogger<CreateCodeEmbeddingsHandler>.Instance);
 
         _testRepo = new Repository
@@ -159,6 +164,8 @@ public class CreateCodeEmbeddingsHandlerTests : IDisposable
     public async Task HandleAsync_GeneratesWhenAvailable()
     {
         _embeddingServiceMock.Setup(e => e.IsAvailable).Returns(true);
+        _resolverMock.Setup(r => r.ResolveEmbeddingKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(("sk-test-key", "user"));
 
         // Add a chunk enrichment
         _context.Enrichments.Add(new Enrichment
