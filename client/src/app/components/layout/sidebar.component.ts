@@ -1,10 +1,12 @@
 import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, CommonModule],
   template: `
     <aside class="sidebar">
       <div class="sidebar-brand">
@@ -43,6 +45,12 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           </a>
         </div>
       </nav>
+      <div class="sidebar-footer" *ngIf="isDevMode">
+        <div class="dev-indicator">
+          <span class="dev-dot"></span>
+          <span>Development Mode</span>
+        </div>
+      </div>
     </aside>
   `,
   styles: [`
@@ -73,6 +81,28 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     .nav-item:hover { color: var(--text); background: var(--background-alt); }
     .nav-item.active { color: var(--primary); background: rgba(0, 102, 204, 0.08); }
     .nav-item i { font-size: 1.125rem; width: 1.25rem; text-align: center; }
+    .sidebar-footer {
+      border-top: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      margin-top: auto;
+    }
+    .dev-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .dev-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success, #22c55e);
+      display: inline-block;
+    }
   `]
 })
-export class SidebarComponent {}
+export class SidebarComponent {
+  isDevMode = !environment.production;
+}

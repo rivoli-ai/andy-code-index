@@ -1,8 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { ApiService } from '../../services/api.service';
 import { Enrichment, EnrichmentListResponse } from '../../models/enrichment.model';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-enrichment-browser',
@@ -13,6 +15,38 @@ import { Enrichment, EnrichmentListResponse } from '../../models/enrichment.mode
       <h1>Enrichments</h1>
     </div>
 
+    <div class="card mb-2">
+      <h3 style="font-size:1rem;margin-bottom:0.5rem">What are enrichments?</h3>
+      <p class="text-muted" style="font-size:0.875rem;margin-bottom:0.75rem">
+        Enrichments are structured knowledge extracted from your repositories. They power MCP agents, semantic search,
+        and chat -- giving AI tools deep understanding of your codebase beyond raw source files.
+      </p>
+      <details style="font-size:0.8125rem">
+        <summary style="cursor:pointer;color:var(--primary);font-weight:500;margin-bottom:0.5rem">Type descriptions</summary>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;margin-top:0.5rem">
+          <div><strong>Chunk</strong> -- Parsed code segments with context (functions, classes, blocks)</div>
+          <div><strong>API Docs</strong> -- Auto-generated documentation for public APIs and endpoints</div>
+          <div><strong>Cookbook</strong> -- How-to recipes derived from real usage patterns in the codebase</div>
+          <div><strong>Wiki</strong> -- High-level explanations of modules, features, and design decisions</div>
+          <div><strong>Architecture</strong> -- System structure, component diagrams, and dependency maps</div>
+          <div><strong>DB Schema</strong> -- Database table definitions and relationships</div>
+          <div><strong>Commit Desc</strong> -- Summarized commit history and changelog entries</div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Summary bar -->
+    <div class="card mb-2" *ngIf="!loading && typeCounts.length > 0" style="padding:0.75rem 1rem">
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;font-size:0.8125rem">
+        <span class="text-muted">{{ totalCount }} total</span>
+        <span *ngFor="let tc of typeCounts" style="display:inline-flex;align-items:center;gap:0.25rem">
+          <span class="badge badge-muted">{{ getSubtypeLabel(tc.subtype) }}</span>
+          <span>{{ tc.count }}</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Filters -->
     <div class="card mb-2">
       <div style="display:flex;gap:1rem;flex-wrap:wrap">
         <div class="form-group" style="margin-bottom:0">
@@ -36,21 +70,33 @@ import { Enrichment, EnrichmentListResponse } from '../../models/enrichment.mode
             <option value="CommitDescription">Commit Desc</option>
           </select>
         </div>
+        <div class="form-group" style="margin-bottom:0">
+          <select class="form-control" [(ngModel)]="repoFilter" (change)="loadEnrichments()" style="width:200px">
+            <option value="">All Repositories</option>
+            <option *ngFor="let r of repos" [value]="r.id">{{ r.name }}</option>
+          </select>
+        </div>
       </div>
     </div>
 
     <div *ngIf="loading" style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
 
     <div *ngIf="!loading && enrichments.length > 0">
-      <div class="text-muted mb-2" style="font-size:0.875rem">{{ totalCount }} enrichments</div>
       <div class="card" *ngFor="let e of enrichments" style="margin-bottom:1rem;cursor:pointer" (click)="toggleExpand(e.id)">
-        <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
-            <span class="badge badge-primary">{{ e.type }}</span>
-            <span class="badge badge-muted" style="margin-left:0.25rem">{{ e.subtype }}</span>
-            <strong style="margin-left:0.75rem">{{ e.title || e.filePath || 'Untitled' }}</strong>
+            <div style="margin-bottom:0.375rem">
+              <span class="badge badge-primary">{{ getTypeLabel(e.type) }}</span>
+              <span class="badge badge-muted" style="margin-left:0.25rem">{{ getSubtypeLabel(e.subtype) }}</span>
+              <span class="badge badge-muted" style="margin-left:0.25rem" *ngIf="e.language">{{ e.language }}</span>
+            </div>
+            <strong>{{ e.title || e.filePath || 'Untitled' }}</strong>
+            <div class="text-muted" style="font-size:0.8125rem;margin-top:0.25rem" *ngIf="e.filePath || getRepoName(e.repositoryId)">
+              <span *ngIf="getRepoName(e.repositoryId)">{{ getRepoName(e.repositoryId) }}</span>
+              <span *ngIf="getRepoName(e.repositoryId) && e.filePath"> / </span>
+              <code *ngIf="e.filePath">{{ e.filePath }}</code>
+            </div>
           </div>
-          <span class="badge badge-muted" *ngIf="e.language">{{ e.language }}</span>
         </div>
         <div *ngIf="expandedId === e.id" style="margin-top:1rem">
           <pre><code>{{ e.content }}</code></pre>
@@ -74,12 +120,37 @@ export class EnrichmentBrowserComponent implements OnInit {
   loading = true;
   typeFilter = '';
   subtypeFilter = '';
+  repoFilter = '';
   expandedId: string | null = null;
   offset = 0;
+  repos: { id: string; name: string }[] = [];
+  typeCounts: { subtype: string; count: number }[] = [];
 
-  constructor(private api: ApiService) {}
+  private typeLabels: Record<string, string> = {
+    'Architecture': 'Architecture',
+    'Development': 'Development',
+    'History': 'History',
+    'Usage': 'Usage',
+  };
 
-  ngOnInit() { this.loadEnrichments(); }
+  private subtypeLabels: Record<string, string> = {
+    'Chunk': 'Chunk',
+    'APIDocs': 'API Docs',
+    'Cookbook': 'Cookbook',
+    'Wiki': 'Wiki',
+    'Physical': 'Architecture',
+    'DatabaseSchema': 'DB Schema',
+    'CommitDescription': 'Commit Desc',
+  };
+
+  constructor(private api: ApiService, private http: HttpClient) {}
+
+  ngOnInit() {
+    this.http.get<any[]>(`${environment.apiUrl}/repositories`).subscribe({
+      next: r => this.repos = r.map((repo: any) => ({ id: repo.id, name: repo.name }))
+    });
+    this.loadEnrichments();
+  }
 
   loadEnrichments() {
     this.offset = 0;
@@ -87,9 +158,15 @@ export class EnrichmentBrowserComponent implements OnInit {
     const params: Record<string, string | number> = { offset: 0, limit: 20 };
     if (this.typeFilter) params['type'] = this.typeFilter;
     if (this.subtypeFilter) params['subtype'] = this.subtypeFilter;
+    if (this.repoFilter) params['repositoryId'] = this.repoFilter;
 
     this.api.getEnrichments(params).subscribe({
-      next: res => { this.enrichments = res.results; this.totalCount = res.totalCount; this.loading = false; },
+      next: res => {
+        this.enrichments = res.results;
+        this.totalCount = res.totalCount;
+        this.loading = false;
+        this.buildTypeCounts(res.results);
+      },
       error: () => this.loading = false
     });
   }
@@ -99,6 +176,7 @@ export class EnrichmentBrowserComponent implements OnInit {
     const params: Record<string, string | number> = { offset: this.offset, limit: 20 };
     if (this.typeFilter) params['type'] = this.typeFilter;
     if (this.subtypeFilter) params['subtype'] = this.subtypeFilter;
+    if (this.repoFilter) params['repositoryId'] = this.repoFilter;
 
     this.api.getEnrichments(params).subscribe({
       next: res => this.enrichments.push(...res.results)
@@ -106,4 +184,25 @@ export class EnrichmentBrowserComponent implements OnInit {
   }
 
   toggleExpand(id: string) { this.expandedId = this.expandedId === id ? null : id; }
+
+  getTypeLabel(type: string): string {
+    return this.typeLabels[type] || type;
+  }
+
+  getSubtypeLabel(subtype: string): string {
+    return this.subtypeLabels[subtype] || subtype;
+  }
+
+  getRepoName(repositoryId: string): string {
+    const repo = this.repos.find(r => r.id === repositoryId);
+    return repo?.name || '';
+  }
+
+  private buildTypeCounts(enrichments: Enrichment[]) {
+    const counts = new Map<string, number>();
+    for (const e of enrichments) {
+      counts.set(e.subtype, (counts.get(e.subtype) || 0) + 1);
+    }
+    this.typeCounts = Array.from(counts.entries()).map(([subtype, count]) => ({ subtype, count }));
+  }
 }

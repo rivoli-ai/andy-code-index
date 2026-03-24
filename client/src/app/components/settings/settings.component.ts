@@ -13,6 +13,26 @@ import { environment } from '../../../environments/environment';
       <h1>Settings</h1>
     </div>
 
+    <div class="card mb-2" style="max-width:640px">
+      <h3 style="font-size:1rem;margin-bottom:0.75rem">Embedding API Key</h3>
+      <p class="text-muted" style="font-size:0.875rem;margin:0">
+        The embedding API key is used to generate <strong>vector representations</strong> of your code.
+        These embeddings power <strong>semantic search</strong> -- finding code by meaning rather than exact keywords.
+        Without an embedding key, only keyword-based search is available.
+      </p>
+    </div>
+
+    <div class="card mb-2" style="max-width:640px">
+      <h3 style="font-size:1rem;margin-bottom:0.75rem">LLM / Chat Model</h3>
+      <p class="text-muted" style="font-size:0.875rem;margin-bottom:0.5rem">
+        The LLM powers the <strong>Chat</strong> feature and generates enrichments such as architecture docs, wiki pages, and cookbook recipes.
+        It is configured server-side via environment variables.
+      </p>
+      <p class="text-muted" style="font-size:0.8125rem;margin:0">
+        <strong>Supported models:</strong> OpenAI GPT-4o, GPT-4o-mini, GPT-3.5 Turbo; Azure OpenAI equivalents; any OpenAI-compatible API.
+      </p>
+    </div>
+
     <div class="card" style="max-width:640px" *ngIf="settings">
       <h3 style="font-size:1rem;margin-bottom:1rem">Embedding Configuration</h3>
 

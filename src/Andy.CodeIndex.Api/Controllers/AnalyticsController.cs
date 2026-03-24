@@ -127,4 +127,62 @@ public class AnalyticsController : ControllerBase
 
         return Ok(files);
     }
+
+    /// <summary>Get comprehensive repository statistics.</summary>
+    [HttpGet("summary")]
+    public async Task<IActionResult> GetSummary(Guid repositoryId, CancellationToken ct = default)
+    {
+        var repo = await _context.Repositories.FindAsync([repositoryId], ct);
+        if (repo is null) return NotFound();
+
+        var chunkCount = await _context.Enrichments.CountAsync(e => e.RepositoryId == repositoryId && e.Subtype == Domain.Enums.EnrichmentSubtype.Chunk, ct);
+        var apiDocsCount = await _context.Enrichments.CountAsync(e => e.RepositoryId == repositoryId && e.Subtype == Domain.Enums.EnrichmentSubtype.APIDocs, ct);
+        var embeddingCount = await _context.ContentEmbeddings.CountAsync(ce => _context.Enrichments.Where(e => e.RepositoryId == repositoryId).Select(e => e.Id).Contains(ce.EnrichmentId), ct);
+
+        var enrichmentsByType = await _context.Enrichments
+            .Where(e => e.RepositoryId == repositoryId)
+            .GroupBy(e => new { e.Type, e.Subtype })
+            .Select(g => new { type = g.Key.Type.ToString(), subtype = g.Key.Subtype.ToString(), count = g.Count() })
+            .ToListAsync(ct);
+
+        var lastCommit = await _context.Commits
+            .Where(c => c.RepositoryId == repositoryId)
+            .OrderByDescending(c => c.CommittedAt)
+            .FirstOrDefaultAsync(ct);
+
+        var testFileCount = await _context.Enrichments
+            .Where(e => e.RepositoryId == repositoryId && e.Subtype == Domain.Enums.EnrichmentSubtype.Chunk && e.FilePath != null && (e.FilePath.Contains("Test") || e.FilePath.Contains("test") || e.FilePath.Contains(".spec.")))
+            .Select(e => e.FilePath).Distinct().CountAsync(ct);
+
+        var totalFiles = await _context.Enrichments
+            .Where(e => e.RepositoryId == repositoryId && e.Subtype == Domain.Enums.EnrichmentSubtype.Chunk && e.FilePath != null)
+            .Select(e => e.FilePath).Distinct().CountAsync(ct);
+
+        return Ok(new
+        {
+            repository = repo.Name,
+            status = repo.Status,
+            defaultBranch = repo.DefaultBranch,
+            lastSyncedAt = repo.LastSyncedAt,
+            lastCommit = lastCommit is not null ? new
+            {
+                sha = lastCommit.Sha,
+                message = lastCommit.Message.Length > 100 ? lastCommit.Message[..100] + "..." : lastCommit.Message,
+                authorName = lastCommit.AuthorName,
+                authorEmail = lastCommit.AuthorEmail,
+                committedAt = lastCommit.CommittedAt,
+                age = DateTime.UtcNow - lastCommit.CommittedAt
+            } : null,
+            stats = new
+            {
+                totalFiles,
+                testFiles = testFileCount,
+                codeChunks = chunkCount,
+                apiDocs = apiDocsCount,
+                embeddings = embeddingCount,
+                hasEmbeddings = embeddingCount > 0,
+            },
+            enrichmentsByType
+        });
+    }
 }

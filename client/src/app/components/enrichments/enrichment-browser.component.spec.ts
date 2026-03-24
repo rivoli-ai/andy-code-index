@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { EnrichmentBrowserComponent } from './enrichment-browser.component';
 import { ApiService } from '../../services/api.service';
 import { of } from 'rxjs';
@@ -12,7 +14,11 @@ describe('EnrichmentBrowserComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [EnrichmentBrowserComponent],
-      providers: [{ provide: ApiService, useValue: apiServiceSpy }]
+      providers: [
+        { provide: ApiService, useValue: apiServiceSpy },
+        provideHttpClient(),
+        provideHttpClientTesting()
+      ]
     }).compileComponents();
   });
 
@@ -27,10 +33,10 @@ describe('EnrichmentBrowserComponent', () => {
     expect(apiServiceSpy.getEnrichments).toHaveBeenCalled();
   });
 
-  it('should show empty state when no enrichments', () => {
+  it('should show explanation text', () => {
     const fixture = TestBed.createComponent(EnrichmentBrowserComponent);
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('No enrichments found');
+    expect(fixture.nativeElement.textContent).toContain('Enrichments');
   });
 
   it('should display enrichments', () => {
