@@ -34,6 +34,8 @@ import { Repository } from '../../models/repository.model';
             <th>Name</th>
             <th>Provider</th>
             <th>Status</th>
+            <th>Enrichments</th>
+            <th>Embeddings</th>
             <th>Last Synced</th>
             <th>Actions</th>
           </tr>
@@ -44,7 +46,11 @@ import { Repository } from '../../models/repository.model';
             <td><span class="badge badge-muted">{{ repo.provider }}</span></td>
             <td>
               <span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span>
-              <span class="badge badge-muted" style="margin-left:0.25rem" *ngIf="repo.status === 'indexed' && repo.stats && !repo.stats.hasEmbeddings">no embeddings</span>
+            </td>
+            <td class="text-muted">{{ repo.stats?.enrichmentCount || 0 }}</td>
+            <td>
+              <span *ngIf="repo.stats?.hasEmbeddings">{{ repo.stats.embeddingCount }}</span>
+              <span class="text-muted" *ngIf="!repo.stats?.hasEmbeddings">--</span>
             </td>
             <td class="text-muted">{{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'short') : 'Never' }}</td>
             <td>

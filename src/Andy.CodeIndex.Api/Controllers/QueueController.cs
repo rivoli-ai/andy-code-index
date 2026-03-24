@@ -25,7 +25,9 @@ public class QueueController : ControllerBase
         var tasks = await _taskRepo.GetAllAsync(ct);
         return Ok(tasks.Select(t => new
         {
-            t.Id, t.RepositoryId, t.CommitId, t.Operation, t.Status,
+            t.Id, t.RepositoryId, t.CommitId,
+            operation = t.Operation.ToString(),
+            status = t.Status.ToString(),
             t.Progress, t.ErrorMessage, t.ChainId, t.Priority,
             t.CreatedAt, t.StartedAt, t.CompletedAt
         }).OrderByDescending(t => t.CreatedAt));

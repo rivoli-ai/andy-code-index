@@ -124,7 +124,25 @@ public class RepositoryService : IRepositoryService
         else
             repos = await _repositoryRepo.GetAllAsync(ct);
 
-        return repos.Select(MapToDto).ToList();
+        var dtos = new List<RepositoryDto>();
+        foreach (var repo in repos)
+        {
+            var dto = MapToDto(repo);
+            var enrichmentCount = await _enrichmentRepo.CountAsync(e => e.RepositoryId == repo.Id, ct);
+            var embeddingCount = await _context.ContentEmbeddings
+                .CountAsync(ce => _context.Enrichments
+                    .Where(e => e.RepositoryId == repo.Id)
+                    .Select(e => e.Id)
+                    .Contains(ce.EnrichmentId), ct);
+            dto.Stats = new RepositoryStatsDto
+            {
+                EnrichmentCount = enrichmentCount,
+                EmbeddingCount = embeddingCount,
+                HasEmbeddings = embeddingCount > 0
+            };
+            dtos.Add(dto);
+        }
+        return dtos;
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
