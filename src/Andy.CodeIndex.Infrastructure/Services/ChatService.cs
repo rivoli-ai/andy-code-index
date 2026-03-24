@@ -62,14 +62,56 @@ public class ChatService : IChatService
             };
         }
 
-        // 2. Search for relevant context (RBAC filtering happens in SearchService)
+        // 2. Fetch relevant enrichment documents (architecture, wiki, etc.)
+        var docQuery = _context.Enrichments
+            .Include(e => e.Repository)
+            .Where(e => e.Subtype != EnrichmentSubtype.Chunk); // Non-code enrichments only
+
+        if (request.RepositoryId.HasValue)
+            docQuery = docQuery.Where(e => e.RepositoryId == request.RepositoryId.Value);
+
+        // Detect if question is about specific enrichment types
+        var messageLower = request.Message.ToLowerInvariant();
+        var wantsArchitecture = messageLower.Contains("architect") || messageLower.Contains("structure") || messageLower.Contains("design") || messageLower.Contains("component");
+        var wantsDeps = messageLower.Contains("depend") || messageLower.Contains("package") || messageLower.Contains("nuget") || messageLower.Contains("npm");
+        var wantsDb = messageLower.Contains("database") || messageLower.Contains("schema") || messageLower.Contains("table") || messageLower.Contains("migration");
+        var wantsWiki = messageLower.Contains("wiki") || messageLower.Contains("document") || messageLower.Contains("guide") || messageLower.Contains("overview");
+        var wantsCookbook = messageLower.Contains("cookbook") || messageLower.Contains("example") || messageLower.Contains("getting started") || messageLower.Contains("how to");
+
+        if (wantsArchitecture) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Physical || e.Subtype == EnrichmentSubtype.DatabaseSchema);
+        else if (wantsDeps) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Dependencies);
+        else if (wantsDb) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.DatabaseSchema);
+        else if (wantsCookbook) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Cookbook);
+        else if (wantsWiki) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Wiki);
+        // If no specific type detected, include all non-chunk enrichments (limited)
+
+        var enrichmentDocs = await docQuery.Take(10).ToListAsync(ct);
+
+        // 3. Also do keyword search on code chunks for specific code context
         var filter = new SearchFilter();
         if (request.RepositoryId.HasValue)
             filter.RepositoryIds = [request.RepositoryId.Value];
 
-        var searchResults = await _searchService.KeywordSearchAsync(request.Message, filter, limit: 8, ct);
+        var searchResults = await _searchService.KeywordSearchAsync(request.Message, filter, limit: 5, ct);
 
-        var sources = searchResults.Results.Select(r => new ChatSource
+        var sources = new List<ChatSource>();
+
+        // Add enrichment docs as sources
+        foreach (var doc in enrichmentDocs)
+        {
+            var content = doc.Content.Length > 1500 ? doc.Content[..1500] + "..." : doc.Content;
+            sources.Add(new ChatSource
+            {
+                FilePath = $"[{doc.Subtype}] {doc.Title ?? doc.Subtype.ToString()}",
+                Content = content,
+                Language = doc.Language,
+                RepositoryName = doc.Repository?.Name,
+                Score = 1.0
+            });
+        }
+
+        // Add code search results
+        sources.AddRange(searchResults.Results.Select(r => new ChatSource
         {
             FilePath = r.FilePath ?? "unknown",
             StartLine = r.StartLine,
@@ -78,7 +120,7 @@ public class ChatService : IChatService
             Language = r.Language,
             RepositoryName = r.RepositoryName,
             Score = r.Score
-        }).ToList();
+        }));
 
         // 3. Build repo context
         var repoContext = "";
