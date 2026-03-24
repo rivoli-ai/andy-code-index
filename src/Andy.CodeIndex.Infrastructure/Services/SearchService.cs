@@ -32,10 +32,6 @@ public class SearchService : ISearchService
     {
         var sw = Stopwatch.StartNew();
 
-        // Gracefully handle unavailable embedding provider
-        if (!_embeddingProvider.IsAvailable)
-            return EmptyResult("semantic", sw);
-
         float[][] queryEmbedding;
         try
         {
