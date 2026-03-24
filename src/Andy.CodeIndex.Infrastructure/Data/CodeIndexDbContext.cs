@@ -21,6 +21,7 @@ public class CodeIndexDbContext : DbContext
     public DbSet<ChunkLineRange> ChunkLineRanges => Set<ChunkLineRange>();
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
     public DbSet<IndexingRun> IndexingRuns => Set<IndexingRun>();
+    public DbSet<SettingsChangeLog> SettingsChangeLogs => Set<SettingsChangeLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,7 @@ public class CodeIndexDbContext : DbContext
         ConfigureChunkLineRange(modelBuilder, isNpgsql);
         ConfigureUserSettings(modelBuilder);
         ConfigureIndexingRun(modelBuilder);
+        ConfigureSettingsChangeLog(modelBuilder);
     }
 
     private static void ConfigureRepository(ModelBuilder modelBuilder, bool isNpgsql)
@@ -324,6 +326,21 @@ public class CodeIndexDbContext : DbContext
             builder.HasIndex(r => r.RepositoryId);
             builder.HasIndex(r => r.ChainId);
             builder.HasIndex(r => r.StartedAt);
+        });
+    }
+
+    private static void ConfigureSettingsChangeLog(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SettingsChangeLog>(builder =>
+        {
+            builder.HasKey(l => l.Id);
+            builder.Property(l => l.UserId).IsRequired().HasMaxLength(256);
+            builder.Property(l => l.Field).IsRequired().HasMaxLength(128);
+            builder.Property(l => l.OldValue).HasMaxLength(256);
+            builder.Property(l => l.NewValue).HasMaxLength(256);
+            builder.Property(l => l.Action).IsRequired().HasMaxLength(32);
+            builder.HasIndex(l => l.UserId);
+            builder.HasIndex(l => l.CreatedAt);
         });
     }
 }

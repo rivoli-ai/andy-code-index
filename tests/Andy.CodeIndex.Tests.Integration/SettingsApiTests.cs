@@ -14,36 +14,37 @@ public class SettingsApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task GetSettings_ReturnsDefaults()
+    public async Task GetSettings_ReturnsEmbeddingState()
     {
         var response = await _client.GetAsync("/api/v1/settings");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await response.Content.ReadAsStringAsync();
-        body.Should().Contain("hasEmbeddingKey");
+        body.Should().Contain("embedding");
+        body.Should().Contain("source");
+        body.Should().Contain("hasKey");
     }
 
     [Fact]
-    public async Task UpdateSettings_StoresKey()
+    public async Task UpdateSettings_StoresKeyAndShowsMasked()
     {
         var response = await _client.PutAsJsonAsync("/api/v1/settings",
             new { embeddingApiKey = "sk-test-key-12345678" });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Verify key is stored (masked in response)
         var getResponse = await _client.GetAsync("/api/v1/settings");
         var body = await getResponse.Content.ReadAsStringAsync();
-        body.Should().Contain("\"hasEmbeddingKey\":true");
+        body.Should().Contain("\"hasKey\":true");
+        body.Should().Contain("\"source\":\"user\"");
+        body.Should().Contain("***...5678"); // Masked: last 4 chars
     }
 
     [Fact]
     public async Task DeleteEmbeddingKey_RemovesKey()
     {
-        // First set a key
         await _client.PutAsJsonAsync("/api/v1/settings",
-            new { embeddingApiKey = "sk-to-delete" });
+            new { embeddingApiKey = "sk-to-delete-1234" });
 
-        // Then delete it
         var response = await _client.DeleteAsync("/api/v1/settings/embedding-key");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -57,9 +58,39 @@ public class SettingsApiTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.GetAsync("/api/v1/settings");
         var body = await response.Content.ReadAsStringAsync();
 
-        // Full key should never appear
         body.Should().NotContain("sk-supersecretkey123456");
-        // But masked version should
-        body.Should().Contain("embeddingKeyMasked");
+        body.Should().Contain("***...3456"); // andy-docs format: ***...last4
+    }
+
+    [Fact]
+    public async Task GetHistory_ReturnsAuditTrail()
+    {
+        // Set a key to create an audit entry
+        await _client.PutAsJsonAsync("/api/v1/settings",
+            new { embeddingApiKey = "sk-audit-test-key-9999" });
+
+        var response = await _client.GetAsync("/api/v1/settings/history");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("EmbeddingApiKey");
+        body.Should().Contain("set"); // action
+    }
+
+    [Fact]
+    public async Task UpdateKey_AuditShowsUpdated()
+    {
+        // Set initial key
+        await _client.PutAsJsonAsync("/api/v1/settings",
+            new { embeddingApiKey = "sk-first-key-0000" });
+
+        // Update key
+        await _client.PutAsJsonAsync("/api/v1/settings",
+            new { embeddingApiKey = "sk-second-key-1111" });
+
+        var response = await _client.GetAsync("/api/v1/settings/history");
+        var body = await response.Content.ReadAsStringAsync();
+
+        body.Should().Contain("updated"); // Second change should be "updated" not "set"
     }
 }
