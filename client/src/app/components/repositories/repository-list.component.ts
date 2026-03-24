@@ -1,13 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { Repository } from '../../models/repository.model';
 
 @Component({
   selector: 'app-repository-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   template: `
     <div class="page-header">
       <h1>Repositories</h1>
@@ -27,7 +28,41 @@ import { Repository } from '../../models/repository.model';
       <a routerLink="/repositories/add" class="btn btn-primary">Add Repository</a>
     </div>
 
-    <div class="card" *ngIf="!loading && repositories.length > 0">
+    <!-- Filters -->
+    <div class="card mb-2" *ngIf="!loading && repositories.length > 0" style="padding:0.75rem 1rem">
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
+        <input class="form-control" [(ngModel)]="nameFilter" placeholder="Search by name..." style="width:200px;padding:0.375rem 0.75rem">
+        <select class="form-control" [(ngModel)]="statusFilter" style="width:130px">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="cloning">Cloning</option>
+          <option value="indexed">Indexed</option>
+          <option value="indexing">Indexing</option>
+          <option value="error">Error</option>
+        </select>
+        <select class="form-control" [(ngModel)]="providerFilter" style="width:140px">
+          <option value="">All Providers</option>
+          <option value="GitHub">GitHub</option>
+          <option value="GitLab">GitLab</option>
+          <option value="Gitea">Gitea</option>
+          <option value="AzureDevOps">Azure DevOps</option>
+        </select>
+        <select class="form-control" [(ngModel)]="sortBy" style="width:150px">
+          <option value="name">Sort: Name</option>
+          <option value="lastSynced">Sort: Last Synced</option>
+          <option value="enrichments">Sort: Enrichments</option>
+          <option value="embeddings">Sort: Embeddings</option>
+        </select>
+        <button class="btn btn-sm btn-secondary" (click)="clearFilters()" *ngIf="nameFilter || statusFilter || providerFilter">
+          Clear
+        </button>
+        <span class="text-muted" style="margin-left:auto;font-size:0.8125rem">
+          Showing {{ filteredRepositories.length }} of {{ repositories.length }}
+        </span>
+      </div>
+    </div>
+
+    <div class="card" *ngIf="!loading && filteredRepositories.length > 0">
       <table>
         <thead>
           <tr>
@@ -41,7 +76,7 @@ import { Repository } from '../../models/repository.model';
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let repo of repositories">
+          <tr *ngFor="let repo of filteredRepositories">
             <td><a [routerLink]="['/repositories', repo.id]">{{ repo.name }}</a></td>
             <td><span class="badge badge-muted">{{ repo.provider }}</span></td>
             <td>
@@ -64,6 +99,13 @@ import { Repository } from '../../models/repository.model';
       </table>
     </div>
 
+    <div *ngIf="!loading && repositories.length > 0 && filteredRepositories.length === 0" class="empty-state card">
+      <i class="bi bi-funnel"></i>
+      <h3>No matching repositories</h3>
+      <p>Try adjusting your filters.</p>
+      <button class="btn btn-secondary" (click)="clearFilters()">Clear Filters</button>
+    </div>
+
     <div class="error-message" *ngIf="error">{{ error }}</div>
   `,
   styles: [`
@@ -76,6 +118,10 @@ export class RepositoryListComponent implements OnInit {
   error = '';
   syncing: Record<string, boolean> = {};
   busyRepos: Set<string> = new Set();
+  nameFilter = '';
+  statusFilter = '';
+  providerFilter = '';
+  sortBy = 'name';
 
   constructor(private api: ApiService) {}
 
@@ -98,6 +144,32 @@ export class RepositoryListComponent implements OnInit {
         this.busyRepos = new Set(pipelines.map((p: any) => p.repositoryId));
       }
     });
+  }
+
+  get filteredRepositories(): Repository[] {
+    let repos = this.repositories;
+    if (this.nameFilter) {
+      const q = this.nameFilter.toLowerCase();
+      repos = repos.filter(r => r.name.toLowerCase().includes(q));
+    }
+    if (this.statusFilter) repos = repos.filter(r => r.status === this.statusFilter);
+    if (this.providerFilter) repos = repos.filter(r => r.provider === this.providerFilter);
+
+    return repos.sort((a, b) => {
+      switch (this.sortBy) {
+        case 'lastSynced': return (b.lastSyncedAt || '').localeCompare(a.lastSyncedAt || '');
+        case 'enrichments': return (b.stats?.enrichmentCount || 0) - (a.stats?.enrichmentCount || 0);
+        case 'embeddings': return (b.stats?.embeddingCount || 0) - (a.stats?.embeddingCount || 0);
+        default: return a.name.localeCompare(b.name);
+      }
+    });
+  }
+
+  clearFilters() {
+    this.nameFilter = '';
+    this.statusFilter = '';
+    this.providerFilter = '';
+    this.sortBy = 'name';
   }
 
   isBusy(repoId: string): boolean {

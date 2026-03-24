@@ -54,14 +54,24 @@ interface DiscoveredRepo {
     <div *ngIf="discovering" style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
 
     <div *ngIf="!discovering && repos.length > 0">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <span class="text-muted">{{ repos.length }} repositories found ({{ trackedCount }} already tracked)</span>
-        <button class="btn btn-primary btn-sm" (click)="addSelected()" [disabled]="adding || selectedCount === 0">
-          Add {{ selectedCount }} Selected
-        </button>
+      <div class="card mb-2" style="padding:0.75rem 1rem">
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
+          <input class="form-control" [(ngModel)]="repoSearch" placeholder="Filter by name..." style="width:200px;padding:0.375rem 0.75rem">
+          <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.875rem;cursor:pointer;margin:0">
+            <input type="checkbox" [(ngModel)]="hideTracked"> Hide already tracked
+          </label>
+          <button class="btn btn-sm btn-secondary" (click)="selectAllVisible()">Select All</button>
+          <button class="btn btn-sm btn-secondary" (click)="deselectAll()">Deselect All</button>
+          <span class="text-muted" style="margin-left:auto;font-size:0.8125rem">
+            Showing {{ filteredRepos.length }} of {{ repos.length }} ({{ trackedCount }} tracked)
+          </span>
+          <button class="btn btn-primary btn-sm" (click)="addSelected()" [disabled]="adding || selectedCount === 0">
+            Add {{ selectedCount }} Selected
+          </button>
+        </div>
       </div>
 
-      <div class="card" *ngFor="let repo of repos" style="margin-bottom:0.5rem;padding:1rem">
+      <div class="card" *ngFor="let repo of filteredRepos" style="margin-bottom:0.5rem;padding:1rem">
         <div style="display:flex;align-items:center;gap:0.75rem">
           <input type="checkbox" [(ngModel)]="repo.selected" [disabled]="repo.alreadyTracked" style="width:18px;height:18px">
           <div style="flex:1">
@@ -97,6 +107,8 @@ export class DiscoveryComponent {
   searched = false;
   error = '';
   addMessage = '';
+  repoSearch = '';
+  hideTracked = false;
 
   constructor(private http: HttpClient) {}
 
@@ -106,6 +118,24 @@ export class DiscoveryComponent {
 
   get trackedCount(): number {
     return this.repos.filter(r => r.alreadyTracked).length;
+  }
+
+  get filteredRepos(): DiscoveredRepo[] {
+    let result = this.repos;
+    if (this.repoSearch) {
+      const q = this.repoSearch.toLowerCase();
+      result = result.filter(r => r.name.toLowerCase().includes(q) || r.fullName.toLowerCase().includes(q));
+    }
+    if (this.hideTracked) result = result.filter(r => !r.alreadyTracked);
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  selectAllVisible() {
+    this.filteredRepos.filter(r => !r.alreadyTracked).forEach(r => r.selected = true);
+  }
+
+  deselectAll() {
+    this.repos.forEach(r => r.selected = false);
   }
 
   discover() {

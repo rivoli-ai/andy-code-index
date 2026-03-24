@@ -101,10 +101,25 @@ interface FilterOptions {
       </div>
     </div>
 
-    <div *ngIf="results && results.results.length === 0 && !searching" class="empty-state card">
-      <i class="bi bi-search"></i>
-      <h3>No results found</h3>
-      <p>Try different keywords, a broader search mode, or remove filters.</p>
+    <div *ngIf="results && results.results.length === 0 && !searching" class="card" style="text-align:center;padding:2rem">
+      <i class="bi bi-search" style="font-size:2rem;color:var(--text-muted);display:block;margin-bottom:1rem"></i>
+      <h3 style="margin-bottom:0.5rem">No results for "{{ query }}"</h3>
+      <p class="text-muted" style="margin-bottom:1rem">
+        Searched using <strong>{{ mode }}</strong> mode
+        <span *ngIf="getActiveFilterLabel()"> with filters: {{ getActiveFilterLabel() }}</span>
+      </p>
+      <div style="text-align:left;max-width:400px;margin:0 auto;font-size:0.875rem">
+        <p style="font-weight:600;margin-bottom:0.5rem">Suggestions:</p>
+        <ul style="padding-left:1.25rem;margin:0">
+          <li *ngIf="mode !== 'keyword'">Try <a href="javascript:void(0)" (click)="switchMode('keyword')">keyword search</a> for exact matches</li>
+          <li *ngIf="mode !== 'semantic'">Try <a href="javascript:void(0)" (click)="switchMode('semantic')">semantic search</a> for conceptual matches</li>
+          <li *ngIf="selectedRepo || selectedLang">
+            <a href="javascript:void(0)" (click)="clearFilters()">Remove filters</a> to search all repos and languages
+          </li>
+          <li>Use simpler or more general keywords</li>
+          <li>Check that repositories are indexed (status: "indexed")</li>
+        </ul>
+      </div>
     </div>
   `,
   styles: [`
@@ -179,5 +194,26 @@ export class SearchComponent implements OnInit {
 
   truncateContent(content: string): string {
     return content.length > 500 ? content.substring(0, 500) + '...' : content;
+  }
+
+  getActiveFilterLabel(): string {
+    const parts: string[] = [];
+    if (this.selectedRepo && this.filters) {
+      const repo = this.filters.repositories.find(r => r.id === this.selectedRepo);
+      if (repo) parts.push(repo.name);
+    }
+    if (this.selectedLang) parts.push(this.selectedLang);
+    return parts.join(', ');
+  }
+
+  switchMode(mode: string) {
+    this.mode = mode;
+    this.search(true);
+  }
+
+  clearFilters() {
+    this.selectedRepo = '';
+    this.selectedLang = '';
+    this.search(true);
   }
 }
