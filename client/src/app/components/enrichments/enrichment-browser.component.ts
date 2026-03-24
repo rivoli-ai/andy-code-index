@@ -88,6 +88,7 @@ import { environment } from '../../../environments/environment';
               <span class="badge badge-primary">{{ getTypeLabel(e.type) }}</span>
               <span class="badge badge-muted" style="margin-left:0.25rem">{{ getSubtypeLabel(e.subtype) }}</span>
               <span class="badge badge-muted" style="margin-left:0.25rem" *ngIf="e.language">{{ e.language }}</span>
+              <span class="badge" style="margin-left:0.25rem" [ngClass]="qualityClass(e.quality)">{{ qualityLabel(e.quality) }}</span>
             </div>
             <strong>{{ e.title || e.filePath || 'Untitled' }}</strong>
             <div class="text-muted" style="font-size:0.8125rem;margin-top:0.25rem" *ngIf="e.filePath || getRepoName(e.repositoryId)">
@@ -258,4 +259,15 @@ export class EnrichmentBrowserComponent implements OnInit {
     return repo?.name || '';
   }
 
+  qualityLabel(quality: number): string {
+    if (quality >= 0.8) return 'High';
+    if (quality >= 0.5) return 'Medium';
+    return 'Low';
+  }
+
+  qualityClass(quality: number): string {
+    if (quality >= 0.8) return 'badge-success';
+    if (quality >= 0.5) return 'badge-warning';
+    return 'badge-danger';
+  }
 }

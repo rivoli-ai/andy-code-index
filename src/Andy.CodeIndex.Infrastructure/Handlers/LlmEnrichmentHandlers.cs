@@ -69,7 +69,7 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
             .ToListAsync(ct);
         Context.Enrichments.RemoveRange(existing);
 
-        // Store new enrichment
+        // Store new enrichment with quality score
         Context.Enrichments.Add(new Enrichment
         {
             Id = Guid.NewGuid(),
@@ -78,6 +78,7 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
             Subtype = Subtype,
             Title = $"{Subtype} for {repo.Name}",
             Content = reply,
+            Quality = EstimateQuality(reply),
             CreatedAt = DateTime.UtcNow
         });
 
@@ -112,6 +113,32 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
             Logger.LogError(ex, "LLM call failed for {Operation}", Operation);
             return null;
         }
+    }
+
+    internal static double EstimateQuality(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return 0.0;
+
+        var lower = content.ToLowerInvariant();
+        var length = content.Length;
+
+        // Low-quality indicators: LLM said it couldn't find anything useful
+        var lowQualityPhrases = new[]
+        {
+            "no database schema", "no schema found", "unable to determine", "cannot determine",
+            "no information available", "not enough context", "no relevant", "i cannot",
+            "i don't have enough", "no data available", "could not find", "unable to find",
+            "no specific", "not found in the", "insufficient", "no evidence of"
+        };
+
+        var hasLowQualityPhrase = lowQualityPhrases.Any(p => lower.Contains(p));
+
+        if (hasLowQualityPhrase && length < 500) return 0.1;
+        if (hasLowQualityPhrase) return 0.3;
+        if (length < 100) return 0.2;
+        if (length < 300) return 0.5;
+        if (length < 1000) return 0.7;
+        return length >= 2000 ? 1.0 : 0.85;
     }
 
     protected string SummarizeChunks(List<Enrichment> chunks, int maxChars = 8000)

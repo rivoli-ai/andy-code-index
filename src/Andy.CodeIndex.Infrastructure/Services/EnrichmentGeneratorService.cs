@@ -85,6 +85,7 @@ public class EnrichmentGeneratorService : IEnrichmentGeneratorService
         StartLine = e.StartLine,
         EndLine = e.EndLine,
         Language = e.Language,
+        Quality = e.Quality,
         CreatedAt = e.CreatedAt
     };
 }

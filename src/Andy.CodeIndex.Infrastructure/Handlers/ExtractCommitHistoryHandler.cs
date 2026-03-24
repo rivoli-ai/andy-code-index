@@ -81,6 +81,7 @@ public class ExtractCommitHistoryHandler : ITaskHandler
             Subtype = EnrichmentSubtype.CommitHistory,
             Title = $"Commit History ({commits.Count} commits, {tags.Count} tags)",
             Content = md.ToString(),
+            Quality = commits.Count > 20 ? 1.0 : commits.Count > 5 ? 0.8 : 0.5,
             CreatedAt = DateTime.UtcNow
         });
 

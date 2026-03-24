@@ -89,6 +89,7 @@ public class ExtractDependenciesHandler : ITaskHandler
                 Subtype = EnrichmentSubtype.Dependencies,
                 Title = $"Dependencies ({allDeps.Count} packages)",
                 Content = md.ToString(),
+                Quality = allDeps.Count > 10 ? 1.0 : allDeps.Count > 3 ? 0.8 : 0.5,
                 CreatedAt = DateTime.UtcNow
             });
         }

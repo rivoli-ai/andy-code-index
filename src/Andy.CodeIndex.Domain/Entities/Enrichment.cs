@@ -17,6 +17,7 @@ public class Enrichment
     public int? EndLine { get; set; }
     public string? Language { get; set; }
     public NpgsqlTsVector? SearchVector { get; set; }
+    public double Quality { get; set; } = 0.5;
     public DateTime CreatedAt { get; set; }
 
     public Repository Repository { get; set; } = null!;

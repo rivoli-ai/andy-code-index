@@ -16,5 +16,6 @@ public class EnrichmentDto
     public int? StartLine { get; set; }
     public int? EndLine { get; set; }
     public string? Language { get; set; }
+    public double Quality { get; set; }
     public DateTime CreatedAt { get; set; }
 }

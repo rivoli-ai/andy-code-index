@@ -11,6 +11,7 @@ export interface Enrichment {
   startLine?: number;
   endLine?: number;
   language?: string;
+  quality: number;
   createdAt: string;
 }
 
