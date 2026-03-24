@@ -96,8 +96,17 @@ public class ChatService : IChatService
         }
         else
         {
-            var repos = await _context.Repositories.Select(r => r.Name).ToListAsync(ct);
-            repoContext = $"\nIndexed repositories: {string.Join(", ", repos)}\n";
+            var repos = await _context.Repositories.ToListAsync(ct);
+            var repoSummaries = new List<string>();
+            foreach (var r in repos)
+            {
+                var chunkCount = await _context.Enrichments.CountAsync(e => e.RepositoryId == r.Id && e.Subtype == EnrichmentSubtype.Chunk, ct);
+                var languages = await _context.Enrichments
+                    .Where(e => e.RepositoryId == r.Id && e.Language != null)
+                    .Select(e => e.Language!).Distinct().ToListAsync(ct);
+                repoSummaries.Add($"- {r.Name} ({r.Url}): {chunkCount} code chunks, languages: {string.Join(", ", languages)}, status: {r.Status}");
+            }
+            repoContext = $"\nIndexed repositories ({repos.Count}):\n{string.Join("\n", repoSummaries)}\n";
         }
 
         // 4. Build conversation with history
