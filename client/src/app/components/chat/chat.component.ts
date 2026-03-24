@@ -2,6 +2,7 @@ import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@ang
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { marked } from 'marked';
 import { environment } from '../../../environments/environment';
 
 interface ChatMessage {
@@ -101,9 +102,19 @@ interface Repository {
     .message-bubble { max-width: 80%; padding: 0.75rem 1rem; border-radius: var(--radius-lg); }
     .message.user .message-bubble { background: var(--primary); color: white; border-bottom-right-radius: 4px; }
     .message.assistant .message-bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-    .message-content { white-space: pre-wrap; word-wrap: break-word; font-size: 0.9375rem; line-height: 1.6; }
+    .message-content { word-wrap: break-word; font-size: 0.9375rem; line-height: 1.6; }
+    .message-content :deep(p) { margin: 0 0 0.5rem 0; }
+    .message-content :deep(p:last-child) { margin-bottom: 0; }
+    .message-content :deep(ul), .message-content :deep(ol) { margin: 0.25rem 0 0.5rem 1.25rem; padding: 0; }
+    .message-content :deep(li) { margin-bottom: 0.25rem; }
+    .message-content :deep(h1), .message-content :deep(h2), .message-content :deep(h3) { font-size: 1rem; font-weight: 600; margin: 0.75rem 0 0.25rem 0; }
     .message-content :deep(code) { background: rgba(0,0,0,0.06); padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.85em; }
+    .message-content :deep(pre) { background: #1e1e1e; color: #d4d4d4; padding: 0.75rem; border-radius: var(--radius); overflow-x: auto; margin: 0.5rem 0; font-size: 0.8rem; }
+    .message-content :deep(pre code) { background: none; padding: 0; color: inherit; }
+    .message-content :deep(strong) { font-weight: 600; }
+    .message-content :deep(blockquote) { border-left: 3px solid var(--border); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--text-muted); }
     .message.user .message-content :deep(code) { background: rgba(255,255,255,0.2); }
+    .message.user .message-content :deep(pre) { background: rgba(0,0,0,0.2); color: white; }
     .sources-toggle { margin-top: 0.5rem; }
     .sources-list { margin-top: 0.5rem; }
     .source-item { font-size: 0.75rem; padding: 0.25rem 0; color: var(--text-muted); }
@@ -181,11 +192,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   formatContent(content: string): string {
-    // Basic markdown-like formatting for code blocks
-    return content
-      .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\n/g, '<br>');
+    return marked.parse(content, { async: false }) as string;
   }
 
   private scrollToBottom() {
