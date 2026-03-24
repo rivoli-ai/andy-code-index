@@ -49,7 +49,7 @@ import { Repository } from '../../models/repository.model';
             </td>
             <td class="text-muted">{{ repo.stats?.enrichmentCount || 0 }}</td>
             <td>
-              <span *ngIf="repo.stats?.hasEmbeddings">{{ repo.stats.embeddingCount }}</span>
+              <span *ngIf="repo.stats?.hasEmbeddings">{{ repo.stats?.embeddingCount }}</span>
               <span class="text-muted" *ngIf="!repo.stats?.hasEmbeddings">--</span>
             </td>
             <td class="text-muted">{{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'short') : 'Never' }}</td>
