@@ -55,7 +55,7 @@ import { environment } from '../../../environments/environment';
     <div class="card mb-2">
       <div style="display:flex;gap:1rem;flex-wrap:wrap">
         <div class="form-group" style="margin-bottom:0">
-          <select class="form-control" [(ngModel)]="typeFilter" (change)="loadEnrichments()" style="width:180px">
+          <select class="form-control" [(ngModel)]="typeFilter" (change)="onTypeChange()" style="width:180px">
             <option value="">All Types</option>
             <option value="Architecture">Architecture</option>
             <option value="Development">Development</option>
@@ -66,19 +66,7 @@ import { environment } from '../../../environments/environment';
         <div class="form-group" style="margin-bottom:0">
           <select class="form-control" [(ngModel)]="subtypeFilter" (change)="loadEnrichments()" style="width:180px">
             <option value="">All Subtypes</option>
-            <option value="Physical">Architecture</option>
-            <option value="DatabaseSchema">DB Schema</option>
-            <option value="Chunk">Chunk</option>
-            <option value="Snippet">Snippet</option>
-            <option value="SnippetSummary">Snippet Summary</option>
-            <option value="Example">Example</option>
-            <option value="ExampleSummary">Example Summary</option>
-            <option value="CommitDescription">Commit Desc</option>
-            <option value="CommitHistory">Commit History</option>
-            <option value="Cookbook">Cookbook</option>
-            <option value="APIDocs">API Docs</option>
-            <option value="Wiki">Wiki</option>
-            <option value="Dependencies">Dependencies</option>
+            <option *ngFor="let st of availableSubtypes" [value]="st.value">{{ st.label }}</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
@@ -159,6 +147,51 @@ export class EnrichmentBrowserComponent implements OnInit {
     'CommitHistory': 'Commit History',
     'Dependencies': 'Dependencies',
   };
+
+  private typeToSubtypes: Record<string, { value: string; label: string }[]> = {
+    'Architecture': [
+      { value: 'Physical', label: 'Architecture' },
+      { value: 'DatabaseSchema', label: 'DB Schema' },
+      { value: 'Dependencies', label: 'Dependencies' },
+    ],
+    'Development': [
+      { value: 'Chunk', label: 'Chunk' },
+      { value: 'Snippet', label: 'Snippet' },
+      { value: 'SnippetSummary', label: 'Snippet Summary' },
+      { value: 'Example', label: 'Example' },
+      { value: 'ExampleSummary', label: 'Example Summary' },
+    ],
+    'History': [
+      { value: 'CommitDescription', label: 'Commit Desc' },
+      { value: 'CommitHistory', label: 'Commit History' },
+    ],
+    'Usage': [
+      { value: 'Cookbook', label: 'Cookbook' },
+      { value: 'APIDocs', label: 'API Docs' },
+      { value: 'Wiki', label: 'Wiki' },
+    ],
+  };
+
+  private allSubtypes: { value: string; label: string }[] = [
+    ...this.typeToSubtypes['Architecture'],
+    ...this.typeToSubtypes['Development'],
+    ...this.typeToSubtypes['History'],
+    ...this.typeToSubtypes['Usage'],
+  ];
+
+  get availableSubtypes(): { value: string; label: string }[] {
+    if (!this.typeFilter) return this.allSubtypes;
+    return this.typeToSubtypes[this.typeFilter] || this.allSubtypes;
+  }
+
+  onTypeChange() {
+    // Reset subtype if it doesn't belong to the new type
+    if (this.subtypeFilter && this.typeFilter) {
+      const valid = this.availableSubtypes.some(s => s.value === this.subtypeFilter);
+      if (!valid) this.subtypeFilter = '';
+    }
+    this.loadEnrichments();
+  }
 
   constructor(private api: ApiService, private http: HttpClient) {}
 
