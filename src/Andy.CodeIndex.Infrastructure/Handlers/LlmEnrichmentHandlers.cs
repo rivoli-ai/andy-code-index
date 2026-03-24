@@ -232,3 +232,23 @@ public class CreateWikiHandler : BaseLlmEnrichmentHandler
         {SummarizeChunks(chunks)}
         """;
 }
+
+public class CreateSummaryEnrichmentsHandler : BaseLlmEnrichmentHandler
+{
+    public override TaskOperation Operation => TaskOperation.CreateSummaryEnrichments;
+    protected override EnrichmentSubtype Subtype => EnrichmentSubtype.SnippetSummary;
+    protected override EnrichmentType Type => EnrichmentType.Development;
+
+    public CreateSummaryEnrichmentsHandler(CodeIndexDbContext context, IApiKeyResolver resolver,
+        IOptions<EnrichmentLlmOptions> opts, IHttpClientFactory http, ILogger<CreateSummaryEnrichmentsHandler> logger)
+        : base(context, resolver, opts, http, logger) { }
+
+    protected override string BuildPrompt(Repository repo, List<Enrichment> chunks) =>
+        $"""
+        Summarize the following code snippets from "{repo.Name}" into concise natural language descriptions.
+        For each file mentioned, describe what it does in 1-2 sentences.
+        Group by file path. Format as markdown.
+
+        {SummarizeChunks(chunks)}
+        """;
+}

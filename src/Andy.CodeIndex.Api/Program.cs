@@ -130,6 +130,8 @@ builder.Services.AddScoped<ITaskHandler, CreateDatabaseSchemaHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateCommitDescriptionHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateCookbookHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateWikiHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateSummaryEnrichmentsHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateSummaryEmbeddingsHandler>();
 
 // --- Background services ---
 builder.Services.AddHostedService<BackgroundWorkerService>();
