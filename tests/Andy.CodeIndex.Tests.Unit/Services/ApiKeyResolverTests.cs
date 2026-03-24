@@ -25,10 +25,11 @@ public class ApiKeyResolverTests : IDisposable
 
     public void Dispose() => _context.Dispose();
 
-    private ApiKeyResolver CreateResolver(string? systemKey = null)
+    private ApiKeyResolver CreateResolver(string? systemKey = null, string? systemLlmKey = null)
     {
-        var options = Options.Create(new EmbeddingOptions { ApiKey = systemKey });
-        return new ApiKeyResolver(_context, _encryptionMock.Object, options, NullLogger<ApiKeyResolver>.Instance);
+        var embeddingOptions = Options.Create(new EmbeddingOptions { ApiKey = systemKey });
+        var llmOptions = Options.Create(new EnrichmentLlmOptions { ApiKey = systemLlmKey });
+        return new ApiKeyResolver(_context, _encryptionMock.Object, embeddingOptions, llmOptions, NullLogger<ApiKeyResolver>.Instance);
     }
 
     [Fact]
@@ -96,5 +97,73 @@ public class ApiKeyResolverTests : IDisposable
         // Decrypt returns "" for non-encrypted data → falls back
         key.Should().Be("sk-system-key");
         source.Should().Be("system");
+    }
+
+    // --- LLM Key Resolution Tests ---
+
+    [Fact]
+    public async Task ResolveLlmKeyAsync_UserLlmKey_ReturnsUserKey()
+    {
+        _context.UserSettings.Add(new UserSettings
+        {
+            Id = Guid.NewGuid(), UserId = "user-llm",
+            LlmApiKey = "enc:sk-user-llm-key",
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var resolver = CreateResolver(systemLlmKey: "sk-system-llm");
+        var (key, model, source) = await resolver.ResolveLlmKeyAsync("user-llm");
+
+        key.Should().Be("sk-user-llm-key");
+        source.Should().Be("user");
+    }
+
+    [Fact]
+    public async Task ResolveLlmKeyAsync_NoUserLlm_FallsBackToUserEmbedding()
+    {
+        _context.UserSettings.Add(new UserSettings
+        {
+            Id = Guid.NewGuid(), UserId = "user-embed-only",
+            EmbeddingApiKey = "enc:sk-embed-key",
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var resolver = CreateResolver();
+        var (key, _, source) = await resolver.ResolveLlmKeyAsync("user-embed-only");
+
+        key.Should().Be("sk-embed-key");
+        source.Should().Be("user");
+    }
+
+    [Fact]
+    public async Task ResolveLlmKeyAsync_NoUserKey_FallsBackToSystemLlm()
+    {
+        var resolver = CreateResolver(systemLlmKey: "sk-system-llm");
+        var (key, _, source) = await resolver.ResolveLlmKeyAsync("user-none");
+
+        key.Should().Be("sk-system-llm");
+        source.Should().Be("system");
+    }
+
+    [Fact]
+    public async Task ResolveLlmKeyAsync_NoLlmKey_FallsBackToSystemEmbedding()
+    {
+        var resolver = CreateResolver(systemKey: "sk-embed-system");
+        var (key, _, source) = await resolver.ResolveLlmKeyAsync("user-none");
+
+        key.Should().Be("sk-embed-system");
+        source.Should().Be("system");
+    }
+
+    [Fact]
+    public async Task ResolveLlmKeyAsync_NoKeys_ReturnsNone()
+    {
+        var resolver = CreateResolver();
+        var (key, _, source) = await resolver.ResolveLlmKeyAsync("user-none");
+
+        key.Should().BeNull();
+        source.Should().Be("none");
     }
 }

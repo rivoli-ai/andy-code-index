@@ -26,7 +26,8 @@ public class ChatService : IChatService
     // Simple in-memory conversation store (per conversationId)
     private static readonly ConcurrentDictionary<string, List<ConversationMessage>> Conversations = new();
 
-    public bool IsAvailable => _llmOptions.IsConfigured;
+    // Available if any key source exists (user or system)
+    public bool IsAvailable => true; // Actual check done at runtime via resolver
 
     public ChatService(
         CodeIndexDbContext context,
@@ -48,11 +49,8 @@ public class ChatService : IChatService
     {
         var conversationId = request.ConversationId ?? Guid.NewGuid().ToString();
 
-        // 1. Resolve API key (user -> system)
-        var (apiKey, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync(userId, ct);
-        // For chat, prefer the enrichment/LLM key over embedding key
-        if (_llmOptions.IsConfigured)
-            apiKey = _llmOptions.ApiKey;
+        // 1. Resolve LLM API key: user LLM key -> user embedding key -> system LLM key -> system embedding key
+        var (apiKey, model, source) = await _apiKeyResolver.ResolveLlmKeyAsync(userId, ct);
 
         if (string.IsNullOrEmpty(apiKey))
         {
@@ -137,7 +135,7 @@ public class ChatService : IChatService
 
         var llmRequest = new
         {
-            model = _llmOptions.Model,
+            model,  // Uses resolved model (from user settings or system config)
             messages,
             max_tokens = 2000,
             temperature = 0.3
@@ -172,7 +170,7 @@ public class ChatService : IChatService
             Reply = reply,
             ConversationId = conversationId,
             Sources = sources,
-            Model = _llmOptions.Model
+            Model = model
         };
     }
 
