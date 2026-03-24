@@ -25,7 +25,8 @@ public class ChatController : ControllerBase
     public async Task<IActionResult> Chat([FromBody] ChatRequest request, CancellationToken ct = default)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub");
+            ?? User.FindFirstValue("sub")
+            ?? "anonymous";
 
         var response = await _chatService.ChatAsync(request, userId, ct);
         return Ok(response);
