@@ -105,7 +105,7 @@ interface Repository {
     .message-content { word-wrap: break-word; font-size: 0.9375rem; line-height: 1.6; }
     .message-content :deep(p) { margin: 0 0 0.5rem 0; }
     .message-content :deep(p:last-child) { margin-bottom: 0; }
-    .message-content :deep(ul), .message-content :deep(ol) { margin: 0.25rem 0 0.5rem 1.25rem; padding: 0; }
+    .message-content :deep(ul), .message-content :deep(ol) { margin: 0.25rem 0 0.5rem 0; padding-left: 1.5rem; list-style-position: outside; }
     .message-content :deep(li) { margin-bottom: 0.25rem; }
     .message-content :deep(h1), .message-content :deep(h2), .message-content :deep(h3) { font-size: 1rem; font-weight: 600; margin: 0.75rem 0 0.25rem 0; }
     .message-content :deep(code) { background: rgba(0,0,0,0.06); padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.85em; }
