@@ -125,6 +125,11 @@ builder.Services.AddScoped<ITaskHandler, ExtractSnippetsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateBM25IndexHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateCodeEmbeddingsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateApiDocsHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateArchitectureDocsHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateDatabaseSchemaHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateCommitDescriptionHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateCookbookHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateWikiHandler>();
 
 // --- Background services ---
 builder.Services.AddHostedService<BackgroundWorkerService>();

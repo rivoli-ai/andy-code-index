@@ -10,11 +10,15 @@ namespace Andy.CodeIndex.Tests.Unit.Services;
 public class TaskQueueServiceTests
 {
     private readonly Mock<IIndexingTaskRepository> _taskRepoMock = new();
+    private readonly Mock<IApiKeyResolver> _resolverMock = new();
     private readonly TaskQueueService _service;
 
     public TaskQueueServiceTests()
     {
-        _service = new TaskQueueService(_taskRepoMock.Object);
+        // Default: no LLM key available (skip LLM operations)
+        _resolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.FromResult<(string?, string, string)>((null, "gpt-4o-mini", "none")));
+        _service = new TaskQueueService(_taskRepoMock.Object, _resolverMock.Object);
 
         _taskRepoMock.Setup(r => r.AddAsync(It.IsAny<IndexingTask>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IndexingTask t, CancellationToken _) => t);

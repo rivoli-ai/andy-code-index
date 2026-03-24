@@ -7,10 +7,12 @@ namespace Andy.CodeIndex.Infrastructure.Services;
 public class TaskQueueService : ITaskQueue
 {
     private readonly IIndexingTaskRepository _taskRepo;
+    private readonly IApiKeyResolver _apiKeyResolver;
 
-    public TaskQueueService(IIndexingTaskRepository taskRepo)
+    public TaskQueueService(IIndexingTaskRepository taskRepo, IApiKeyResolver apiKeyResolver)
     {
         _taskRepo = taskRepo;
+        _apiKeyResolver = apiKeyResolver;
     }
 
     public async Task<IndexingTask> EnqueueAsync(Guid repositoryId, TaskOperation operation,
@@ -65,9 +67,13 @@ public class TaskQueueService : ITaskQueue
         if (next is null)
             return;
 
-        // Skip LLM-dependent operations for now (they'll be optional)
+        // Skip LLM-dependent operations only if no LLM key is available
         if (IsLlmDependent(next.Value))
-            next = GetNextNonLlmOperation(next.Value);
+        {
+            var (llmKey, _, _) = await _apiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
+            if (string.IsNullOrEmpty(llmKey))
+                next = GetNextNonLlmOperation(next.Value);
+        }
 
         if (next is null)
             return;
