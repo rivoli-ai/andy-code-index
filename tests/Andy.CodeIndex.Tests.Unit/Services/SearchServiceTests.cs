@@ -147,6 +147,33 @@ public class SearchServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SemanticSearchAsync_EmbeddingProviderThrows_ReturnsEmptyNotError()
+    {
+        _providerMock.Setup(p => p.GenerateEmbeddingsAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("401 Unauthorized"));
+
+        var result = await _service.SemanticSearchAsync("test");
+
+        result.Results.Should().BeEmpty();
+        result.SearchMode.Should().Be("semantic");
+    }
+
+    [Fact]
+    public async Task HybridSearchAsync_EmbeddingProviderThrows_FallsBackToKeywordOnly()
+    {
+        SeedEnrichments(("public class UserService { }", "csharp", "UserService.cs"));
+
+        _providerMock.Setup(p => p.GenerateEmbeddingsAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("401 Unauthorized"));
+        _providerMock.Setup(p => p.IsAvailable).Returns(false);
+
+        var result = await _service.HybridSearchAsync("UserService");
+
+        result.SearchMode.Should().Be("hybrid");
+        result.Results.Should().NotBeEmpty("keyword search should still return results even when semantic fails");
+    }
+
+    [Fact]
     public async Task HybridSearchAsync_CombinesKeywordResults()
     {
         SeedEnrichments(

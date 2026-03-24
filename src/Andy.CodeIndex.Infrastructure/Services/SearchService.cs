@@ -32,12 +32,25 @@ public class SearchService : ISearchService
     {
         var sw = Stopwatch.StartNew();
 
-        var queryEmbedding = await _embeddingProvider.GenerateEmbeddingsAsync([query], ct);
+        // Gracefully handle unavailable embedding provider
+        if (!_embeddingProvider.IsAvailable)
+            return EmptyResult("semantic", sw);
+
+        float[][] queryEmbedding;
+        try
+        {
+            queryEmbedding = await _embeddingProvider.GenerateEmbeddingsAsync([query], ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Embedding provider failed for semantic search, returning empty results");
+            return EmptyResult("semantic", sw);
+        }
+
         if (queryEmbedding.Length == 0)
             return EmptyResult("semantic", sw);
 
         // Semantic search requires PostgreSQL with pgvector
-        // For InMemory (tests), return empty — semantic search is tested via integration tests
         if (!_context.Database.IsNpgsql())
             return EmptyResult("semantic", sw);
 
