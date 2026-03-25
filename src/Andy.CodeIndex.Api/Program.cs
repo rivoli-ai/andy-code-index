@@ -236,6 +236,28 @@ app.UseCors("AllowAngularApp");
 app.UseAuthentication();
 app.UseAuthorization();
 
+// --- MCP auth debugging middleware ---
+if (app.Environment.IsDevelopment() && !string.IsNullOrEmpty(andyAuthAuthority))
+{
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/mcp"))
+        {
+            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            var hasAuth = context.Request.Headers.ContainsKey("Authorization");
+            var authScheme = hasAuth ? context.Request.Headers.Authorization.ToString().Split(' ').FirstOrDefault() : null;
+            var isAuthenticated = context.User?.Identity?.IsAuthenticated ?? false;
+            var userId = context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? context.User?.FindFirst("sub")?.Value;
+
+            logger.LogInformation(
+                "MCP Request: Method={Method} Path={Path} HasAuth={HasAuth} Scheme={Scheme} Authenticated={IsAuth} UserId={UserId}",
+                context.Request.Method, context.Request.Path, hasAuth, authScheme, isAuthenticated, userId);
+        }
+        await next();
+    });
+}
+
 app.MapControllers();
 
 // --- MCP endpoint ---
@@ -243,7 +265,7 @@ app.MapMcp("/mcp")
     .RequireCors("AllowMcpClients")
     .RequireAuthorization();
 
-// --- OAuth Protected Resource Metadata (RFC 8707) ---
+// --- OAuth Protected Resource Metadata & Proxy Endpoints (RFC 8707) ---
 if (!string.IsNullOrEmpty(andyAuthAuthority))
 {
     var oauthMetadataJsonOptions = new System.Text.Json.JsonSerializerOptions
@@ -252,6 +274,7 @@ if (!string.IsNullOrEmpty(andyAuthAuthority))
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
+    // Protected resource metadata
     app.MapGet("/.well-known/oauth-protected-resource", (IServiceProvider sp) =>
     {
         var optionsMonitor = sp.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
@@ -268,6 +291,49 @@ if (!string.IsNullOrEmpty(andyAuthAuthority))
         var options = optionsMonitor.Get(
             ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationDefaults.AuthenticationScheme);
         return Results.Json(options.ResourceMetadata, oauthMetadataJsonOptions);
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+
+    // Some clients mistakenly append /mcp to well-known paths
+    app.MapGet("/.well-known/oauth-protected-resource/mcp", (IServiceProvider sp) =>
+    {
+        var optionsMonitor = sp.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationOptions>>();
+        var options = optionsMonitor.Get(
+            ModelContextProtocol.AspNetCore.Authentication.McpAuthenticationDefaults.AuthenticationScheme);
+        return Results.Json(options.ResourceMetadata, oauthMetadataJsonOptions);
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+
+    // OpenID Configuration -- redirect to Andy.Auth
+    app.MapGet("/.well-known/openid-configuration", () =>
+        Results.Redirect($"{andyAuthAuthority}/.well-known/openid-configuration", permanent: false))
+        .AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapGet("/.well-known/oauth-authorization-server", () =>
+        Results.Redirect($"{andyAuthAuthority}/.well-known/openid-configuration", permanent: false))
+        .AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapGet("/.well-known/openid-configuration/mcp", () =>
+        Results.Redirect($"{andyAuthAuthority}/.well-known/openid-configuration", permanent: false))
+        .AllowAnonymous().RequireCors("AllowMcpClients");
+
+    app.MapGet("/.well-known/oauth-authorization-server/mcp", () =>
+        Results.Redirect($"{andyAuthAuthority}/.well-known/openid-configuration", permanent: false))
+        .AllowAnonymous().RequireCors("AllowMcpClients");
+
+    // Proxy authorization endpoint -- redirect to Andy.Auth
+    app.MapGet("/authorize", (HttpContext ctx) =>
+    {
+        var qs = ctx.Request.QueryString.HasValue ? ctx.Request.QueryString.Value : string.Empty;
+        return Results.Redirect($"{andyAuthAuthority}/connect/authorize{qs}", permanent: false);
+    }).AllowAnonymous().RequireCors("AllowMcpClients");
+
+    // Proxy token endpoint -- 307 redirect preserves POST body
+    app.MapPost("/token", (HttpContext ctx) =>
+    {
+        var qs = ctx.Request.QueryString.HasValue ? ctx.Request.QueryString.Value : string.Empty;
+        ctx.Response.StatusCode = StatusCodes.Status307TemporaryRedirect;
+        ctx.Response.Headers.Location = $"{andyAuthAuthority}/connect/token{qs}";
+        return Task.CompletedTask;
     }).AllowAnonymous().RequireCors("AllowMcpClients");
 }
 
