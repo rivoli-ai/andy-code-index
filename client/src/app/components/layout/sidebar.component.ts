@@ -47,11 +47,13 @@ import { AuthService } from '../../services/auth.service';
         </div>
       </nav>
       <div class="sidebar-footer">
-        <div class="user-info" *ngIf="authService.authEnabled && authService.isAuthenticated()">
-          <i class="bi bi-person-circle" style="font-size:var(--font-lg)"></i>
-          <span class="user-name">{{ authService.getUserName() || 'User' }}</span>
-          <button class="sign-out-btn" (click)="signOut()" title="Sign out">
-            <i class="bi bi-box-arrow-right"></i>
+        <div class="user-section" *ngIf="authService.authEnabled && authService.isAuthenticated()">
+          <div class="user-info">
+            <i class="bi bi-person-circle"></i>
+            <span class="user-name">{{ authService.getUserName() || 'User' }}</span>
+          </div>
+          <button class="btn btn-sm btn-secondary sign-out-btn" (click)="signOut()">
+            <i class="bi bi-box-arrow-right"></i> Sign Out
           </button>
         </div>
         <div class="dev-indicator" *ngIf="isDevMode && !authService.authEnabled">
@@ -94,6 +96,11 @@ import { AuthService } from '../../services/auth.service';
       padding: 1rem 1.5rem;
       margin-top: auto;
     }
+    .user-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
     .user-info {
       display: flex;
       align-items: center;
@@ -101,6 +108,7 @@ import { AuthService } from '../../services/auth.service';
       font-size: var(--font-sm);
       color: var(--text);
     }
+    .user-info i { font-size: var(--font-xl); color: var(--primary); }
     .user-name {
       flex: 1;
       overflow: hidden;
@@ -109,11 +117,9 @@ import { AuthService } from '../../services/auth.service';
       font-weight: 500;
     }
     .sign-out-btn {
-      background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 0.25rem;
-      border-radius: var(--radius); transition: all var(--transition);
+      width: 100%;
+      justify-content: center;
     }
-    .sign-out-btn:hover { color: var(--danger); background: rgba(220,53,69,0.08); }
     .dev-indicator {
       display: flex;
       align-items: center;
