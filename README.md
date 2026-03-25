@@ -37,6 +37,7 @@ Andy.CodeIndex.sln
     requirements.md               Functional and non-functional requirements
     design.md                     Architecture, domain model, API, search
     implementation.md             Phase-by-phase implementation guide
+    security.md                   Authentication, RBAC, permissions, MCP security
 ```
 
 ## Quick start
@@ -134,12 +135,16 @@ AndyAuth__Authority=https://auth.example.com
 Rbac__ApiBaseUrl=https://rbac.example.com
 ```
 
-## Authentication
+## Authentication & Authorization
 
-- **Development**: anonymous access (no auth required when `AndyAuth:Authority` is empty)
-- **Production**: OAuth 2.0 via Andy.Auth with JWT Bearer tokens
+- **Authentication**: OAuth 2.0 with PKCE via Andy.Auth (JWT Bearer tokens)
+- **RBAC**: 35 permission checks across all controllers via Andy.Rbac.Client with 5-minute in-memory cache
+- **Permissions**: 9 permissions across 5 resource types (repository, search, enrichment, task, settings)
 - **MCP**: OAuth Protected Resource Metadata at `/.well-known/oauth-protected-resource`
-- **User API keys**: per-user embedding and LLM keys stored encrypted, resolved via 4-tier chain (user LLM, user embedding, system LLM, system embedding)
+- **User API keys**: per-user embedding and LLM keys stored encrypted, resolved via 4-tier chain
+- **Development fallback**: anonymous access when `AndyAuth:Authority` is empty
+
+See [docs/security.md](docs/security.md) for the full security reference.
 
 ## Testing
 

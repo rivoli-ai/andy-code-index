@@ -449,103 +449,15 @@ Each chunk tracks: content, byte offset, 1-based start/end line numbers.
 
 ## 7. Authentication & Authorization
 
-### 7.1 Authentication Flow
+See [docs/security.md](security.md) for the full security reference covering:
 
-```
-┌──────────┐    ┌──────────────┐    ┌──────────────┐
-│ Client    │───►│ Andy.Auth    │───►│ JWT Token    │
-│ (Browser/ │    │ OAuth Server │    │ issued       │
-│  MCP/CLI) │    └──────────────┘    └──────┬───────┘
-└──────────┘                               │
-                                           ▼
-                    ┌──────────────────────────────────┐
-                    │ Andy.CodeIndex.Api                 │
-                    │                                   │
-                    │ JWT validated via Andy.Auth pkg    │
-                    │ AddAndyAuth(configuration)        │
-                    │                                   │
-                    │ ICurrentUserService extracts:     │
-                    │   UserId, Email, DisplayName      │
-                    └──────────────────────────────────┘
-```
-
-### 7.2 RBAC Permission Model
-
-```
-Application: code-index
-
-Resource Types & Actions:
-┌───────────────┬──────────────────────────────────────┐
-│ Resource Type │ Actions                              │
-├───────────────┼──────────────────────────────────────┤
-│ repository    │ read, write, delete, index           │
-│               │ (supports instance-level per repo)   │
-│ search        │ read                                 │
-│ enrichment    │ read                                 │
-│ task          │ read, write                          │
-│ admin         │ manage                               │
-└───────────────┴──────────────────────────────────────┘
-
-Default Roles:
-┌──────────────────────┬─────────────────────────────────────┐
-│ Role                 │ Permissions                         │
-├──────────────────────┼─────────────────────────────────────┤
-│ code-index:viewer    │ repository:read, search:read,       │
-│                      │ enrichment:read, task:read          │
-├──────────────────────┼─────────────────────────────────────┤
-│ code-index:contributor│ viewer + repository:write,         │
-│                      │ repository:index, task:write        │
-├──────────────────────┼─────────────────────────────────────┤
-│ code-index:admin     │ all permissions including           │
-│                      │ repository:delete, admin:manage     │
-└──────────────────────┴─────────────────────────────────────┘
-
-Permission Format: "code-index:{resource-type}:{action}"
-Instance Format:   checked with resourceInstanceId = repository.Id
-```
-
-### 7.3 Authorization Check Flow
-
-```
-HTTP Request
-    │
-    ▼
-[JWT Validation] ──401──► Unauthorized
-    │ valid
-    ▼
-[Extract SubjectId from claims]
-    │
-    ▼
-[IRbacClient.HasPermissionAsync(subjectId, permission, resourceInstanceId?)]
-    │
-    ├── allowed ──► Process request
-    └── denied  ──► 403 { allowed: false, reason: "..." }
-
-### 7.4 API Key Resolution Chain
-
-For embedding operations, the API key is resolved via a 3-tier chain:
-
-```
-Request with User JWT
-    │
-    ▼
-[IApiKeyResolver.ResolveEmbeddingKeyAsync(userId)]
-    │
-    ├── Tier 1: User-specific key (UserSettings.EmbeddingApiKey, encrypted)
-    │           → source: "user"
-    │
-    ├── Tier 2: System-level key (EmbeddingOptions.ApiKey from appsettings)
-    │           → source: "system"
-    │
-    └── Tier 3: No key available
-                → source: "none" (embedding skipped)
-```
-
-User settings managed via:
-- `GET /api/v1/settings` — view (keys masked: sk-...last4)
-- `PUT /api/v1/settings` — update (keys encrypted at rest)
-- `DELETE /api/v1/settings/embedding-key` — remove (falls back to system)
-```
+- OAuth 2.0 with PKCE authentication flow (Andy.Auth)
+- RBAC permission model with 9 permissions across 5 resource types
+- Controller permission mapping (35 `[RequirePermission]` attributes)
+- Permission caching (5-minute in-memory TTL via Andy.Rbac.Client)
+- Per-user API key encryption and 4-tier resolution chain
+- MCP OAuth Protected Resource Metadata (RFC 8707)
+- Development setup for Andy.Auth and RBAC
 
 ## 8. External Integrations
 
