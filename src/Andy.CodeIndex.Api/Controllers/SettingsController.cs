@@ -2,6 +2,7 @@ using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Infrastructure.Data;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +37,7 @@ public class SettingsController : ControllerBase
         ?? "anonymous";
 
     /// <summary>Get current user's settings (API keys masked, shows source).</summary>
-    [HttpGet]
+    [RequirePermission("settings:read")]    [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSettings(CancellationToken ct = default)
     {
@@ -65,7 +66,7 @@ public class SettingsController : ControllerBase
     }
 
     /// <summary>Update current user's settings with audit trail.</summary>
-    [HttpPut]
+    [RequirePermission("settings:write")]    [HttpPut]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateSettings(
         [FromBody] UpdateSettingsRequest request,
@@ -116,7 +117,7 @@ public class SettingsController : ControllerBase
     }
 
     /// <summary>Delete current user's embedding API key.</summary>
-    [HttpDelete("embedding-key")]
+    [RequirePermission("settings:write")]    [HttpDelete("embedding-key")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteEmbeddingKey(CancellationToken ct = default)
     {
@@ -135,7 +136,7 @@ public class SettingsController : ControllerBase
     }
 
     /// <summary>Get settings change history for the current user.</summary>
-    [HttpGet("history")]
+    [RequirePermission("settings:read")]    [HttpGet("history")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetHistory([FromQuery] int limit = 20, CancellationToken ct = default)
     {
@@ -158,7 +159,7 @@ public class SettingsController : ControllerBase
     }
 
     /// <summary>Queue re-embedding for all indexed repositories. Requires explicit approval.</summary>
-    [HttpPost("re-embed")]
+    [RequirePermission("settings:write")]    [HttpPost("re-embed")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ReEmbed(CancellationToken ct = default)
     {

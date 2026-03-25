@@ -1,5 +1,6 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,7 +22,7 @@ public class DiscoveryController : ControllerBase
     }
 
     /// <summary>Discover repositories in a GitHub organization.</summary>
-    [HttpGet("github")]
+    [RequirePermission("repository:read")]    [HttpGet("github")]
     [ProducesResponseType(typeof(List<DiscoveredRepo>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DiscoverGitHub(
         [FromQuery] string org,
@@ -35,7 +36,7 @@ public class DiscoveryController : ControllerBase
     }
 
     /// <summary>Discover repositories in an Azure DevOps organization.</summary>
-    [HttpGet("azure-devops")]
+    [RequirePermission("repository:read")]    [HttpGet("azure-devops")]
     [ProducesResponseType(typeof(List<DiscoveredRepo>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DiscoverAzureDevOps(
         [FromQuery] string org,
@@ -48,7 +49,7 @@ public class DiscoveryController : ControllerBase
     }
 
     /// <summary>Add discovered repositories for indexing.</summary>
-    [HttpPost("sync")]
+    [RequirePermission("repository:write")]    [HttpPost("sync")]
     [ProducesResponseType(typeof(SyncDiscoveryResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> SyncDiscovered(
         [FromBody] SyncDiscoveryRequest request,

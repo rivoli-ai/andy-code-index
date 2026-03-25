@@ -1,5 +1,6 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,7 +20,7 @@ public class SearchController : ControllerBase
     }
 
     /// <summary>Hybrid search combining semantic and keyword results via RRF.</summary>
-    [HttpPost]
+    [RequirePermission("search:read")]    [HttpPost]
     [ProducesResponseType(typeof(SearchResultsDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> HybridSearch(
         [FromBody] SearchRequest request,
@@ -31,7 +32,7 @@ public class SearchController : ControllerBase
     }
 
     /// <summary>Semantic similarity search using vector embeddings.</summary>
-    [HttpGet("semantic")]
+    [RequirePermission("search:read")]    [HttpGet("semantic")]
     [ProducesResponseType(typeof(SearchResultsDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> SemanticSearch(
         [FromQuery] string query,
@@ -49,7 +50,7 @@ public class SearchController : ControllerBase
     }
 
     /// <summary>BM25 keyword search using full-text indexing.</summary>
-    [HttpGet("keyword")]
+    [RequirePermission("search:read")]    [HttpGet("keyword")]
     [ProducesResponseType(typeof(SearchResultsDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> KeywordSearch(
         [FromQuery] string keywords,
@@ -67,7 +68,7 @@ public class SearchController : ControllerBase
     }
 
     /// <summary>Get available languages and repositories for search filters.</summary>
-    [HttpGet("filters")]
+    [RequirePermission("search:read")]    [HttpGet("filters")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetFilters(CancellationToken ct = default)
     {

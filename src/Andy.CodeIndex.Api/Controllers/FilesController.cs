@@ -1,5 +1,6 @@
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -27,7 +28,7 @@ public class FilesController : ControllerBase
     }
 
     /// <summary>Read file content at a specific ref (branch, tag, or commit SHA).</summary>
-    [HttpGet("blob/{gitRef}/{**filePath}")]
+    [RequirePermission("repository:read")]    [HttpGet("blob/{gitRef}/{**filePath}")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ReadFile(
@@ -47,7 +48,7 @@ public class FilesController : ControllerBase
     }
 
     /// <summary>List files matching a glob pattern.</summary>
-    [HttpGet("ls")]
+    [RequirePermission("repository:read")]    [HttpGet("ls")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ListFiles(
@@ -69,7 +70,7 @@ public class FilesController : ControllerBase
     }
 
     /// <summary>Search file contents with a regex pattern.</summary>
-    [HttpGet("grep")]
+    [RequirePermission("repository:read")]    [HttpGet("grep")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Grep(

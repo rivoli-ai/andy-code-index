@@ -1,5 +1,6 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -20,7 +21,7 @@ public class ChatController : ControllerBase
     }
 
     /// <summary>Chat with the indexed codebase using RAG.</summary>
-    [HttpPost]
+    [RequirePermission("search:read")]    [HttpPost]
     [ProducesResponseType(typeof(ChatResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Chat([FromBody] ChatRequest request, CancellationToken ct = default)
     {

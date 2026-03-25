@@ -1,4 +1,5 @@
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,7 +21,7 @@ public class CommitsController : ControllerBase
     }
 
     /// <summary>List commits for a repository, ordered by date descending.</summary>
-    [HttpGet("commits")]
+    [RequirePermission("repository:read")]    [HttpGet("commits")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ListCommits(
@@ -46,7 +47,7 @@ public class CommitsController : ControllerBase
     }
 
     /// <summary>Get a single commit by SHA.</summary>
-    [HttpGet("commits/{sha}")]
+    [RequirePermission("repository:read")]    [HttpGet("commits/{sha}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetCommit(Guid repositoryId, string sha, CancellationToken ct = default)

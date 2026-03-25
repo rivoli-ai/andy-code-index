@@ -1,5 +1,6 @@
 using Andy.CodeIndex.Domain.Enums;
 using Andy.CodeIndex.Infrastructure.Data;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,7 @@ public class AnalyticsController : ControllerBase
     }
 
     /// <summary>Get language breakdown for a repository.</summary>
-    [HttpGet("languages")]
+    [RequirePermission("repository:read")]    [HttpGet("languages")]
     public async Task<IActionResult> GetLanguages(Guid repositoryId, CancellationToken ct = default)
     {
         var languages = await _context.Enrichments
@@ -36,7 +37,7 @@ public class AnalyticsController : ControllerBase
     }
 
     /// <summary>Get top terms from enrichment content.</summary>
-    [HttpGet("top-terms")]
+    [RequirePermission("repository:read")]    [HttpGet("top-terms")]
     public async Task<IActionResult> GetTopTerms(Guid repositoryId, [FromQuery] int limit = 30, CancellationToken ct = default)
     {
         // Get sample of chunk content for term extraction
@@ -90,7 +91,7 @@ public class AnalyticsController : ControllerBase
     }
 
     /// <summary>Get file type distribution.</summary>
-    [HttpGet("file-types")]
+    [RequirePermission("repository:read")]    [HttpGet("file-types")]
     public async Task<IActionResult> GetFileTypes(Guid repositoryId, CancellationToken ct = default)
     {
         var fileTypes = await _context.Enrichments
@@ -112,7 +113,7 @@ public class AnalyticsController : ControllerBase
     }
 
     /// <summary>Get files with most chunks (complexity indicator).</summary>
-    [HttpGet("complex-files")]
+    [RequirePermission("repository:read")]    [HttpGet("complex-files")]
     public async Task<IActionResult> GetComplexFiles(Guid repositoryId, [FromQuery] int limit = 10, CancellationToken ct = default)
     {
         var files = await _context.Enrichments
@@ -129,7 +130,7 @@ public class AnalyticsController : ControllerBase
     }
 
     /// <summary>Get comprehensive repository statistics.</summary>
-    [HttpGet("summary")]
+    [RequirePermission("repository:read")]    [HttpGet("summary")]
     public async Task<IActionResult> GetSummary(Guid repositoryId, CancellationToken ct = default)
     {
         var repo = await _context.Repositories.FindAsync([repositoryId], ct);

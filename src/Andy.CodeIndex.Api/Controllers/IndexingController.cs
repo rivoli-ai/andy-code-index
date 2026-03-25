@@ -1,6 +1,7 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Data;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +25,7 @@ public class IndexingController : ControllerBase
     }
 
     /// <summary>Get indexing history for a repository.</summary>
-    [HttpGet("repositories/{repositoryId:guid}/history")]
+    [RequirePermission("repository:read")]    [HttpGet("repositories/{repositoryId:guid}/history")]
     [ProducesResponseType(typeof(List<IndexingRunDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetHistory(Guid repositoryId, [FromQuery] int limit = 20, CancellationToken ct = default)
@@ -60,7 +61,7 @@ public class IndexingController : ControllerBase
     }
 
     /// <summary>Get periodic sync status and schedule.</summary>
-    [HttpGet("sync/status")]
+    [RequirePermission("task:read")]    [HttpGet("sync/status")]
     [ProducesResponseType(typeof(SyncStatusDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSyncStatus(CancellationToken ct = default)
     {

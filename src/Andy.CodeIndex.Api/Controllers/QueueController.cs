@@ -1,6 +1,7 @@
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,7 +21,7 @@ public class QueueController : ControllerBase
     }
 
     /// <summary>Get all tasks.</summary>
-    [HttpGet]
+    [RequirePermission("task:read")]    [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> List(CancellationToken ct = default)
     {
@@ -36,7 +37,7 @@ public class QueueController : ControllerBase
     }
 
     /// <summary>Get active tasks grouped by repository for pipeline progress.</summary>
-    [HttpGet("pipelines")]
+    [RequirePermission("task:read")]    [HttpGet("pipelines")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPipelines(CancellationToken ct = default)
     {
@@ -81,7 +82,7 @@ public class QueueController : ControllerBase
     }
 
     /// <summary>Get task by ID.</summary>
-    [HttpGet("{id:guid}")]
+    [RequirePermission("task:read")]    [HttpGet("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct = default)

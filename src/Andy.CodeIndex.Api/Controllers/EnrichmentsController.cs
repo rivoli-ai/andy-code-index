@@ -1,6 +1,7 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,7 +21,7 @@ public class EnrichmentsController : ControllerBase
     }
 
     /// <summary>Query enrichments with filters.</summary>
-    [HttpGet]
+    [RequirePermission("enrichment:read")]    [HttpGet]
     [ProducesResponseType(typeof(EnrichmentListResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Query(
         [FromQuery] EnrichmentType? type = null,
@@ -46,7 +47,7 @@ public class EnrichmentsController : ControllerBase
     }
 
     /// <summary>Get per-subtype counts, optionally filtered by type and repository.</summary>
-    [HttpGet("counts")]
+    [RequirePermission("enrichment:read")]    [HttpGet("counts")]
     [ProducesResponseType(typeof(Dictionary<string, int>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCounts(
         [FromQuery] EnrichmentType? type = null,
@@ -58,7 +59,7 @@ public class EnrichmentsController : ControllerBase
     }
 
     /// <summary>Get enrichment by ID with full content.</summary>
-    [HttpGet("{id:guid}")]
+    [RequirePermission("enrichment:read")]    [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(EnrichmentDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct = default)

@@ -1,6 +1,7 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,6 +22,7 @@ public class RepositoriesController : ControllerBase
 
     /// <summary>List all tracked repositories.</summary>
     [HttpGet]
+    [RequirePermission("repository:read")]
     [ProducesResponseType(typeof(List<RepositoryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromQuery] GitProvider? provider = null,
@@ -33,6 +35,7 @@ public class RepositoriesController : ControllerBase
 
     /// <summary>Add a new repository for indexing.</summary>
     [HttpPost]
+    [RequirePermission("repository:write")]
     [ProducesResponseType(typeof(RepositoryDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
@@ -60,6 +63,7 @@ public class RepositoriesController : ControllerBase
 
     /// <summary>Get repository details including branches, tags, and stats.</summary>
     [HttpGet("{id:guid}")]
+    [RequirePermission("repository:read")]
     [ProducesResponseType(typeof(RepositoryDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct = default)
@@ -70,6 +74,7 @@ public class RepositoriesController : ControllerBase
 
     /// <summary>Delete a repository and all associated data.</summary>
     [HttpDelete("{id:guid}")]
+    [RequirePermission("repository:delete")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
@@ -87,6 +92,7 @@ public class RepositoriesController : ControllerBase
 
     /// <summary>Trigger a manual sync for a repository.</summary>
     [HttpPost("{id:guid}/sync")]
+    [RequirePermission("repository:execute")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
