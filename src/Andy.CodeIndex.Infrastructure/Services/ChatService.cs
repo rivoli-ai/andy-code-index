@@ -19,6 +19,7 @@ public class ChatService : IChatService
     private readonly CodeIndexDbContext _context;
     private readonly ISearchService _searchService;
     private readonly IApiKeyResolver _apiKeyResolver;
+    private readonly IQuestionClassifier _classifier;
     private readonly EnrichmentLlmOptions _llmOptions;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ChatService> _logger;
@@ -33,6 +34,7 @@ public class ChatService : IChatService
         CodeIndexDbContext context,
         ISearchService searchService,
         IApiKeyResolver apiKeyResolver,
+        IQuestionClassifier classifier,
         IOptions<EnrichmentLlmOptions> llmOptions,
         IHttpClientFactory httpClientFactory,
         ILogger<ChatService> logger)
@@ -40,6 +42,7 @@ public class ChatService : IChatService
         _context = context;
         _searchService = searchService;
         _apiKeyResolver = apiKeyResolver;
+        _classifier = classifier;
         _llmOptions = llmOptions.Value;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
@@ -62,32 +65,36 @@ public class ChatService : IChatService
             };
         }
 
-        // 2. Fetch relevant enrichment documents (architecture, wiki, etc.)
+        // 2. Classify the question and fetch relevant enrichment documents
+        var classification = _classifier.Classify(request.Message);
+
         var docQuery = _context.Enrichments
             .Include(e => e.Repository)
-            .Where(e => e.Subtype != EnrichmentSubtype.Chunk); // Non-code enrichments only
+            .Where(e => e.Subtype != EnrichmentSubtype.Chunk && e.Quality >= 0.3);
 
         if (request.RepositoryId.HasValue)
             docQuery = docQuery.Where(e => e.RepositoryId == request.RepositoryId.Value);
 
-        // Detect if question is about specific enrichment types
-        var messageLower = request.Message.ToLowerInvariant();
-        var wantsArchitecture = messageLower.Contains("architect") || messageLower.Contains("structure") || messageLower.Contains("design") || messageLower.Contains("component");
-        var wantsDeps = messageLower.Contains("depend") || messageLower.Contains("package") || messageLower.Contains("nuget") || messageLower.Contains("npm");
-        var wantsDb = messageLower.Contains("database") || messageLower.Contains("schema") || messageLower.Contains("table") || messageLower.Contains("migration");
-        var wantsWiki = messageLower.Contains("wiki") || messageLower.Contains("document") || messageLower.Contains("guide") || messageLower.Contains("overview");
-        var wantsCookbook = messageLower.Contains("cookbook") || messageLower.Contains("example") || messageLower.Contains("getting started") || messageLower.Contains("how to");
-        var wantsHistory = messageLower.Contains("history") || messageLower.Contains("commit") || messageLower.Contains("changelog") || messageLower.Contains("tag") || messageLower.Contains("release") || messageLower.Contains("version");
+        if (classification.DimensionId != "general")
+        {
+            var subtypes = classification.RequiredEnrichments;
+            docQuery = docQuery.Where(e => subtypes.Contains(e.Subtype));
+        }
 
-        if (wantsArchitecture) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Physical || e.Subtype == EnrichmentSubtype.DatabaseSchema);
-        else if (wantsDeps) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Dependencies);
-        else if (wantsDb) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.DatabaseSchema);
-        else if (wantsHistory) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.CommitHistory || e.Subtype == EnrichmentSubtype.CommitDescription);
-        else if (wantsCookbook) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Cookbook);
-        else if (wantsWiki) docQuery = docQuery.Where(e => e.Subtype == EnrichmentSubtype.Wiki);
-        // If no specific type detected, include all non-chunk enrichments (limited)
+        var enrichmentDocs = await docQuery.OrderByDescending(e => e.Quality).Take(10).ToListAsync(ct);
 
-        var enrichmentDocs = await docQuery.Take(10).ToListAsync(ct);
+        // If primary enrichments are insufficient, try fallbacks
+        if (enrichmentDocs.Count < 2 && classification.FallbackEnrichments.Length > 0)
+        {
+            var fallbacks = classification.FallbackEnrichments;
+            var fallbackQuery = _context.Enrichments
+                .Include(e => e.Repository)
+                .Where(e => fallbacks.Contains(e.Subtype) && e.Quality >= 0.3);
+            if (request.RepositoryId.HasValue)
+                fallbackQuery = fallbackQuery.Where(e => e.RepositoryId == request.RepositoryId.Value);
+            var fallbackDocs = await fallbackQuery.OrderByDescending(e => e.Quality).Take(5).ToListAsync(ct);
+            enrichmentDocs.AddRange(fallbackDocs);
+        }
 
         // 3. Also do keyword search on code chunks for specific code context
         var filter = new SearchFilter();
@@ -164,8 +171,12 @@ public class ChatService : IChatService
                   $"\n```{s.Language}\n{s.Content}\n```"))
             : "";
 
+        var classificationHint = classification.MatchedQuestionText is not null
+            ? $"\nThe user is likely asking about: {classification.MatchedQuestionText} (dimension: {classification.DimensionLabel})\n"
+            : "";
+
         var systemPrompt = $@"You are a code assistant with access to indexed source code repositories. Answer questions about the codebase using the provided context. Be specific, reference file paths and line numbers when relevant. If you don't have enough context, say so.
-{repoContext}{codeContext}";
+{classificationHint}{repoContext}{codeContext}";
 
         var messages = new List<object>
         {

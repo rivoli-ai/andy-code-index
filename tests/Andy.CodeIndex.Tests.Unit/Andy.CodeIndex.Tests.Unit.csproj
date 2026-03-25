@@ -27,6 +27,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\src\Andy.CodeIndex.Api\Data\question-ontology.json" Link="Data\question-ontology.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Andy.CodeIndex.Domain\Andy.CodeIndex.Domain.csproj" />
     <ProjectReference Include="..\..\src\Andy.CodeIndex.Application\Andy.CodeIndex.Application.csproj" />
     <ProjectReference Include="..\..\src\Andy.CodeIndex.Infrastructure\Andy.CodeIndex.Infrastructure.csproj" />

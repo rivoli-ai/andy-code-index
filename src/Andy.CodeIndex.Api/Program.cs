@@ -101,6 +101,7 @@ builder.Services.AddScoped<ICodeAnalysisService, CodeAnalysisService>();
 builder.Services.AddScoped<IEnrichmentGeneratorService, EnrichmentGeneratorService>();
 builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddSingleton<RankFusionService>();
+builder.Services.AddSingleton<IQuestionClassifier, QuestionClassifier>();
 builder.Services.AddHttpClient("EmbeddingService");
 builder.Services.AddScoped<IEmbeddingProvider>(sp =>
 {

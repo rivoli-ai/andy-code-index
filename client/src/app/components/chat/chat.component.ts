@@ -138,8 +138,8 @@ interface Repository {
     .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; justify-content: center; }
     .suggestion { padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: var(--font-sm); cursor: pointer; transition: all var(--transition); color: var(--text); }
     .suggestion:hover { border-color: var(--primary); color: var(--primary); }
-    .suggestion-tabs { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-bottom: 1rem; justify-content: center; }
-    .suggestion-tab { padding: 0.375rem 0.875rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: var(--font-xs); cursor: pointer; transition: all var(--transition); color: var(--text-muted); font-weight: 500; }
+    .suggestion-tabs { display: flex; gap: 0.375rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.25rem; -webkit-overflow-scrolling: touch; }
+    .suggestion-tab { padding: 0.375rem 0.875rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: var(--font-xs); cursor: pointer; transition: all var(--transition); color: var(--text-muted); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
     .suggestion-tab:hover { border-color: var(--primary); color: var(--primary); }
     .suggestion-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
   `]
@@ -154,21 +154,25 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   selectedRepo = '';
   conversationId: string | null = null;
   chatAvailable = false;
-  activeCategory = 'Structure';
-  suggestionCategories = [
-    { name: 'Structure', questions: ['How is this repo organized?', 'What are the main modules?', 'Show me the dependency graph'] },
-    { name: 'Patterns', questions: ['What design patterns are used?', 'How is dependency injection configured?', 'What\'s the error handling strategy?'] },
-    { name: 'Testing', questions: ['What test frameworks are used?', 'What\'s the test coverage like?', 'Show me example test patterns'] },
-    { name: 'Dependencies', questions: ['What external packages are used?', 'What are the key NuGet/npm dependencies?', 'Are there any outdated dependencies?'] },
-    { name: 'Architecture', questions: ['Explain the architecture', 'How does data flow through the system?', 'What databases are used?'] },
-    { name: 'Migration', questions: ['How would I add a new feature?', 'What would it take to migrate to Python?', 'How to add a new API endpoint?'] },
-  ];
+  activeCategory = '';
+  suggestionCategories: { name: string; questions: string[] }[] = [];
 
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
     this.http.get<Repository[]>(`${environment.apiUrl}/repositories`).subscribe({
       next: r => this.repos = r
+    });
+    this.http.get<any>(`${environment.apiUrl}/chat/suggestions`).subscribe({
+      next: res => {
+        this.suggestionCategories = (res.dimensions || []).map((d: any) => ({
+          name: d.label,
+          questions: d.questions.map((q: any) => q.text)
+        }));
+        if (this.suggestionCategories.length > 0 && !this.activeCategory) {
+          this.activeCategory = this.suggestionCategories[0].name;
+        }
+      }
     });
     this.http.get<any>(`${environment.apiUrl}/chat/status`).subscribe({
       next: s => this.chatAvailable = s.available

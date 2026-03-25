@@ -14,10 +14,12 @@ namespace Andy.CodeIndex.Api.Controllers;
 public class ChatController : ControllerBase
 {
     private readonly IChatService _chatService;
+    private readonly IQuestionClassifier _classifier;
 
-    public ChatController(IChatService chatService)
+    public ChatController(IChatService chatService, IQuestionClassifier classifier)
     {
         _chatService = chatService;
+        _classifier = classifier;
     }
 
     /// <summary>Chat with the indexed codebase using RAG.</summary>
@@ -31,6 +33,14 @@ public class ChatController : ControllerBase
 
         var response = await _chatService.ChatAsync(request, userId, ct);
         return Ok(response);
+    }
+
+    /// <summary>Get suggested questions organized by dimension.</summary>
+    [HttpGet("suggestions")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetSuggestions()
+    {
+        return Ok(new { dimensions = _classifier.GetSuggestions() });
     }
 
     /// <summary>Check if chat is available (LLM configured).</summary>
