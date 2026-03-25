@@ -1,17 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { CallbackComponent } from './callback.component';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
-import { of } from 'rxjs';
-import { convertToParamMap } from '@angular/router';
 
 describe('CallbackComponent', () => {
   let authServiceSpy: jasmine.SpyObj<AuthService>;
   let routerSpy: jasmine.SpyObj<Router>;
 
   beforeEach(async () => {
-    authServiceSpy = jasmine.createSpyObj('AuthService', ['handleCallback']);
-    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    authServiceSpy = jasmine.createSpyObj('AuthService', ['handleCallback'], { authEnabled: true });
+    routerSpy = jasmine.createSpyObj('Router', ['navigate', 'navigateByUrl']);
 
     await TestBed.configureTestingModule({
       imports: [CallbackComponent],
@@ -48,14 +46,14 @@ describe('CallbackComponent', () => {
     const fixture = TestBed.createComponent(CallbackComponent);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/repositories']);
+    expect(routerSpy.navigateByUrl).toHaveBeenCalledWith('/repositories');
   });
 
-  it('should navigate to login on failure', async () => {
+  it('should show error on failure', async () => {
     authServiceSpy.handleCallback.and.returnValue(Promise.resolve(false));
     const fixture = TestBed.createComponent(CallbackComponent);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/login']);
+    expect(fixture.componentInstance.error).toBeTruthy();
   });
 });

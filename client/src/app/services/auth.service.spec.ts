@@ -1,55 +1,40 @@
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let routerSpy: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
-    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
-
     TestBed.configureTestingModule({
       providers: [
         AuthService,
-        { provide: Router, useValue: routerSpy }
+        provideHttpClient(),
+        provideHttpClientTesting()
       ]
     });
     service = TestBed.inject(AuthService);
-    sessionStorage.clear();
+    localStorage.clear();
   });
 
   it('should be created', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should return null token when not authenticated', () => {
-    expect(service.getToken()).toBeNull();
+  it('should report authEnabled based on environment', () => {
+    expect(typeof service.authEnabled).toBe('boolean');
   });
 
-  it('should return false for isAuthenticated when no token', () => {
-    expect(service.isAuthenticated()).toBeFalse();
+  it('should return null user name when not authenticated', () => {
+    expect(service.getUserName()).toBeNull();
   });
 
-  it('should return true for isAuthenticated with valid token', () => {
-    // Create a mock JWT with future expiry
-    const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }));
-    const mockToken = `header.${payload}.signature`;
-    sessionStorage.setItem('code_index_token', mockToken);
-    expect(service.isAuthenticated()).toBeTrue();
+  it('should return null user email when not authenticated', () => {
+    expect(service.getUserEmail()).toBeNull();
   });
 
-  it('should return false for isAuthenticated with expired token', () => {
-    const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 3600 }));
-    const mockToken = `header.${payload}.signature`;
-    sessionStorage.setItem('code_index_token', mockToken);
-    expect(service.isAuthenticated()).toBeFalse();
-  });
-
-  it('should clear token on logout', () => {
-    sessionStorage.setItem('code_index_token', 'test-token');
-    service.logout();
-    expect(sessionStorage.getItem('code_index_token')).toBeNull();
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/login']);
+  it('should have ensureInitialized method', async () => {
+    await expectAsync(service.ensureInitialized()).toBeResolved();
   });
 });

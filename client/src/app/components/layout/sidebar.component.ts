@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -45,8 +46,15 @@ import { environment } from '../../../environments/environment';
           </a>
         </div>
       </nav>
-      <div class="sidebar-footer" *ngIf="isDevMode">
-        <div class="dev-indicator">
+      <div class="sidebar-footer">
+        <div class="user-info" *ngIf="authService.authEnabled && authService.isAuthenticated()">
+          <i class="bi bi-person-circle" style="font-size:var(--font-lg)"></i>
+          <span class="user-name">{{ authService.getUserName() || 'User' }}</span>
+          <button class="sign-out-btn" (click)="signOut()" title="Sign out">
+            <i class="bi bi-box-arrow-right"></i>
+          </button>
+        </div>
+        <div class="dev-indicator" *ngIf="isDevMode && !authService.authEnabled">
           <span class="dev-dot"></span>
           <span>Development Mode</span>
         </div>
@@ -86,6 +94,26 @@ import { environment } from '../../../environments/environment';
       padding: 1rem 1.5rem;
       margin-top: auto;
     }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: var(--font-sm);
+      color: var(--text);
+    }
+    .user-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+    .sign-out-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); padding: 0.25rem;
+      border-radius: var(--radius); transition: all var(--transition);
+    }
+    .sign-out-btn:hover { color: var(--danger); background: rgba(220,53,69,0.08); }
     .dev-indicator {
       display: flex;
       align-items: center;
@@ -105,4 +133,10 @@ import { environment } from '../../../environments/environment';
 })
 export class SidebarComponent {
   isDevMode = !environment.production;
+
+  constructor(public authService: AuthService) {}
+
+  signOut() {
+    this.authService.signOut();
+  }
 }

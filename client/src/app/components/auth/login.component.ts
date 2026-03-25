@@ -1,10 +1,12 @@
 import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
-import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-login',
   standalone: true,
+  imports: [CommonModule],
   template: `
     <div class="login-container">
       <div class="login-card">
@@ -13,10 +15,23 @@ import { environment } from '../../../environments/environment';
           <h1>Andy CodeIndex</h1>
         </div>
         <p>Semantic code indexing for the Andy ecosystem</p>
-        <button class="btn btn-primary" (click)="login()" *ngIf="authEnabled">
-          <i class="bi bi-box-arrow-in-right"></i> Sign in with Andy Auth
-        </button>
-        <p *ngIf="!authEnabled" class="text-muted">Authentication not configured — running in dev mode</p>
+
+        <div *ngIf="authEnabled && !authenticated">
+          <button class="btn btn-primary" (click)="signIn()" [disabled]="signingIn">
+            {{ signingIn ? 'Redirecting...' : 'Sign in with Andy Auth' }}
+          </button>
+          <div *ngIf="error" class="error-msg">{{ error }}</div>
+        </div>
+
+        <div *ngIf="authEnabled && authenticated">
+          <p><strong>Welcome back, {{ userName }}</strong></p>
+          <button class="btn btn-primary" (click)="goToApp()" style="margin-right:0.5rem">Go to Repositories</button>
+          <button class="btn btn-secondary" (click)="signOut()">Sign Out</button>
+        </div>
+
+        <p *ngIf="!authEnabled" class="text-muted">
+          Authentication not configured. Running in dev mode.
+        </p>
       </div>
     </div>
   `,
@@ -28,20 +43,45 @@ import { environment } from '../../../environments/environment';
     .login-card {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius-lg); padding: 3rem;
-      text-align: center; max-width: 400px; width: 100%;
+      text-align: center; max-width: 420px; width: 100%;
       box-shadow: var(--shadow);
     }
     .brand { margin-bottom: 1.5rem; }
     .brand i { font-size: 3rem; color: var(--primary); display: block; margin-bottom: 0.75rem; }
-    .brand h1 { font-size: 1.5rem; }
+    .brand h1 { font-size: var(--font-2xl); }
     p { color: var(--text-muted); margin-bottom: 2rem; }
-  `],
-  imports: [/* CommonModule if needed */]
+    .error-msg { color: var(--danger); margin-top: 1rem; font-size: var(--font-sm); }
+  `]
 })
 export class LoginComponent {
-  authEnabled = !!environment.authorityUrl;
+  authEnabled: boolean;
+  authenticated: boolean;
+  userName: string | null;
+  signingIn = false;
+  error = '';
 
-  constructor(private auth: AuthService) {}
+  constructor(private auth: AuthService, private router: Router) {
+    this.authEnabled = auth.authEnabled;
+    this.authenticated = auth.isAuthenticated();
+    this.userName = auth.getUserName();
+  }
 
-  login() { this.auth.login(); }
+  async signIn() {
+    this.signingIn = true;
+    this.error = '';
+    try {
+      await this.auth.signIn();
+    } catch (e: any) {
+      this.error = e.message || 'Sign in failed';
+      this.signingIn = false;
+    }
+  }
+
+  signOut() {
+    this.auth.signOut();
+  }
+
+  goToApp() {
+    this.router.navigate(['/repositories']);
+  }
 }
