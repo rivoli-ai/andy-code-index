@@ -134,7 +134,16 @@ export class RepositoryListComponent implements OnInit {
     this.loading = true;
     this.api.getRepositories().subscribe({
       next: repos => { this.repositories = repos; this.loading = false; },
-      error: err => { this.error = 'Failed to load repositories'; this.loading = false; }
+      error: (err: any) => {
+        if (err.status === 403) {
+          this.error = err.error?.error || 'Access denied. You do not have permission to view repositories.';
+        } else if (err.status === 401) {
+          this.error = 'Session expired. Please sign in again.';
+        } else {
+          this.error = 'Failed to load repositories. Check that the server is running.';
+        }
+        this.loading = false;
+      }
     });
   }
 

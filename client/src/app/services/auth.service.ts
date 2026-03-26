@@ -251,14 +251,17 @@ export class AuthService {
     const idToken = localStorage.getItem(this.STORAGE_ID_TOKEN);
     this.clearSession();
 
-    if (idToken && this.discoveryDoc?.end_session_endpoint) {
-      const logoutUrl = new URL(this.discoveryDoc.end_session_endpoint);
-      logoutUrl.searchParams.set('id_token_hint', idToken);
-      logoutUrl.searchParams.set('post_logout_redirect_uri', environment.auth.redirectUri.replace('/callback', '/login'));
-      window.location.href = logoutUrl.toString();
-    } else {
-      window.location.href = '/login';
-    }
+    // Redirect to Andy.Auth logout to clear the server-side session cookie.
+    // Use end_session_endpoint from discovery, or fall back to /connect/logout.
+    const endSessionEndpoint = this.discoveryDoc?.end_session_endpoint
+      || `${environment.auth.authority}/connect/logout`;
+
+    const postLogoutUri = environment.auth.redirectUri.replace('/callback', '/login');
+    const logoutUrl = new URL(endSessionEndpoint);
+    if (idToken) logoutUrl.searchParams.set('id_token_hint', idToken);
+    logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutUri);
+
+    window.location.href = logoutUrl.toString();
   }
 
   private clearSession(): void {

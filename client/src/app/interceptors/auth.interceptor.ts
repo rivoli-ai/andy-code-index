@@ -31,6 +31,21 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           if (error.status === 401) {
             authService.signOut();
           }
+          if (error.status === 403) {
+            // Enrich the error with a clear message for the UI
+            const enrichedError = new HttpErrorResponse({
+              error: {
+                error: 'Access denied. You do not have the required permissions for this operation. Contact your administrator to request access.',
+                code: 'FORBIDDEN',
+                originalError: error.error
+              },
+              headers: error.headers,
+              status: 403,
+              statusText: 'Forbidden',
+              url: error.url ?? undefined
+            });
+            return throwError(() => enrichedError);
+          }
           return throwError(() => error);
         })
       );
