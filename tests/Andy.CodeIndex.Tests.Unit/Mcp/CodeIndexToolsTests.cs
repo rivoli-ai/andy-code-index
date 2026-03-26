@@ -15,6 +15,7 @@ public class CodeIndexToolsTests
     private readonly Mock<ISearchService> _searchServiceMock = new();
     private readonly Mock<IEnrichmentGeneratorService> _enrichmentServiceMock = new();
     private readonly Mock<IGitService> _gitServiceMock = new();
+    private readonly Mock<ICommitRepository> _commitRepoMock = new();
     private readonly CodeIndexTools _tools;
 
     private readonly RepositoryDto _testRepo = new()
@@ -30,14 +31,13 @@ public class CodeIndexToolsTests
     public CodeIndexToolsTests()
     {
         var chatServiceMock = new Mock<IChatService>();
-        var commitRepoMock = new Mock<ICommitRepository>();
         _tools = new CodeIndexTools(
             _repoServiceMock.Object,
             _searchServiceMock.Object,
             _enrichmentServiceMock.Object,
             _gitServiceMock.Object,
             chatServiceMock.Object,
-            commitRepoMock.Object,
+            _commitRepoMock.Object,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }));
 
         _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
@@ -221,5 +221,205 @@ public class CodeIndexToolsTests
         var result = await _tools.ListFiles("nonexistent", "**/*.cs");
         var json = System.Text.Json.JsonSerializer.Serialize(result);
         json.Should().Contain("not found");
+    }
+
+    // --- AddRepository ---
+
+    [Fact]
+    public async Task AddRepository_ValidUrl_ReturnsCreatedRepo()
+    {
+        var newRepo = new RepositoryDto
+        {
+            Id = Guid.NewGuid(), Name = "new-repo",
+            Url = "https://github.com/test/new-repo",
+            Provider = GitProvider.GitHub, Status = "pending"
+        };
+        _repoServiceMock.Setup(s => s.AddAsync(It.IsAny<CreateRepositoryRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(newRepo);
+
+        var result = await _tools.AddRepository("https://github.com/test/new-repo");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("new-repo");
+        json.Should().Contain("Indexing pipeline started");
+    }
+
+    [Fact]
+    public async Task AddRepository_DuplicateUrl_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.AddAsync(It.IsAny<CreateRepositoryRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Repository with URL 'x' already exists."));
+
+        var result = await _tools.AddRepository("https://github.com/test/dup");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("already exists");
+    }
+
+    [Fact]
+    public async Task AddRepository_InvalidUrl_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.AddAsync(It.IsAny<CreateRepositoryRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UriFormatException());
+
+        var result = await _tools.AddRepository("not-a-url");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("Invalid");
+    }
+
+    // --- DeleteRepository ---
+
+    [Fact]
+    public async Task DeleteRepository_ExistingRepo_ReturnsConfirmation()
+    {
+        var result = await _tools.DeleteRepository("andy-docs");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("deleted");
+
+        _repoServiceMock.Verify(s => s.DeleteAsync(_testRepo.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteRepository_NonExistentRepo_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _tools.DeleteRepository("nonexistent");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
+    }
+
+    // --- SyncRepository ---
+
+    [Fact]
+    public async Task SyncRepository_ExistingRepo_ReturnsStarted()
+    {
+        var result = await _tools.SyncRepository("andy-docs");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("Sync started");
+
+        _repoServiceMock.Verify(s => s.SyncAsync(_testRepo.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SyncRepository_AlreadySyncing_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.SyncAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("already has active tasks"));
+
+        var result = await _tools.SyncRepository("andy-docs");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("active tasks");
+    }
+
+    [Fact]
+    public async Task SyncRepository_NonExistentRepo_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _tools.SyncRepository("nonexistent");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
+    }
+
+    // --- Commits ---
+
+    [Fact]
+    public async Task ListCommits_ExistingRepo_ReturnsCommits()
+    {
+        _commitRepoMock.Setup(c => c.GetByRepositoryAsync(_testRepo.Id, 0, 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new Domain.Entities.Commit
+                {
+                    Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+                    Sha = "abc123", Message = "Initial commit",
+                    AuthorName = "Dev", AuthorEmail = "dev@test.com",
+                    CommittedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                }
+            ]);
+
+        var result = await _tools.ListCommits("andy-docs");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("abc123");
+        json.Should().Contain("Initial commit");
+    }
+
+    [Fact]
+    public async Task ListCommits_NonExistentRepo_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _tools.ListCommits("nonexistent");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
+    }
+
+    [Fact]
+    public async Task ListCommits_CustomLimit_PassesLimit()
+    {
+        _commitRepoMock.Setup(c => c.GetByRepositoryAsync(_testRepo.Id, 0, 5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        await _tools.ListCommits("andy-docs", limit: 5);
+
+        _commitRepoMock.Verify(c => c.GetByRepositoryAsync(_testRepo.Id, 0, 5, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // --- SearchFilters ---
+
+    [Fact]
+    public async Task GetSearchFilters_ReturnsReposAndLanguages()
+    {
+        _searchServiceMock.Setup(s => s.GetFilterOptionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SearchFilterOptions
+            {
+                Repositories = [new FilterOption { Id = "1", Name = "repo1" }],
+                Languages = ["csharp", "typescript"]
+            });
+
+        var result = await _tools.GetSearchFilters();
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("repo1");
+        json.Should().Contain("csharp");
+        json.Should().Contain("typescript");
+    }
+
+    // --- EnrichmentCounts ---
+
+    [Fact]
+    public async Task GetEnrichmentCounts_NoFilter_ReturnsCounts()
+    {
+        _enrichmentServiceMock.Setup(s => s.GetCountsBySubtypeAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, int> { { "Physical", 5 }, { "Chunk", 100 } });
+
+        var result = await _tools.GetEnrichmentCounts();
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("Physical");
+        json.Should().Contain("105"); // total
+    }
+
+    [Fact]
+    public async Task GetEnrichmentCounts_WithRepoFilter_PassesRepoId()
+    {
+        _enrichmentServiceMock.Setup(s => s.GetCountsBySubtypeAsync(null, _testRepo.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, int> { { "Wiki", 3 } });
+
+        var result = await _tools.GetEnrichmentCounts("andy-docs");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("Wiki");
+    }
+
+    [Fact]
+    public async Task GetEnrichmentCounts_NonExistentRepo_ReturnsAllCounts()
+    {
+        // Non-existent repo resolves to null, so repoId is null -- returns unfiltered counts
+        _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _enrichmentServiceMock.Setup(s => s.GetCountsBySubtypeAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, int>());
+
+        var result = await _tools.GetEnrichmentCounts("nonexistent");
+        result.Should().NotBeNull();
     }
 }
