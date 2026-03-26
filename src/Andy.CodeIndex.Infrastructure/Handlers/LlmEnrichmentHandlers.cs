@@ -38,7 +38,7 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
         Logger = logger;
     }
 
-    public async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
+    public virtual async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
         var repo = await Context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");

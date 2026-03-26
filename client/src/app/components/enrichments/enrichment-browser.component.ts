@@ -147,6 +147,10 @@ export class EnrichmentBrowserComponent implements OnInit {
     'CommitDescription': 'Commit Desc',
     'CommitHistory': 'Commit History',
     'Dependencies': 'Dependencies',
+    'Ownership': 'Ownership',
+    'Security': 'Security',
+    'Operations': 'Operations',
+    'Quality': 'Quality',
   };
 
   private typeToSubtypes: Record<string, { value: string; label: string }[]> = {

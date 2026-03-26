@@ -175,7 +175,7 @@ public class TaskQueueServiceTests
     [Fact]
     public void GetNextOperation_LastInChain_ReturnsNull()
     {
-        TaskQueueService.GetNextOperation(TaskOperation.CreateWiki).Should().BeNull();
+        TaskQueueService.GetNextOperation(TaskOperation.CreateQualityDocs).Should().BeNull();
     }
 
     [Fact]

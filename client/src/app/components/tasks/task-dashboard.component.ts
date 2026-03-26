@@ -91,6 +91,10 @@ export class TaskDashboardComponent implements OnInit, OnDestroy {
     'CreateWiki': 'Generate Wiki',
     'ExtractDependencies': 'Extract Dependencies',
     'ExtractCommitHistory': 'Extract Commit History',
+    'CreateOwnershipDocs': 'Generate Ownership Docs',
+    'CreateSecurityDocs': 'Generate Security Docs',
+    'CreateOperationsDocs': 'Generate Operations Docs',
+    'CreateQualityDocs': 'Generate Quality Docs',
   };
 
   constructor(private api: ApiService) {}

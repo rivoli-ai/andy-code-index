@@ -19,5 +19,9 @@ public enum TaskOperation
     CreateCookbook,
     CreateWiki,
     ExtractDependencies,
-    ExtractCommitHistory
+    ExtractCommitHistory,
+    CreateOwnershipDocs,
+    CreateSecurityDocs,
+    CreateOperationsDocs,
+    CreateQualityDocs
 }

@@ -254,6 +254,34 @@ public class CodeIndexTools
         return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.CommitHistory, "Commit history");
     }
 
+    [McpServerTool(Name = "code_index_ownership"), Description("Get ownership and collaboration info for a repository")]
+    public async Task<object> GetOwnership(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.Ownership, "Ownership");
+    }
+
+    [McpServerTool(Name = "code_index_security"), Description("Get security architecture and auth analysis for a repository")]
+    public async Task<object> GetSecurity(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.Security, "Security");
+    }
+
+    [McpServerTool(Name = "code_index_operations"), Description("Get deployment, CI/CD, and infrastructure info for a repository")]
+    public async Task<object> GetOperations(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.Operations, "Operations");
+    }
+
+    [McpServerTool(Name = "code_index_quality"), Description("Get test strategy, quality signals, and coverage info for a repository")]
+    public async Task<object> GetQuality(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.Quality, "Quality");
+    }
+
     [McpServerTool(Name = "code_index_dependencies"), Description("Get package dependencies for a repository")]
     public async Task<object> GetDependencies(
         [Description("Repository URL or name")] string repo_url)

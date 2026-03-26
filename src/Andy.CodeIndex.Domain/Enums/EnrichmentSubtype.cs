@@ -25,5 +25,11 @@ public enum EnrichmentSubtype
     Dependencies,
 
     // History
-    CommitHistory
+    CommitHistory,
+
+    // Cross-cutting
+    Ownership,
+    Security,
+    Operations,
+    Quality
 }

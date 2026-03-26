@@ -110,7 +110,11 @@ public class TaskQueueService : ITaskQueue
             TaskOperation.CreateDatabaseSchema,
             TaskOperation.CreateCommitDescription,
             TaskOperation.CreateCookbook,
-            TaskOperation.CreateWiki
+            TaskOperation.CreateWiki,
+            TaskOperation.CreateOwnershipDocs,
+            TaskOperation.CreateSecurityDocs,
+            TaskOperation.CreateOperationsDocs,
+            TaskOperation.CreateQualityDocs
         ],
         TaskChainType.Resync =>
         [
@@ -151,6 +155,10 @@ public class TaskQueueService : ITaskQueue
             TaskOperation.CreateCommitDescription,
             TaskOperation.CreateCookbook,
             TaskOperation.CreateWiki,
+            TaskOperation.CreateOwnershipDocs,
+            TaskOperation.CreateSecurityDocs,
+            TaskOperation.CreateOperationsDocs,
+            TaskOperation.CreateQualityDocs,
         ];
 
         var index = Array.IndexOf(fullChain, current);
@@ -166,6 +174,10 @@ public class TaskQueueService : ITaskQueue
         TaskOperation.CreateCommitDescription or
         TaskOperation.CreateCookbook or
         TaskOperation.CreateWiki or
+        TaskOperation.CreateOwnershipDocs or
+        TaskOperation.CreateSecurityDocs or
+        TaskOperation.CreateOperationsDocs or
+        TaskOperation.CreateQualityDocs or
         TaskOperation.CreateSummaryEnrichments or
         TaskOperation.CreateSummaryEmbeddings;
 

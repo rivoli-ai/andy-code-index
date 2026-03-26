@@ -135,6 +135,10 @@ builder.Services.AddScoped<ITaskHandler, CreateSummaryEnrichmentsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateSummaryEmbeddingsHandler>();
 builder.Services.AddScoped<ITaskHandler, ExtractDependenciesHandler>();
 builder.Services.AddScoped<ITaskHandler, ExtractCommitHistoryHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateOwnershipDocsHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateSecurityDocsHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateOperationsDocsHandler>();
+builder.Services.AddScoped<ITaskHandler, CreateQualityDocsHandler>();
 builder.Services.AddScoped<IDependencyParserService, Andy.CodeIndex.Infrastructure.Parsers.DependencyParserService>();
 
 // --- Background services ---
