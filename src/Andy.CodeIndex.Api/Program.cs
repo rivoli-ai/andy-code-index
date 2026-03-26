@@ -75,24 +75,24 @@ else
 var rbacBaseUrl = builder.Configuration["Rbac:ApiBaseUrl"];
 if (!string.IsNullOrEmpty(rbacBaseUrl))
 {
-    builder.Services.AddRbacClient(options =>
-    {
-        options.ApiBaseUrl = rbacBaseUrl;
-        options.ApplicationCode = "code-index";
-    });
-
-    // In development, accept self-signed certificates for the RBAC server
+    // In development, accept self-signed certificates for all HttpClients (including RBAC)
     if (builder.Environment.IsDevelopment())
     {
-        builder.Services.ConfigureHttpClientDefaults(clientBuilder =>
+        builder.Services.ConfigureHttpClientDefaults(b =>
         {
-            clientBuilder.ConfigurePrimaryHttpMessageHandler(() =>
+            b.ConfigurePrimaryHttpMessageHandler(() =>
                 new HttpClientHandler
                 {
                     ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
                 });
         });
     }
+
+    builder.Services.AddRbacClient(options =>
+    {
+        options.ApiBaseUrl = rbacBaseUrl;
+        options.ApplicationCode = "code-index";
+    });
 }
 
 // --- Repositories ---
