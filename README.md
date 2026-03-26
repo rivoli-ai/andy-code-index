@@ -100,6 +100,10 @@ The indexing pipeline runs automatically: Clone, Sync, Scan, Extract Snippets, E
 | GET | `/api/v1/queue` | Task queue |
 | GET | `/api/v1/queue/pipelines` | Active pipeline progress |
 | POST | `/api/v1/chat` | RAG chat with indexed code |
+| GET | `/api/v1/chat/conversations` | List user's conversations |
+| GET | `/api/v1/chat/conversations/{id}` | Get conversation with messages |
+| DELETE | `/api/v1/chat/conversations/{id}` | Delete a conversation |
+| PUT | `/api/v1/chat/conversations/{id}/title` | Rename a conversation |
 | GET | `/api/v1/discover/{provider}` | Discover repos in an org |
 | POST | `/api/v1/discover/sync` | Import discovered repos |
 | GET | `/api/v1/sync/status` | Sync schedule |

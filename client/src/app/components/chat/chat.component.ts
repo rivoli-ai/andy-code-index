@@ -67,9 +67,29 @@ interface SuggestionDimension {
           </div>
         </div>
 
-        <div class="sidebar-section sidebar-footer-section">
-          <h3 class="sidebar-title" style="color:var(--text-light)">Conversations</h3>
-          <p class="text-muted" style="font-size:var(--font-xs);margin:0">Coming soon</p>
+        <div class="sidebar-section conversations-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+            <h3 class="sidebar-title" style="margin:0">Conversations</h3>
+            <button class="btn-icon" (click)="newChat()" title="New Chat">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <div class="conversation-list">
+            <div *ngFor="let conv of conversations" class="conversation-item"
+                 [class.active]="conversationId === conv.id"
+                 (click)="resumeConversation(conv.id)">
+              <div class="conv-title">{{ conv.title }}</div>
+              <div class="conv-meta">
+                <span>{{ formatTimeAgo(conv.updatedAt) }}</span>
+                <button class="btn-icon-sm" (click)="deleteConversation(conv.id, $event)" title="Delete">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </div>
+            <div *ngIf="conversations.length === 0" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem">
+              No conversations yet.
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -170,7 +190,27 @@ interface SuggestionDimension {
       padding-left: 0.875rem;
     }
 
-    .sidebar-footer-section { margin-top: auto; border-top: 1px solid var(--border); border-bottom: none; }
+    .conversations-section { margin-top: auto; border-top: 1px solid var(--border); border-bottom: none; max-height: 40%; overflow-y: auto; }
+    .conversation-list { display: flex; flex-direction: column; gap: 0.125rem; }
+    .conversation-item {
+      padding: 0.5rem 0.625rem; border-radius: var(--radius); cursor: pointer;
+      transition: all var(--transition); border: 1px solid transparent;
+    }
+    .conversation-item:hover { background: var(--surface); border-color: var(--border); }
+    .conversation-item.active { background: rgba(0,102,204,0.06); border-color: var(--primary-light); }
+    .conv-title { font-size: var(--font-xs); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conv-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: var(--text-muted); margin-top: 0.125rem; }
+    .btn-icon {
+      background: none; border: 1px solid var(--border); border-radius: var(--radius);
+      cursor: pointer; padding: 0.25rem 0.5rem; color: var(--text-muted);
+      transition: all var(--transition); font-size: var(--font-xs);
+    }
+    .btn-icon:hover { color: var(--primary); border-color: var(--primary); }
+    .btn-icon-sm {
+      background: none; border: none; cursor: pointer; padding: 0.125rem;
+      color: var(--text-light); transition: all var(--transition); font-size: 0.7rem;
+    }
+    .btn-icon-sm:hover { color: var(--danger); }
 
     /* --- Right chat area --- */
     .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -242,6 +282,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   allCategories: SuggestionDimension[] = [];
   visibleQuestions: string[] = [];
+  conversations: { id: string; title: string; updatedAt: string; messageCount: number }[] = [];
 
   private searchAliases: Record<string, string[]> = {
     'db': ['database', 'schema', 'table', 'migration', 'entity'],
@@ -282,6 +323,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     this.http.get<any>(`${environment.apiUrl}/chat/status`).subscribe({
       next: s => this.chatAvailable = s.available
     });
+    this.loadConversations();
   }
 
   ngAfterViewChecked() {
@@ -322,6 +364,56 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     }
   }
 
+  loadConversations() {
+    this.http.get<any>(`${environment.apiUrl}/chat/conversations?limit=50`).subscribe({
+      next: res => this.conversations = res.conversations || []
+    });
+  }
+
+  newChat() {
+    this.messages = [];
+    this.conversationId = null;
+    this.input = '';
+  }
+
+  resumeConversation(id: string) {
+    this.http.get<any>(`${environment.apiUrl}/chat/conversations/${id}`).subscribe({
+      next: res => {
+        this.conversationId = res.id;
+        this.messages = (res.messages || []).map((m: any) => ({
+          role: m.role,
+          content: m.content,
+          sources: m.sourcesJson ? JSON.parse(m.sourcesJson) : undefined,
+          showSources: false
+        }));
+      }
+    });
+  }
+
+  deleteConversation(id: string, event: Event) {
+    event.stopPropagation();
+    this.http.delete(`${environment.apiUrl}/chat/conversations/${id}`).subscribe({
+      next: () => {
+        this.conversations = this.conversations.filter(c => c.id !== id);
+        if (this.conversationId === id) this.newChat();
+      }
+    });
+  }
+
+  formatTimeAgo(dateStr: string): string {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  }
+
   send() {
     if (!this.input.trim() || this.sending) return;
 
@@ -343,6 +435,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
           showSources: false
         });
         this.sending = false;
+        this.loadConversations();
       },
       error: () => {
         this.messages.push({ role: 'assistant', content: 'Failed to get a response. Check your LLM configuration in Settings.' });
