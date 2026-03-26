@@ -133,7 +133,7 @@ interface SuggestionDimension {
 
     /* --- Left sidebar --- */
     .chat-sidebar {
-      width: 280px; min-width: 280px;
+      width: 300px; min-width: 300px;
       border-right: 1px solid var(--border);
       display: flex; flex-direction: column;
       overflow-y: auto;
@@ -146,24 +146,29 @@ interface SuggestionDimension {
     .category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; }
     .category-tile {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 0.375rem 0.625rem; border: 1px solid var(--border); border-radius: var(--radius);
-      background: var(--surface); font-size: var(--font-xs); cursor: pointer;
+      padding: 0.375rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); font-size: 0.75rem; cursor: pointer;
       transition: all var(--transition); color: var(--text); text-align: left;
+      min-height: 2rem;
     }
-    .category-tile:hover { border-color: var(--primary); color: var(--primary); }
+    .category-tile:hover { border-color: var(--primary); color: var(--primary); background: rgba(0,102,204,0.04); }
     .category-tile.active { background: var(--primary); color: white; border-color: var(--primary); }
-    .category-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .category-count { font-size: 0.7rem; opacity: 0.7; flex-shrink: 0; }
+    .category-name { font-weight: 500; line-height: 1.2; }
+    .category-count { font-size: 0.65rem; opacity: 0.7; flex-shrink: 0; margin-left: 0.25rem; }
 
     .question-list { flex: 1; overflow-y: auto; padding: 0.5rem 0.75rem; }
     .question-item {
       display: block; width: 100%; text-align: left;
       padding: 0.5rem 0.625rem; margin-bottom: 0.25rem;
-      border: none; border-radius: var(--radius); background: none;
+      border: 1px solid transparent; border-radius: var(--radius); background: none;
       font-size: var(--font-xs); color: var(--text); cursor: pointer;
       transition: all var(--transition); line-height: 1.4;
     }
-    .question-item:hover { background: var(--surface); color: var(--primary); }
+    .question-item:hover {
+      background: var(--surface); color: var(--primary);
+      border-color: var(--primary-light);
+      padding-left: 0.875rem;
+    }
 
     .sidebar-footer-section { margin-top: auto; border-top: 1px solid var(--border); border-bottom: none; }
 
@@ -238,6 +243,23 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   allCategories: SuggestionDimension[] = [];
   visibleQuestions: string[] = [];
 
+  private searchAliases: Record<string, string[]> = {
+    'db': ['database', 'schema', 'table', 'migration', 'entity'],
+    'auth': ['authentication', 'authorization', 'login', 'sign in', 'oauth', 'jwt'],
+    'deps': ['dependency', 'dependencies', 'package', 'nuget', 'npm'],
+    'ci': ['ci/cd', 'pipeline', 'github actions', 'jenkins', 'deploy'],
+    'k8s': ['kubernetes', 'container', 'docker', 'helm'],
+    'api': ['endpoint', 'route', 'controller', 'rest', 'swagger'],
+    'test': ['testing', 'unit test', 'integration test', 'coverage', 'spec'],
+    'perf': ['performance', 'latency', 'throughput', 'benchmark'],
+    'config': ['configuration', 'settings', 'environment', 'env'],
+    'repo': ['repository', 'codebase', 'project'],
+    'infra': ['infrastructure', 'terraform', 'cloud', 'deployment'],
+    'sec': ['security', 'secrets', 'encryption', 'vulnerability'],
+    'ops': ['operations', 'monitoring', 'alerting', 'logging'],
+    'doc': ['documentation', 'readme', 'wiki', 'guide'],
+  };
+
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
@@ -274,10 +296,26 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   filterQuestions() {
     if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase();
+      const q = this.searchQuery.toLowerCase().trim();
+      // Expand query with aliases
+      const expandedTerms = [q];
+      for (const [alias, expansions] of Object.entries(this.searchAliases)) {
+        if (q === alias || q.includes(alias)) {
+          expandedTerms.push(...expansions);
+        }
+        // Also reverse: if query matches an expansion, include the alias targets
+        if (expansions.some(e => e.includes(q) || q.includes(e))) {
+          expandedTerms.push(...expansions);
+        }
+      }
+      const uniqueTerms = [...new Set(expandedTerms)];
+
       this.visibleQuestions = this.allCategories
         .flatMap(c => c.questions)
-        .filter(question => question.toLowerCase().includes(q));
+        .filter(question => {
+          const lower = question.toLowerCase();
+          return uniqueTerms.some(term => lower.includes(term));
+        });
     } else {
       const cat = this.allCategories.find(c => c.name === this.activeCategory);
       this.visibleQuestions = cat?.questions || [];
