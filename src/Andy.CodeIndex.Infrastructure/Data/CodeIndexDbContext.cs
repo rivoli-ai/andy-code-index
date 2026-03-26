@@ -22,6 +22,8 @@ public class CodeIndexDbContext : DbContext
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
     public DbSet<IndexingRun> IndexingRuns => Set<IndexingRun>();
     public DbSet<SettingsChangeLog> SettingsChangeLogs => Set<SettingsChangeLog>();
+    public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +48,7 @@ public class CodeIndexDbContext : DbContext
         ConfigureUserSettings(modelBuilder);
         ConfigureIndexingRun(modelBuilder);
         ConfigureSettingsChangeLog(modelBuilder);
+        ConfigureChatConversation(modelBuilder);
     }
 
     private static void ConfigureRepository(ModelBuilder modelBuilder, bool isNpgsql)
@@ -341,6 +344,27 @@ public class CodeIndexDbContext : DbContext
             builder.Property(l => l.Action).IsRequired().HasMaxLength(32);
             builder.HasIndex(l => l.UserId);
             builder.HasIndex(l => l.CreatedAt);
+        });
+    }
+
+    private static void ConfigureChatConversation(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ChatConversation>(builder =>
+        {
+            builder.HasKey(c => c.Id);
+            builder.Property(c => c.UserId).IsRequired().HasMaxLength(256);
+            builder.Property(c => c.Title).IsRequired().HasMaxLength(256);
+            builder.HasOne(c => c.Repository).WithMany().HasForeignKey(c => c.RepositoryId).OnDelete(DeleteBehavior.SetNull);
+            builder.HasIndex(c => new { c.UserId, c.UpdatedAt });
+        });
+
+        modelBuilder.Entity<ChatMessage>(builder =>
+        {
+            builder.HasKey(m => m.Id);
+            builder.Property(m => m.Role).IsRequired().HasMaxLength(16);
+            builder.Property(m => m.Content).IsRequired();
+            builder.HasOne(m => m.Conversation).WithMany(c => c.Messages).HasForeignKey(m => m.ConversationId).OnDelete(DeleteBehavior.Cascade);
+            builder.HasIndex(m => m.ConversationId);
         });
     }
 }

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -6,6 +5,7 @@ using System.Text.Json.Serialization;
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
+using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
 using Andy.CodeIndex.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -23,9 +23,6 @@ public class ChatService : IChatService
     private readonly EnrichmentLlmOptions _llmOptions;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ChatService> _logger;
-
-    // Simple in-memory conversation store (per conversationId)
-    private static readonly ConcurrentDictionary<string, List<ConversationMessage>> Conversations = new();
 
     // Available if any key source exists (user or system)
     public bool IsAvailable => true; // Actual check done at runtime via resolver
@@ -52,14 +49,40 @@ public class ChatService : IChatService
     {
         var conversationId = request.ConversationId ?? Guid.NewGuid().ToString();
 
-        // 1. Resolve LLM API key: user LLM key -> user embedding key -> system LLM key -> system embedding key
+        // 0. Create or load conversation
+        var conversation = await _context.ChatConversations
+            .FirstOrDefaultAsync(c => c.Id.ToString() == conversationId, ct);
+
+        if (conversation == null)
+        {
+            conversation = new ChatConversation
+            {
+                Id = Guid.Parse(conversationId),
+                UserId = userId ?? "anonymous",
+                Title = request.Message.Length > 60 ? request.Message[..57] + "..." : request.Message,
+                RepositoryId = request.RepositoryId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.ChatConversations.Add(conversation);
+            await _context.SaveChangesAsync(ct);
+        }
+
+        // 1. Resolve LLM API key
         var (apiKey, model, source) = await _apiKeyResolver.ResolveLlmKeyAsync(userId, ct);
 
         if (string.IsNullOrEmpty(apiKey))
         {
+            // Still persist the user's message even without LLM
+            var noKeyReply = "No LLM API key configured. Set an API key in Settings or configure Enrichment:ApiKey in appsettings.";
+            _context.ChatMessages.Add(new Domain.Entities.ChatMessage { Id = Guid.NewGuid(), ConversationId = conversation.Id, Role = "user", Content = request.Message, CreatedAt = DateTime.UtcNow });
+            _context.ChatMessages.Add(new Domain.Entities.ChatMessage { Id = Guid.NewGuid(), ConversationId = conversation.Id, Role = "assistant", Content = noKeyReply, CreatedAt = DateTime.UtcNow });
+            conversation.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(ct);
+
             return new ChatResponse
             {
-                Reply = "No LLM API key configured. Set an API key in Settings or configure Enrichment:ApiKey in appsettings.",
+                Reply = noKeyReply,
                 ConversationId = conversationId,
                 Model = _llmOptions.Model
             };
@@ -160,8 +183,12 @@ public class ChatService : IChatService
             repoContext = $"\nIndexed repositories ({repos.Count}):\n{string.Join("\n", repoSummaries)}\n";
         }
 
-        // 4. Build conversation with history
-        var history = Conversations.GetOrAdd(conversationId, _ => []);
+        // 4. Load conversation history
+        var history = await _context.ChatMessages
+            .Where(m => m.ConversationId == conversation.Id)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new { m.Role, m.Content })
+            .ToListAsync(ct);
 
         var codeContext = sources.Count > 0
             ? "\n\nRelevant code from the indexed repositories:\n" +
@@ -183,7 +210,7 @@ public class ChatService : IChatService
             new { role = "system", content = systemPrompt }
         };
 
-        // Add conversation history (last 10 exchanges)
+        // Add conversation history (last 20 messages)
         foreach (var msg in history.TakeLast(20))
         {
             messages.Add(new { role = msg.Role, content = msg.Content });
@@ -221,13 +248,20 @@ public class ChatService : IChatService
             reply = $"LLM call failed: {ex.Message}. Check your API key and model configuration in Settings.";
         }
 
-        // 6. Store conversation
-        history.Add(new ConversationMessage("user", request.Message));
-        history.Add(new ConversationMessage("assistant", reply));
-
-        // Keep conversation size bounded
-        if (history.Count > 40)
-            history.RemoveRange(0, history.Count - 40);
+        // 6. Persist messages to database
+        var sourcesJson = sources.Count > 0 ? JsonSerializer.Serialize(sources) : null;
+        _context.ChatMessages.Add(new Domain.Entities.ChatMessage
+        {
+            Id = Guid.NewGuid(), ConversationId = conversation.Id,
+            Role = "user", Content = request.Message, CreatedAt = DateTime.UtcNow
+        });
+        _context.ChatMessages.Add(new Domain.Entities.ChatMessage
+        {
+            Id = Guid.NewGuid(), ConversationId = conversation.Id,
+            Role = "assistant", Content = reply, SourcesJson = sourcesJson, CreatedAt = DateTime.UtcNow
+        });
+        conversation.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(ct);
 
         return new ChatResponse
         {
@@ -253,5 +287,4 @@ public class ChatService : IChatService
         public string? Content { get; set; }
     }
 
-    private record ConversationMessage(string Role, string Content);
 }

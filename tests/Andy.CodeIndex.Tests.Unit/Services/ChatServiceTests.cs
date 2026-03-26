@@ -93,13 +93,14 @@ public class ChatServiceTests : IDisposable
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(("", "", "none"));
 
+        var convId = Guid.NewGuid().ToString();
         var response = await _chatService.ChatAsync(new ChatRequest
         {
             Message = "hello",
-            ConversationId = "my-conv-id"
+            ConversationId = convId
         });
 
-        response.ConversationId.Should().Be("my-conv-id");
+        response.ConversationId.Should().Be(convId);
     }
 
     [Fact]
