@@ -125,6 +125,7 @@ export class AuthService {
     authUrl.searchParams.set('code_challenge_method', 'S256');
     authUrl.searchParams.set('state', state);
 
+    console.log('[AUTH] Redirecting to:', authUrl.toString());
     window.location.href = authUrl.toString();
   }
 
@@ -246,22 +247,23 @@ export class AuthService {
   }
 
   async signOut(): Promise<void> {
-    if (!this.discoveryDoc) await this.loadDiscoveryDocument();
-
     const idToken = localStorage.getItem(this.STORAGE_ID_TOKEN);
     this.clearSession();
 
-    // Redirect to Andy.Auth logout to clear the server-side session cookie.
-    // Use end_session_endpoint from discovery, or fall back to /connect/logout.
-    const endSessionEndpoint = this.discoveryDoc?.end_session_endpoint
-      || `${environment.auth.authority}/connect/logout`;
+    // Clear Andy.Auth session via iframe (non-blocking), then redirect to login
+    if (idToken && this.authEnabled) {
+      const endSessionEndpoint = `${environment.auth.authority}/connect/logout`;
+      const logoutUrl = `${endSessionEndpoint}?id_token_hint=${encodeURIComponent(idToken)}`;
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = logoutUrl;
+      document.body.appendChild(iframe);
+      // Give the iframe a moment to clear the cookie
+      await new Promise(resolve => setTimeout(resolve, 500));
+      document.body.removeChild(iframe);
+    }
 
-    const postLogoutUri = environment.auth.redirectUri.replace('/callback', '/login');
-    const logoutUrl = new URL(endSessionEndpoint);
-    if (idToken) logoutUrl.searchParams.set('id_token_hint', idToken);
-    logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutUri);
-
-    window.location.href = logoutUrl.toString();
+    window.location.href = '/login';
   }
 
   private clearSession(): void {
