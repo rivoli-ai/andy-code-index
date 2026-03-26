@@ -30,12 +30,14 @@ public class CodeIndexToolsTests
     public CodeIndexToolsTests()
     {
         var chatServiceMock = new Mock<IChatService>();
+        var commitRepoMock = new Mock<ICommitRepository>();
         _tools = new CodeIndexTools(
             _repoServiceMock.Object,
             _searchServiceMock.Object,
             _enrichmentServiceMock.Object,
             _gitServiceMock.Object,
             chatServiceMock.Object,
+            commitRepoMock.Object,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }));
 
         _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))

@@ -17,6 +17,7 @@ public class CodeIndexTools
     private readonly IEnrichmentGeneratorService _enrichmentService;
     private readonly IGitService _gitService;
     private readonly IChatService _chatService;
+    private readonly ICommitRepository _commitRepo;
     private readonly IndexingOptions _options;
 
     public CodeIndexTools(
@@ -25,6 +26,7 @@ public class CodeIndexTools
         IEnrichmentGeneratorService enrichmentService,
         IGitService gitService,
         IChatService chatService,
+        ICommitRepository commitRepo,
         IOptions<IndexingOptions> options)
     {
         _repoService = repoService;
@@ -32,6 +34,7 @@ public class CodeIndexTools
         _enrichmentService = enrichmentService;
         _gitService = gitService;
         _chatService = chatService;
+        _commitRepo = commitRepo;
         _options = options.Value;
     }
 
@@ -320,6 +323,108 @@ public class CodeIndexTools
                 embeddings = r.Stats?.EmbeddingCount ?? 0,
                 hasEmbeddings = r.Stats?.HasEmbeddings ?? false })
         };
+    }
+
+    [McpServerTool(Name = "code_index_add_repository"), Description("Add a Git repository for indexing")]
+    public async Task<object> AddRepository(
+        [Description("Repository URL (e.g., https://github.com/org/repo)")] string url,
+        [Description("Personal access token for private repos")] string? pat = null)
+    {
+        try
+        {
+            var repo = await _repoService.AddAsync(new CreateRepositoryRequest { Url = url, PersonalAccessToken = pat });
+            return new { repository = repo.Name, id = repo.Id, status = repo.Status, url = repo.Url, message = "Repository added. Indexing pipeline started." };
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
+        {
+            return new { error = ex.Message };
+        }
+        catch (UriFormatException)
+        {
+            return new { error = "Invalid repository URL format." };
+        }
+    }
+
+    [McpServerTool(Name = "code_index_delete_repository"), Description("Remove a repository and all its indexed data")]
+    public async Task<object> DeleteRepository(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        try
+        {
+            await _repoService.DeleteAsync(repo.Id);
+            return new { repository = repo.Name, message = "Repository deleted." };
+        }
+        catch (KeyNotFoundException)
+        {
+            return new { error = $"Repository '{repo_url}' not found" };
+        }
+    }
+
+    [McpServerTool(Name = "code_index_sync_repository"), Description("Trigger a sync/re-index for a repository")]
+    public async Task<object> SyncRepository(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        try
+        {
+            await _repoService.SyncAsync(repo.Id);
+            return new { repository = repo.Name, message = "Sync started. Check task queue for progress." };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new { error = ex.Message };
+        }
+    }
+
+    [McpServerTool(Name = "code_index_commits"), Description("List recent commits for a repository")]
+    public async Task<object> ListCommits(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Maximum commits to return")] int? limit = null)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var commits = await _commitRepo.GetByRepositoryAsync(repo.Id, 0, limit ?? 20);
+        return new
+        {
+            repository = repo.Name,
+            total = commits.Count,
+            commits = commits.Select(c => new { c.Sha, c.Message, c.AuthorName, c.AuthorEmail, c.CommittedAt })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_search_filters"), Description("Get available repositories and programming languages for search filtering")]
+    public async Task<object> GetSearchFilters()
+    {
+        var filters = await _searchService.GetFilterOptionsAsync();
+        return new
+        {
+            repositories = filters.Repositories.Select(r => new { r.Id, r.Name }),
+            languages = filters.Languages
+        };
+    }
+
+    [McpServerTool(Name = "code_index_enrichment_counts"), Description("Get enrichment counts grouped by subtype, optionally filtered by repository")]
+    public async Task<object> GetEnrichmentCounts(
+        [Description("Repository URL or name (optional)")] string? repo_url = null)
+    {
+        Guid? repoId = null;
+        if (repo_url is not null)
+        {
+            var repo = await ResolveRepo(repo_url);
+            if (repo is not null) repoId = repo.Id;
+        }
+
+        var counts = await _enrichmentService.GetCountsBySubtypeAsync(repositoryId: repoId);
+        return new { total = counts.Values.Sum(), counts };
     }
 
     // --- Helpers ---

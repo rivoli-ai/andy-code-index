@@ -111,9 +111,13 @@ Swagger UI available at `/swagger` in development mode.
 
 ## MCP Tools
 
-19 tools exposed at `/mcp` with the `code_index_` prefix:
+29 tools exposed at `/mcp` with the `code_index_` prefix:
 
-`code_index_version`, `code_index_repositories`, `code_index_architecture_docs`, `code_index_api_docs`, `code_index_commit_description`, `code_index_commit_history`, `code_index_database_schema`, `code_index_cookbook`, `code_index_wiki`, `code_index_wiki_page`, `code_index_semantic_search`, `code_index_keyword_search`, `code_index_grep`, `code_index_read_resource`, `code_index_ls`, `code_index_chat`, `code_index_dependencies`, `code_index_analytics`, `code_index_sync_status`
+**Query:** `code_index_version`, `code_index_repositories`, `code_index_semantic_search`, `code_index_keyword_search`, `code_index_grep`, `code_index_read_resource`, `code_index_ls`, `code_index_chat`, `code_index_search_filters`, `code_index_commits`
+
+**Enrichments:** `code_index_architecture_docs`, `code_index_api_docs`, `code_index_database_schema`, `code_index_cookbook`, `code_index_wiki`, `code_index_wiki_page`, `code_index_commit_description`, `code_index_commit_history`, `code_index_dependencies`, `code_index_ownership`, `code_index_security`, `code_index_operations`, `code_index_quality`, `code_index_enrichment_counts`
+
+**Management:** `code_index_add_repository`, `code_index_delete_repository`, `code_index_sync_repository`, `code_index_analytics`, `code_index_sync_status`
 
 ## Configuration
 
