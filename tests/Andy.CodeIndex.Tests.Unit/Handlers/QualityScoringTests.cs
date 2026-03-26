@@ -5,6 +5,30 @@ namespace Andy.CodeIndex.Tests.Unit.Handlers;
 
 public class QualityScoringTests
 {
+    // --- EstimateQuality edge cases ---
+
+    [Theory]
+    [InlineData("no relevant information found", 0.1)]
+    [InlineData("I cannot determine from the available code", 0.1)]
+    [InlineData("could not find any database schema", 0.1)]
+    [InlineData("insufficient context to analyze", 0.1)]
+    public void EstimateQuality_VariousLowQualityPhrases_ReturnsLow(string content, double maxExpected)
+    {
+        BaseLlmEnrichmentHandler.EstimateQuality(content).Should().BeLessThanOrEqualTo(maxExpected + 0.2);
+    }
+
+    [Theory]
+    [InlineData(50, 0.2)]
+    [InlineData(150, 0.5)]
+    [InlineData(500, 0.7)]
+    [InlineData(1200, 0.85)]
+    [InlineData(3000, 1.0)]
+    public void EstimateQuality_VariousLengths_ScalesCorrectly(int length, double minExpected)
+    {
+        var content = new string('x', length);
+        BaseLlmEnrichmentHandler.EstimateQuality(content).Should().BeGreaterThanOrEqualTo(minExpected);
+    }
+
     [Fact]
     public void EstimateQuality_EmptyContent_ReturnsZero()
     {

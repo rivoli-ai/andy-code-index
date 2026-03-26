@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +49,20 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 options.DefaultChallengeScheme = "Test";
                 options.DefaultScheme = "Test";
             }).AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", _ => { });
+
+            // Override authorization to allow all requests (bypass RBAC in tests)
+            services.AddAuthorization(options =>
+            {
+                options.DefaultPolicy = new AuthorizationPolicyBuilder("Test")
+                    .RequireAssertion(_ => true)
+                    .Build();
+                options.FallbackPolicy = new AuthorizationPolicyBuilder("Test")
+                    .RequireAssertion(_ => true)
+                    .Build();
+            });
+
+            // Replace the policy provider so RequirePermission dynamic policies also pass
+            services.AddSingleton<IAuthorizationPolicyProvider, AllowAllPolicyProvider>();
 
             // Add InMemory database with stable name per factory instance
             services.AddDbContext<CodeIndexDbContext>(options =>
@@ -104,4 +119,19 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
         var ticket = new AuthenticationTicket(principal, "Test");
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
+}
+
+/// <summary>
+/// Policy provider that allows all requests regardless of policy name.
+/// Used in integration tests to bypass RBAC permission checks.
+/// </summary>
+public class AllowAllPolicyProvider : IAuthorizationPolicyProvider
+{
+    private static readonly AuthorizationPolicy AllowAll = new AuthorizationPolicyBuilder("Test")
+        .RequireAssertion(_ => true)
+        .Build();
+
+    public Task<AuthorizationPolicy?> GetPolicyAsync(string policyName) => Task.FromResult<AuthorizationPolicy?>(AllowAll);
+    public Task<AuthorizationPolicy> GetDefaultPolicyAsync() => Task.FromResult(AllowAll);
+    public Task<AuthorizationPolicy?> GetFallbackPolicyAsync() => Task.FromResult<AuthorizationPolicy?>(AllowAll);
 }
