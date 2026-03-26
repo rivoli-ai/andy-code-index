@@ -26,86 +26,164 @@ interface Repository {
   name: string;
 }
 
+interface SuggestionDimension {
+  id: string;
+  name: string;
+  questions: string[];
+}
+
 @Component({
   selector: 'app-chat',
   standalone: true,
   imports: [CommonModule, FormsModule],
   encapsulation: ViewEncapsulation.None,
   template: `
-    <div class="chat-container">
-      <div class="chat-header">
-        <h1 style="font-size:var(--font-2xl);margin:0">Chat with Code</h1>
-        <div style="display:flex;gap:0.75rem;align-items:center">
-          <select class="form-control" [(ngModel)]="selectedRepo" style="width:180px;padding:0.375rem 0.75rem">
-            <option value="">All Repositories</option>
-            <option *ngFor="let r of repos" [value]="r.id">{{ r.name }}</option>
-          </select>
-          <span class="badge badge-muted" *ngIf="!chatAvailable">LLM not configured</span>
-        </div>
-      </div>
-
-      <div class="chat-messages" #messagesContainer>
-        <div *ngIf="messages.length === 0" class="empty-state" style="padding:3rem 3rem 1rem">
-          <i class="bi bi-chat-dots" style="font-size:2.5rem;display:block;margin-bottom:1rem;color:var(--primary)"></i>
-          <h3>Ask about your codebase</h3>
-          <p class="text-muted">Select a category below, or type your own question.</p>
+    <div class="chat-layout">
+      <!-- Left Panel: Quick Questions -->
+      <aside class="chat-sidebar">
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">Quick Questions</h3>
+          <input class="form-control sidebar-search" [(ngModel)]="searchQuery"
+                 placeholder="Search questions..." (input)="filterQuestions()">
         </div>
 
-        <div class="quick-queries" style="padding:0.75rem 0;border-bottom:1px solid var(--border);margin-bottom:1rem">
-          <div class="suggestion-tabs">
-            <button *ngFor="let cat of suggestionCategories" class="suggestion-tab"
+        <div class="sidebar-section">
+          <div class="category-grid">
+            <button *ngFor="let cat of allCategories" class="category-tile"
                     [class.active]="activeCategory === cat.name"
-                    (click)="activeCategory = cat.name">
-              {{ cat.name }}
+                    (click)="selectCategory(cat.name)">
+              <span class="category-name">{{ cat.name }}</span>
+              <span class="category-count">{{ cat.questions.length }}</span>
             </button>
           </div>
-          <div class="suggestions" *ngFor="let cat of suggestionCategories">
-            <ng-container *ngIf="activeCategory === cat.name">
-              <button class="suggestion" *ngFor="let q of cat.questions" (click)="askSuggestion(q)">{{ q }}</button>
-            </ng-container>
+        </div>
+
+        <div class="sidebar-section question-list">
+          <button *ngFor="let q of visibleQuestions" class="question-item" (click)="askSuggestion(q)">
+            {{ q }}
+          </button>
+          <div *ngIf="visibleQuestions.length === 0" class="text-muted" style="padding:0.5rem;font-size:var(--font-xs)">
+            No matching questions.
           </div>
         </div>
 
-        <div *ngFor="let msg of messages" class="message" [ngClass]="msg.role">
-          <div class="message-bubble">
-            <div class="message-content" [innerHTML]="formatContent(msg.content)"></div>
-            <div *ngIf="msg.sources && msg.sources.length > 0" class="sources-toggle">
-              <button class="btn btn-sm btn-secondary" (click)="msg.showSources = !msg.showSources" style="font-size:0.75rem">
-                <i class="bi" [ngClass]="msg.showSources ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-                {{ msg.sources.length }} sources
-              </button>
-              <div *ngIf="msg.showSources" class="sources-list">
-                <div *ngFor="let s of msg.sources" class="source-item">
-                  <code>{{ s.repositoryName }}/{{ s.filePath }}</code>
-                  <span class="text-muted" *ngIf="s.startLine"> :{{ s.startLine }}</span>
+        <div class="sidebar-section sidebar-footer-section">
+          <h3 class="sidebar-title" style="color:var(--text-light)">Conversations</h3>
+          <p class="text-muted" style="font-size:var(--font-xs);margin:0">Coming soon</p>
+        </div>
+      </aside>
+
+      <!-- Right Panel: Chat -->
+      <main class="chat-main">
+        <div class="chat-header">
+          <h1>Chat with Code</h1>
+          <div style="display:flex;gap:0.75rem;align-items:center">
+            <select class="form-control" [(ngModel)]="selectedRepo" style="width:180px">
+              <option value="">All Repositories</option>
+              <option *ngFor="let r of repos" [value]="r.id">{{ r.name }}</option>
+            </select>
+            <span class="badge badge-muted" *ngIf="!chatAvailable">LLM not configured</span>
+          </div>
+        </div>
+
+        <div class="chat-messages" #messagesContainer>
+          <div *ngIf="messages.length === 0" class="empty-chat">
+            <i class="bi bi-chat-dots"></i>
+            <h3>Ask about your codebase</h3>
+            <p class="text-muted">Select a question from the left panel, or type your own below.</p>
+          </div>
+
+          <div *ngFor="let msg of messages" class="message" [ngClass]="msg.role">
+            <div class="message-bubble">
+              <div class="message-content" [innerHTML]="formatContent(msg.content)"></div>
+              <div *ngIf="msg.sources && msg.sources.length > 0" class="sources-toggle">
+                <button class="btn btn-sm btn-secondary" (click)="msg.showSources = !msg.showSources" style="font-size:var(--font-xs)">
+                  <i class="bi" [ngClass]="msg.showSources ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                  {{ msg.sources.length }} sources
+                </button>
+                <div *ngIf="msg.showSources" class="sources-list">
+                  <div *ngFor="let s of msg.sources" class="source-item">
+                    <code>{{ s.repositoryName }}/{{ s.filePath }}</code>
+                    <span class="text-muted" *ngIf="s.startLine"> :{{ s.startLine }}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+
+          <div *ngIf="sending" class="message assistant">
+            <div class="message-bubble"><div class="spinner" style="width:1.5rem;height:1.5rem"></div></div>
+          </div>
         </div>
 
-        <div *ngIf="sending" class="message assistant">
-          <div class="message-bubble"><div class="spinner" style="width:1.5rem;height:1.5rem"></div></div>
+        <div class="chat-input">
+          <textarea class="form-control" [(ngModel)]="input" placeholder="Ask about your code..."
+                    (keydown.enter)="onEnter($event)" rows="1"
+                    [disabled]="sending"></textarea>
+          <button class="btn btn-primary" (click)="send()" [disabled]="sending || !input.trim()">
+            <i class="bi bi-send"></i>
+          </button>
         </div>
-      </div>
-
-      <div class="chat-input">
-        <textarea class="form-control" [(ngModel)]="input" placeholder="Ask about your code..."
-                  (keydown.enter)="onEnter($event)" rows="1"
-                  [disabled]="sending"></textarea>
-        <button class="btn btn-primary" (click)="send()" [disabled]="sending || !input.trim()">
-          <i class="bi bi-send"></i>
-        </button>
-      </div>
+      </main>
     </div>
   `,
   styles: [`
-    .chat-container { display: flex; flex-direction: column; height: calc(100vh - 4rem); }
-    .chat-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
-    .chat-messages { flex: 1; overflow-y: auto; padding-bottom: 1rem; }
-    .chat-input { display: flex; gap: 0.75rem; padding: 1rem 0; border-top: 1px solid var(--border); }
-    .chat-input textarea { resize: none; min-height: 44px; max-height: 120px; }
+    /* --- Two-panel layout --- */
+    .chat-layout { display: flex; height: calc(100vh - 4rem); gap: 0; }
+
+    /* --- Left sidebar --- */
+    .chat-sidebar {
+      width: 280px; min-width: 280px;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow-y: auto;
+      background: var(--background-alt);
+    }
+    .sidebar-section { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+    .sidebar-title { font-size: var(--font-sm); font-weight: 600; margin: 0 0 0.5rem 0; }
+    .sidebar-search { font-size: var(--font-xs); padding: 0.375rem 0.625rem; }
+
+    .category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; }
+    .category-tile {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.375rem 0.625rem; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); font-size: var(--font-xs); cursor: pointer;
+      transition: all var(--transition); color: var(--text); text-align: left;
+    }
+    .category-tile:hover { border-color: var(--primary); color: var(--primary); }
+    .category-tile.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .category-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .category-count { font-size: 0.7rem; opacity: 0.7; flex-shrink: 0; }
+
+    .question-list { flex: 1; overflow-y: auto; padding: 0.5rem 0.75rem; }
+    .question-item {
+      display: block; width: 100%; text-align: left;
+      padding: 0.5rem 0.625rem; margin-bottom: 0.25rem;
+      border: none; border-radius: var(--radius); background: none;
+      font-size: var(--font-xs); color: var(--text); cursor: pointer;
+      transition: all var(--transition); line-height: 1.4;
+    }
+    .question-item:hover { background: var(--surface); color: var(--primary); }
+
+    .sidebar-footer-section { margin-top: auto; border-top: 1px solid var(--border); border-bottom: none; }
+
+    /* --- Right chat area --- */
+    .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .chat-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border);
+    }
+    .chat-header h1 { font-size: var(--font-xl); margin: 0; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 1.5rem; }
+    .chat-input { display: flex; gap: 0.75rem; padding: 0.75rem 1.5rem; border-top: 1px solid var(--border); }
+    .chat-input textarea { resize: none; min-height: 44px; max-height: 120px; flex: 1; }
     .chat-input .btn { align-self: flex-end; padding: 0.625rem 1rem; }
+
+    .empty-chat { text-align: center; padding: 4rem 2rem; color: var(--text-muted); }
+    .empty-chat i { font-size: 3rem; display: block; margin-bottom: 1rem; color: var(--primary); }
+    .empty-chat h3 { margin-bottom: 0.5rem; color: var(--text); }
+
+    /* --- Messages --- */
     .message { display: flex; margin-bottom: 1rem; }
     .message.user { justify-content: flex-end; }
     .message.assistant { justify-content: flex-start; }
@@ -135,13 +213,13 @@ interface Repository {
     .sources-toggle { margin-top: 0.5rem; }
     .sources-list { margin-top: 0.5rem; }
     .source-item { font-size: var(--font-xs); padding: 0.25rem 0; color: var(--text-muted); }
-    .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; justify-content: center; }
-    .suggestion { padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: var(--font-sm); cursor: pointer; transition: all var(--transition); color: var(--text); }
-    .suggestion:hover { border-color: var(--primary); color: var(--primary); }
-    .suggestion-tabs { display: flex; gap: 0.375rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.25rem; -webkit-overflow-scrolling: touch; }
-    .suggestion-tab { padding: 0.375rem 0.875rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); font-size: var(--font-xs); cursor: pointer; transition: all var(--transition); color: var(--text-muted); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
-    .suggestion-tab:hover { border-color: var(--primary); color: var(--primary); }
-    .suggestion-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    /* --- Responsive --- */
+    @media (max-width: 768px) {
+      .chat-layout { flex-direction: column; }
+      .chat-sidebar { width: 100%; min-width: 100%; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--border); }
+      .question-list { max-height: 120px; }
+    }
   `]
 })
 export class ChatComponent implements OnInit, AfterViewChecked {
@@ -155,7 +233,10 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   conversationId: string | null = null;
   chatAvailable = false;
   activeCategory = '';
-  suggestionCategories: { name: string; questions: string[] }[] = [];
+  searchQuery = '';
+
+  allCategories: SuggestionDimension[] = [];
+  visibleQuestions: string[] = [];
 
   constructor(private http: HttpClient) {}
 
@@ -165,12 +246,14 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     });
     this.http.get<any>(`${environment.apiUrl}/chat/suggestions`).subscribe({
       next: res => {
-        this.suggestionCategories = (res.dimensions || []).map((d: any) => ({
+        this.allCategories = (res.dimensions || []).map((d: any) => ({
+          id: d.id,
           name: d.label,
           questions: d.questions.map((q: any) => q.text)
         }));
-        if (this.suggestionCategories.length > 0 && !this.activeCategory) {
-          this.activeCategory = this.suggestionCategories[0].name;
+        if (this.allCategories.length > 0) {
+          this.activeCategory = this.allCategories[0].name;
+          this.filterQuestions();
         }
       }
     });
@@ -181,6 +264,24 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   ngAfterViewChecked() {
     this.scrollToBottom();
+  }
+
+  selectCategory(name: string) {
+    this.activeCategory = name;
+    this.searchQuery = '';
+    this.filterQuestions();
+  }
+
+  filterQuestions() {
+    if (this.searchQuery.trim()) {
+      const q = this.searchQuery.toLowerCase();
+      this.visibleQuestions = this.allCategories
+        .flatMap(c => c.questions)
+        .filter(question => question.toLowerCase().includes(q));
+    } else {
+      const cat = this.allCategories.find(c => c.name === this.activeCategory);
+      this.visibleQuestions = cat?.questions || [];
+    }
   }
 
   send() {
