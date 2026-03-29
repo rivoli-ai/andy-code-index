@@ -231,7 +231,12 @@ Examples:
 
 You can fetch up to {_fileAccessOptions.MaxFilesPerTurn} files per turn. Provide line-referenced answers when citing source code.
 
-You also have a `get_committers` tool that returns all unique committers/contributors with their commit counts, first and last commit dates. Use it when asked about contributors, authors, team members, or who worked on the code.";
+You also have these tools:
+- `get_committers`: returns all unique committers/contributors with commit counts and date ranges. Use for questions about contributors, authors, or team members.
+- `get_commits`: returns recent commits with SHA, message, author, and date. Use for questions about recent changes, history, or what was modified. Accepts optional repository_name and limit.
+- `get_commit_details`: returns details about a specific commit including its enrichments. Use to understand what happened in a particular commit. Requires repository_name and sha.
+
+Always use these tools to answer questions about commits, contributors, and history — never say you don't have access to this data.";
         }
 
         var systemPrompt = $@"You are a code assistant with access to indexed source code repositories. Answer questions about the codebase using the provided context. Be specific, reference file paths and line numbers when relevant. If you don't have enough context, say so.
@@ -399,6 +404,16 @@ You also have a `get_committers` tool that returns all unique committers/contrib
             return await ProcessGetCommittersAsync(request, ct);
         }
 
+        if (toolCall.Function?.Name == "get_commits")
+        {
+            return await ProcessGetCommitsAsync(request, toolCall.Function.Arguments, ct);
+        }
+
+        if (toolCall.Function?.Name == "get_commit_details")
+        {
+            return await ProcessGetCommitDiffAsync(toolCall.Function.Arguments, ct);
+        }
+
         if (toolCall.Function?.Name != "get_file")
         {
             return JsonSerializer.Serialize(new { error = $"Unknown tool: {toolCall.Function?.Name}" });
@@ -533,6 +548,118 @@ You also have a `get_committers` tool that returns all unique committers/contrib
         });
     }
 
+    private async Task<string> ProcessGetCommitsAsync(ChatRequest request, string? arguments, CancellationToken ct)
+    {
+        // Parse optional limit from arguments
+        var limit = 20;
+        if (!string.IsNullOrEmpty(arguments))
+        {
+            try
+            {
+                var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(arguments,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (args?.TryGetValue("limit", out var l) == true) limit = l.GetInt32();
+                if (args?.TryGetValue("repository_name", out var rn) == true && !request.RepositoryId.HasValue)
+                {
+                    var repoName = rn.GetString();
+                    if (!string.IsNullOrEmpty(repoName))
+                    {
+                        var repo = await _context.Repositories.FirstOrDefaultAsync(
+                            r => r.Name == repoName, ct);
+                        if (repo != null)
+                            request.RepositoryId = repo.Id;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        limit = Math.Clamp(limit, 1, 50);
+
+        var query = _context.Commits
+            .Include(c => c.Repository)
+            .AsQueryable();
+
+        if (request.RepositoryId.HasValue)
+            query = query.Where(c => c.RepositoryId == request.RepositoryId.Value);
+
+        var commits = await query
+            .OrderByDescending(c => c.CommittedAt)
+            .Take(limit)
+            .Select(c => new
+            {
+                repository = c.Repository!.Name,
+                sha = c.Sha,
+                message = c.Message,
+                author = c.AuthorName,
+                email = c.AuthorEmail,
+                date = c.CommittedAt
+            })
+            .ToListAsync(ct);
+
+        return JsonSerializer.Serialize(new { totalReturned = commits.Count, commits });
+    }
+
+    private async Task<string> ProcessGetCommitDiffAsync(string? arguments, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(arguments))
+            return JsonSerializer.Serialize(new { error = "Missing arguments: need repository_name and sha" });
+
+        string? repoName = null, sha = null;
+        try
+        {
+            var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(arguments,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (args?.TryGetValue("repository_name", out var rn) == true) repoName = rn.GetString();
+            if (args?.TryGetValue("sha", out var s) == true) sha = s.GetString();
+        }
+        catch { return JsonSerializer.Serialize(new { error = "Invalid arguments" }); }
+
+        if (string.IsNullOrEmpty(repoName) || string.IsNullOrEmpty(sha))
+            return JsonSerializer.Serialize(new { error = "Missing repository_name or sha" });
+
+        var repo = await _context.Repositories.FirstOrDefaultAsync(r => r.Name == repoName, ct);
+        if (repo == null)
+            return JsonSerializer.Serialize(new { error = $"Repository '{repoName}' not found" });
+
+        var options = Microsoft.Extensions.Options.Options.Create(
+            new Application.Options.IndexingOptions { DataDir = _fileAccessService is not null ? "" : "" });
+
+        // Use git diff-tree to get changed files
+        try
+        {
+            var cloneDir = _fileAccessService != null
+                ? _context.Repositories.Where(r => r.Id == repo.Id).Select(r => r.Name).FirstOrDefault() ?? ""
+                : "";
+
+            // Query enrichments for this commit to show what was generated
+            var commit = await _context.Commits.FirstOrDefaultAsync(c => c.RepositoryId == repo.Id && c.Sha.StartsWith(sha), ct);
+            if (commit == null)
+                return JsonSerializer.Serialize(new { error = $"Commit '{sha}' not found" });
+
+            var enrichments = await _context.Enrichments
+                .Where(e => e.CommitId == commit.Id)
+                .GroupBy(e => e.Subtype)
+                .Select(g => new { subtype = g.Key.ToString(), count = g.Count() })
+                .ToListAsync(ct);
+
+            return JsonSerializer.Serialize(new
+            {
+                repository = repo.Name,
+                sha = commit.Sha,
+                message = commit.Message,
+                author = commit.AuthorName,
+                date = commit.CommittedAt,
+                enrichmentsAtCommit = enrichments,
+                totalEnrichments = enrichments.Sum(e => e.count)
+            });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message });
+        }
+    }
+
     private static List<object> BuildToolDefinitions(bool hasRepoContext)
     {
         var tools = new List<object>();
@@ -585,6 +712,46 @@ You also have a `get_committers` tool that returns all unique committers/contrib
                     type = "object",
                     properties = new Dictionary<string, object>(),
                     required = Array.Empty<string>()
+                }
+            }
+        });
+
+        tools.Add(new
+        {
+            type = "function",
+            function = new
+            {
+                name = "get_commits",
+                description = "Get recent commits for the repository (or all repos if none scoped). Returns commit SHA, message, author, and date. Use this to answer questions about recent changes, history, and what was modified.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new Dictionary<string, object>
+                    {
+                        ["repository_name"] = new { type = "string", description = "Repository name (optional if one is already in context)" },
+                        ["limit"] = new { type = "integer", description = "Number of commits to return (default: 20, max: 50)" }
+                    },
+                    required = Array.Empty<string>()
+                }
+            }
+        });
+
+        tools.Add(new
+        {
+            type = "function",
+            function = new
+            {
+                name = "get_commit_details",
+                description = "Get details about a specific commit including its enrichments. Use this to understand what happened in a particular commit.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new Dictionary<string, object>
+                    {
+                        ["repository_name"] = new { type = "string", description = "Repository name" },
+                        ["sha"] = new { type = "string", description = "Commit SHA (full or abbreviated)" }
+                    },
+                    required = new[] { "repository_name", "sha" }
                 }
             }
         });
