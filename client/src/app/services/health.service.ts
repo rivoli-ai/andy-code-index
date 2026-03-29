@@ -8,7 +8,7 @@ import { environment } from '../../environments/environment';
 export class HealthService implements OnDestroy {
   private readonly POLL_INTERVAL = 30_000;
   private readonly TIMEOUT = 5_000;
-  private readonly healthUrl = `${environment.apiUrl}/health`;
+  private readonly healthUrl = '/health';
 
   isConnected$ = new BehaviorSubject<boolean>(true);
   private pollSubscription?: Subscription;

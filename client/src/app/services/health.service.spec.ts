@@ -62,7 +62,7 @@ describe('HealthService', () => {
     service.checkHealth().subscribe(() => {
       expect(httpSpy.get).toHaveBeenCalled();
       const url = httpSpy.get.calls.mostRecent().args[0];
-      expect(url).toBe('/api/v1/health');
+      expect(url).toBe('/health');
       done();
     });
   });
