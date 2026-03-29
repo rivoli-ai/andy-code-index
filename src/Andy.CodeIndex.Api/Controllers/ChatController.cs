@@ -175,7 +175,11 @@ public class ChatController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetStatus()
     {
-        return Ok(new { available = _chatService.IsAvailable });
+        return Ok(new
+        {
+            available = _chatService.IsAvailable,
+            fileAccessEnabled = _chatService.FileAccessEnabled
+        });
     }
 }
 

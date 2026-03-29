@@ -2,6 +2,8 @@ using Andy.CodeIndex.Api.Controllers;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.CodeIndex.Infrastructure.Data;
+using Andy.CodeIndex.Tests.Unit.Helpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -13,12 +15,14 @@ public class CommitsControllerTests
     private readonly Mock<ICommitRepository> _commitRepoMock = new();
     private readonly Mock<ICodeRepositoryRepository> _repoRepoMock = new();
     private readonly Mock<ICommitComparisonService> _comparisonServiceMock = new();
+    private readonly CodeIndexDbContext _dbContext;
     private readonly CommitsController _controller;
     private readonly Guid _repoId = Guid.NewGuid();
 
     public CommitsControllerTests()
     {
-        _controller = new CommitsController(_commitRepoMock.Object, _repoRepoMock.Object, _comparisonServiceMock.Object);
+        _dbContext = TestDbContextFactory.Create();
+        _controller = new CommitsController(_commitRepoMock.Object, _repoRepoMock.Object, _comparisonServiceMock.Object, _dbContext);
 
         _repoRepoMock.Setup(r => r.GetByIdAsync(_repoId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Repository

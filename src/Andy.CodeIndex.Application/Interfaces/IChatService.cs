@@ -6,4 +6,5 @@ public interface IChatService
 {
     Task<ChatResponse> ChatAsync(ChatRequest request, string? userId = null, CancellationToken ct = default);
     bool IsAvailable { get; }
+    bool FileAccessEnabled { get; }
 }

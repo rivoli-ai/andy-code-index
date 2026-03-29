@@ -91,27 +91,73 @@ public class GitService : IGitService
 
     public async Task<List<GitCommitInfo>> GetCommitsAsync(string repoDir, int limit = 100, string? sinceSha = null, CancellationToken ct = default)
     {
-        var args = new List<string> { "log", "--all", $"--max-count={limit}", "--format=%H%n%s%n%an%n%ae%n%aI%n---" };
+        var args = new List<string> { "log", "--all", $"--max-count={limit}", "--format=%H%n%P%n%s%n%an%n%ae%n%aI%n---" };
 
         if (sinceSha is not null)
             args.Add($"{sinceSha}..HEAD");
 
-        var output = await RunGitAsync(repoDir, args, ct);
-        var commits = new List<GitCommitInfo>();
+        return await ParseCommitLogAsync(repoDir, args, ct);
+    }
 
+    public async Task<List<GitCommitInfo>> GetCommitsAsync(string repoDir, string gitRef, int limit = 50, string? beforeSha = null, CancellationToken ct = default)
+    {
+        if (!IsValidRef(gitRef))
+            throw new ArgumentException($"Invalid git ref: {gitRef}");
+
+        var args = new List<string> { "log", $"--max-count={limit}", "--format=%H%n%P%n%s%n%an%n%ae%n%aI%n---" };
+
+        if (beforeSha is not null)
+        {
+            if (!IsValidRef(beforeSha))
+                throw new ArgumentException($"Invalid before SHA: {beforeSha}");
+            // Show commits reachable from ref, starting before the cursor SHA
+            args.Add(gitRef);
+            // Skip the cursor commit itself: use ^beforeSha~ to exclude it
+            args.AddRange(["--not", $"{beforeSha}"]);
+        }
+        else
+        {
+            args.Add(gitRef);
+        }
+
+        return await ParseCommitLogAsync(repoDir, args, ct);
+    }
+
+    internal async Task<List<GitCommitInfo>> ParseCommitLogAsync(string repoDir, List<string> args, CancellationToken ct)
+    {
+        var output = await RunGitAsync(repoDir, args, ct);
+        return ParseCommitLog(output);
+    }
+
+    internal static List<GitCommitInfo> ParseCommitLog(string output)
+    {
+        var commits = new List<GitCommitInfo>();
         var entries = output.Split("---\n", StringSplitOptions.RemoveEmptyEntries);
+
         foreach (var entry in entries)
         {
             var lines = entry.Split('\n', StringSplitOptions.None);
-            if (lines.Length < 5) continue;
+            if (lines.Length < 6) continue;
+
+            var sha = lines[0].Trim();
+            if (string.IsNullOrEmpty(sha)) continue;
+
+            var parentLine = lines[1].Trim();
+            var parentShas = string.IsNullOrEmpty(parentLine)
+                ? new List<string>()
+                : parentLine.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+
+            if (!DateTimeOffset.TryParse(lines[5].Trim(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var committedAt))
+                continue;
 
             commits.Add(new GitCommitInfo
             {
-                Sha = lines[0].Trim(),
-                Message = lines[1].Trim(),
-                AuthorName = lines[2].Trim(),
-                AuthorEmail = lines[3].Trim(),
-                CommittedAt = DateTimeOffset.Parse(lines[4].Trim(), CultureInfo.InvariantCulture).UtcDateTime
+                Sha = sha,
+                Message = lines[2].Trim(),
+                AuthorName = lines[3].Trim(),
+                AuthorEmail = lines[4].Trim(),
+                CommittedAt = committedAt.UtcDateTime,
+                ParentShas = parentShas
             });
         }
 
@@ -175,6 +221,18 @@ public class GitService : IGitService
         }
     }
 
+    public async Task<byte[]?> ReadFileBytesAsync(string repoDir, string commitSha, string filePath, CancellationToken ct = default)
+    {
+        try
+        {
+            return await RunGitBinaryAsync(repoDir, ["show", $"{commitSha}:{filePath}"], ct);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
     public async Task<List<GitFileInfo>> ListFilesAsync(string repoDir, string commitSha, string? globPattern = null, CancellationToken ct = default)
     {
         var output = await RunGitAsync(repoDir, ["ls-tree", "-r", "--long", commitSha], ct);
@@ -212,6 +270,95 @@ public class GitService : IGitService
         }
 
         return files;
+    }
+
+    public async Task<List<GitTreeEntry>> ListTreeAsync(string repoDir, string commitSha, string? path = null, bool recursive = false, CancellationToken ct = default)
+    {
+        var args = new List<string> { "ls-tree", "--long" };
+        if (recursive)
+            args.Add("-r");
+
+        if (!string.IsNullOrEmpty(path))
+        {
+            // Normalize path: ensure it ends with / for directory listing
+            var normalizedPath = path.TrimEnd('/') + "/";
+            args.Add($"{commitSha}:{normalizedPath}");
+        }
+        else
+        {
+            args.Add(commitSha);
+        }
+
+        string output;
+        try
+        {
+            output = await RunGitAsync(repoDir, args, ct);
+        }
+        catch (InvalidOperationException)
+        {
+            return [];
+        }
+
+        var entries = new List<GitTreeEntry>();
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            // Format: mode type hash size\tpath
+            var tabIndex = line.IndexOf('\t');
+            if (tabIndex < 0) continue;
+
+            var meta = line[..tabIndex].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var entryPath = line[(tabIndex + 1)..];
+
+            if (meta.Length < 4) continue;
+
+            var type = meta[1]; // "blob" or "tree"
+            long size = 0;
+            if (type == "blob")
+                long.TryParse(meta[3], out size);
+
+            // For non-recursive listing, entryPath is just the name;
+            // for recursive listing, it's the full relative path.
+            var name = entryPath.Contains('/')
+                ? entryPath[(entryPath.LastIndexOf('/') + 1)..]
+                : entryPath;
+
+            var fullPath = !string.IsNullOrEmpty(path)
+                ? path.TrimEnd('/') + "/" + entryPath
+                : entryPath;
+
+            string? language = null;
+            if (type == "blob")
+            {
+                var ext = Path.GetExtension(entryPath);
+                if (ext.Length > 0 && LanguageMap.TryGetValue(ext, out var lang))
+                    language = lang;
+            }
+
+            entries.Add(new GitTreeEntry
+            {
+                Path = fullPath,
+                Name = name,
+                Type = type,
+                Hash = meta[2],
+                Size = size,
+                Language = language
+            });
+        }
+
+        return entries;
+    }
+
+    public async Task<string> GetHeadRefAsync(string repoDir, CancellationToken ct = default)
+    {
+        try
+        {
+            var output = await RunGitAsync(repoDir, ["rev-parse", "HEAD"], ct);
+            return output.Trim();
+        }
+        catch (InvalidOperationException)
+        {
+            return "HEAD";
+        }
     }
 
     public async Task<string?> ResolveRefAsync(string repoDir, string gitRef, CancellationToken ct = default)
@@ -365,5 +512,41 @@ public class GitService : IGitService
         }
 
         return stdout;
+    }
+
+    private async Task<byte[]> RunGitBinaryAsync(string? workingDir, IEnumerable<string> arguments, CancellationToken ct)
+    {
+        var argList = arguments.ToList();
+        var psi = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = workingDir ?? Directory.GetCurrentDirectory(),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        foreach (var arg in argList)
+            psi.ArgumentList.Add(arg);
+
+        using var process = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to start git process");
+
+        using var ms = new MemoryStream();
+        await process.StandardOutput.BaseStream.CopyToAsync(ms, ct);
+        var stderr = await process.StandardError.ReadToEndAsync(ct);
+
+        await process.WaitForExitAsync(ct);
+
+        if (process.ExitCode != 0)
+        {
+            _logger.LogWarning("git {Args} exited with {Code}: {Stderr}",
+                string.Join(' ', argList), process.ExitCode, stderr.Trim());
+            throw new InvalidOperationException(
+                $"git {argList[0]} failed (exit {process.ExitCode}): {stderr.Trim()}");
+        }
+
+        return ms.ToArray();
     }
 }

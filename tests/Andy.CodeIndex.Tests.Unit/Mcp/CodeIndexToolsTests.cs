@@ -19,6 +19,7 @@ public class CodeIndexToolsTests
     private readonly Mock<IGitService> _gitServiceMock = new();
     private readonly Mock<ICommitRepository> _commitRepoMock = new();
     private readonly Mock<IChatService> _chatServiceMock = new();
+    private readonly Mock<IChatFileAccessService> _chatFileAccessServiceMock = new();
     private readonly Mock<IIndexingTaskRepository> _taskRepoMock = new();
     private readonly Mock<IRepoDiscoveryService> _discoveryServiceMock = new();
     private readonly Mock<IQuestionClassifier> _classifierMock = new();
@@ -43,6 +44,7 @@ public class CodeIndexToolsTests
             _enrichmentServiceMock.Object,
             _gitServiceMock.Object,
             _chatServiceMock.Object,
+            _chatFileAccessServiceMock.Object,
             _commitRepoMock.Object,
             _taskRepoMock.Object,
             _discoveryServiceMock.Object,

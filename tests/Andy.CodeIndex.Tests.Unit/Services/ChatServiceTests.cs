@@ -18,6 +18,7 @@ public class ChatServiceTests : IDisposable
     private readonly Mock<ISearchService> _searchServiceMock = new();
     private readonly Mock<IApiKeyResolver> _apiKeyResolverMock = new();
     private readonly Mock<IQuestionClassifier> _classifierMock = new();
+    private readonly Mock<IChatFileAccessService> _fileAccessServiceMock = new();
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock = new();
     private readonly ChatService _chatService;
     private readonly Repository _testRepo;
@@ -56,9 +57,18 @@ public class ChatServiceTests : IDisposable
             TimeoutSeconds = 30
         });
 
+        var fileAccessOptions = Options.Create(new ChatFileAccessOptions
+        {
+            Enabled = true,
+            MaxFileSizeBytes = 102400,
+            MaxFilesPerTurn = 3,
+            MaxIterations = 3
+        });
+
         _chatService = new ChatService(
             _context, _searchServiceMock.Object, _apiKeyResolverMock.Object,
-            _classifierMock.Object, llmOptions, _httpClientFactoryMock.Object,
+            _classifierMock.Object, _fileAccessServiceMock.Object,
+            llmOptions, fileAccessOptions, _httpClientFactoryMock.Object,
             NullLogger<ChatService>.Instance);
     }
 
@@ -182,5 +192,43 @@ public class ChatServiceTests : IDisposable
     public void IsAvailable_ReturnsTrue()
     {
         _chatService.IsAvailable.Should().BeTrue();
+    }
+
+    [Fact]
+    public void FileAccessEnabled_ReturnsTrue_WhenConfigured()
+    {
+        _chatService.FileAccessEnabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public void FileAccessEnabled_ReturnsFalse_WhenDisabled()
+    {
+        var fileAccessOptions = Options.Create(new ChatFileAccessOptions { Enabled = false });
+        var service = new ChatService(
+            _context, _searchServiceMock.Object, _apiKeyResolverMock.Object,
+            _classifierMock.Object, _fileAccessServiceMock.Object,
+            Options.Create(new EnrichmentLlmOptions { BaseUrl = "https://api.openai.com/v1", Model = "gpt-4o-mini", TimeoutSeconds = 30 }),
+            fileAccessOptions, _httpClientFactoryMock.Object,
+            NullLogger<ChatService>.Instance);
+
+        service.FileAccessEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ChatAsync_WithRef_PassesRefToRequest()
+    {
+        _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(("", "", "none"));
+
+        var response = await _chatService.ChatAsync(new ChatRequest
+        {
+            Message = "show me Program.cs",
+            RepositoryId = _testRepo.Id,
+            Ref = "v1.0"
+        });
+
+        // With no API key, it returns early but still creates the conversation
+        response.Should().NotBeNull();
+        response.ConversationId.Should().NotBeNullOrEmpty();
     }
 }

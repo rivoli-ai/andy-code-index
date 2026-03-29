@@ -110,6 +110,7 @@ builder.Services.AddScoped<ICommitComparisonService, CommitComparisonService>();
 builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddSingleton<IFileFilterService, FileFilterService>();
 builder.Services.AddSingleton<IBinaryDetectionService, BinaryDetectionService>();
+builder.Services.AddSingleton<IDocumentParser, PdfDocumentParser>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();
 builder.Services.AddScoped<ITaskQueue, TaskQueueService>();
 builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
@@ -130,6 +131,8 @@ builder.Services.AddScoped<IEmbeddingProvider>(sp =>
 });
 builder.Services.AddHttpClient("Discovery");
 builder.Services.AddHttpClient("Chat");
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IChatFileAccessService, ChatFileAccessService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IRepoDiscoveryService, Andy.CodeIndex.Infrastructure.Discovery.RepoDiscoveryService>();
 builder.Services.AddHostedService<Andy.CodeIndex.Infrastructure.Discovery.SeedService>();
@@ -155,6 +158,7 @@ builder.Services.AddScoped<ITaskHandler, CreateOwnershipDocsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateSecurityDocsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateOperationsDocsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateQualityDocsHandler>();
+builder.Services.AddScoped<ITaskHandler, ExtractDocumentTextHandler>();
 builder.Services.AddScoped<IDependencyParserService, Andy.CodeIndex.Infrastructure.Parsers.DependencyParserService>();
 
 // --- Background services ---
@@ -171,9 +175,11 @@ builder.Services.AddOpenTelemetry()
 // --- Options ---
 builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
 builder.Services.Configure<FileFilterOptions>(builder.Configuration.GetSection("Indexing:FileFilters"));
+builder.Services.Configure<DocumentParsingOptions>(builder.Configuration.GetSection(DocumentParsingOptions.SectionName));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection(EmbeddingOptions.SectionName));
 builder.Services.Configure<EnrichmentLlmOptions>(builder.Configuration.GetSection(EnrichmentLlmOptions.SectionName));
+builder.Services.Configure<ChatFileAccessOptions>(builder.Configuration.GetSection(ChatFileAccessOptions.SectionName));
 builder.Services.Configure<DiscoveryOptions>(builder.Configuration.GetSection(DiscoveryOptions.SectionName));
 
 // --- MCP Server ---

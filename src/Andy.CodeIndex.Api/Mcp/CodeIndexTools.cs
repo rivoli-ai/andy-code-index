@@ -19,6 +19,7 @@ public class CodeIndexTools
     private readonly IEnrichmentGeneratorService _enrichmentService;
     private readonly IGitService _gitService;
     private readonly IChatService _chatService;
+    private readonly IChatFileAccessService _chatFileAccessService;
     private readonly ICommitRepository _commitRepo;
     private readonly IIndexingTaskRepository _taskRepo;
     private readonly IRepoDiscoveryService _discoveryService;
@@ -32,6 +33,7 @@ public class CodeIndexTools
         IEnrichmentGeneratorService enrichmentService,
         IGitService gitService,
         IChatService chatService,
+        IChatFileAccessService chatFileAccessService,
         ICommitRepository commitRepo,
         IIndexingTaskRepository taskRepo,
         IRepoDiscoveryService discoveryService,
@@ -44,6 +46,7 @@ public class CodeIndexTools
         _enrichmentService = enrichmentService;
         _gitService = gitService;
         _chatService = chatService;
+        _chatFileAccessService = chatFileAccessService;
         _commitRepo = commitRepo;
         _taskRepo = taskRepo;
         _discoveryService = discoveryService;
@@ -232,11 +235,12 @@ public class CodeIndexTools
         return new { total = files.Count, files = files.Select(f => new { f.Path, f.Size, f.Language }) };
     }
 
-    [McpServerTool(Name = "code_index_chat"), Description("Chat with the indexed codebase - ask questions about code structure, patterns, complexity")]
+    [McpServerTool(Name = "code_index_chat"), Description("Chat with the indexed codebase - ask questions about code structure, patterns, complexity. Supports file access at specific git refs.")]
     public async Task<object> Chat(
         [Description("Your question about the codebase")] string message,
         [Description("Repository name to scope the conversation (optional)")] string? repository = null,
-        [Description("Conversation ID for follow-up messages")] string? conversation_id = null)
+        [Description("Conversation ID for follow-up messages")] string? conversation_id = null,
+        [Description("Git ref (branch, tag, or SHA) for file access context (optional, defaults to HEAD)")] string? git_ref = null)
     {
         Guid? repoId = null;
         if (repository is not null)
@@ -249,7 +253,8 @@ public class CodeIndexTools
         {
             Message = message,
             RepositoryId = repoId,
-            ConversationId = conversation_id
+            ConversationId = conversation_id,
+            Ref = git_ref
         });
 
         return new
@@ -259,7 +264,8 @@ public class CodeIndexTools
             model = response.Model,
             sources = response.Sources.Select(s => new
             {
-                s.FilePath, s.RepositoryName, s.StartLine, s.EndLine, s.Language
+                s.FilePath, s.RepositoryName, s.StartLine, s.EndLine, s.Language,
+                s.Ref, s.ResolvedCommitSha
             })
         };
     }
@@ -551,7 +557,47 @@ public class CodeIndexTools
     [McpServerTool(Name = "code_index_chat_status"), Description("Check if the chat feature is available (LLM configured)")]
     public object GetChatStatus()
     {
-        return new { available = _chatService.IsAvailable };
+        return new
+        {
+            available = _chatService.IsAvailable,
+            fileAccessEnabled = _chatService.FileAccessEnabled
+        };
+    }
+
+    [McpServerTool(Name = "code_index_fetch_file"), Description("Fetch a source code file from a repository at a specific git ref (branch, tag, or commit SHA)")]
+    public async Task<object> FetchFile(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Git ref: branch name, tag, or commit SHA (e.g., 'main', 'v1.0', 'abc1234')")] string @ref,
+        [Description("Path to the file relative to repository root (e.g., 'src/Program.cs')")] string file_path)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var result = await _chatFileAccessService.FetchFileForChatAsync(
+            repo.Id, @ref, file_path, ct: default);
+
+        if (!result.IsSuccess)
+        {
+            var errorObj = new Dictionary<string, object> { ["error"] = result.Error! };
+            if (result.IsBinary)
+                errorObj["metadata"] = new { size = result.Size };
+            if (result.Error!.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                errorObj["suggestion"] = "Use code_index_grep or code_index_ls to find the correct path";
+            else if (result.Error.Contains("too large", StringComparison.OrdinalIgnoreCase))
+                errorObj["suggestion"] = "Use code_index_grep to search for specific patterns";
+            return errorObj;
+        }
+
+        return new
+        {
+            file_path = result.FilePath,
+            content = result.Content,
+            language = result.Language,
+            size = result.Size,
+            resolved_sha = result.ResolvedSha,
+            line_count = result.Content?.Split('\n').Length ?? 0
+        };
     }
 
     [McpServerTool(Name = "code_index_queue_tasks"), Description("List all indexing tasks in the queue with their status and progress")]
@@ -723,6 +769,205 @@ public class CodeIndexTools
             repository = repo.Name,
             total = runs.Count,
             runs
+        };
+    }
+
+    [McpServerTool(Name = "code_index_git_log"), Description("Get live git commit log with enrichment counts, cursor-paginated")]
+    public async Task<object> GitLog(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Git ref (branch, tag, or SHA) to start from")] string? @ref = null,
+        [Description("Maximum commits to return")] int? limit = null,
+        [Description("Cursor SHA for pagination (commits before this SHA)")] string? before = null)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var cloneDir = _gitService.GetCloneDir(_options.DataDir, repo.Id);
+        if (!Directory.Exists(cloneDir))
+            return new { error = "Repository not cloned yet" };
+
+        var effectiveRef = @ref ?? repo.DefaultBranch ?? "HEAD";
+        var effectiveLimit = Math.Clamp(limit ?? 50, 1, 500);
+
+        var resolvedSha = await _gitService.ResolveRefAsync(cloneDir, effectiveRef);
+        if (resolvedSha is null)
+            return new { error = $"Ref '{effectiveRef}' not found" };
+
+        List<GitCommitInfo> commits;
+        try
+        {
+            commits = await _gitService.GetCommitsAsync(cloneDir, effectiveRef, effectiveLimit + 1, before);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new { error = ex.Message };
+        }
+
+        var hasMore = commits.Count > effectiveLimit;
+        if (hasMore)
+            commits = commits.Take(effectiveLimit).ToList();
+
+        // Batch query enrichment counts from DB
+        var shas = commits.Select(c => c.Sha).ToList();
+        var dbCommits = await _dbContext.Commits
+            .Where(c => c.RepositoryId == repo.Id && shas.Contains(c.Sha))
+            .Select(c => new { c.Sha, c.IsIndexed, c.Id })
+            .ToListAsync();
+        var commitIdsBySha = dbCommits.ToDictionary(c => c.Sha, c => c.Id);
+        var indexedShas = dbCommits.Where(c => c.IsIndexed).Select(c => c.Sha).ToHashSet();
+        var commitIds = commitIdsBySha.Values.ToList();
+        var enrichmentCounts = commitIds.Count > 0
+            ? await _dbContext.Enrichments
+                .Where(e => e.CommitId.HasValue && commitIds.Contains(e.CommitId.Value))
+                .GroupBy(e => e.CommitId!.Value)
+                .Select(g => new { CommitId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(g => g.CommitId, g => g.Count)
+            : new Dictionary<Guid, int>();
+
+        return new
+        {
+            hasMore,
+            nextCursor = hasMore ? commits.Last().Sha : null,
+            commits = commits.Select(c =>
+            {
+                commitIdsBySha.TryGetValue(c.Sha, out var commitId);
+                enrichmentCounts.TryGetValue(commitId, out var enrichCount);
+                return new
+                {
+                    sha = c.Sha,
+                    abbreviatedSha = c.Sha.Length >= 7 ? c.Sha[..7] : c.Sha,
+                    message = c.Message,
+                    authorName = c.AuthorName,
+                    authorEmail = c.AuthorEmail,
+                    committedAt = c.CommittedAt,
+                    parentShas = c.ParentShas,
+                    isIndexed = indexedShas.Contains(c.Sha),
+                    enrichmentCount = enrichCount
+                };
+            })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_git_refs"), Description("List branches and tags for a repository")]
+    public async Task<object> GitRefs(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var cloneDir = _gitService.GetCloneDir(_options.DataDir, repo.Id);
+        if (!Directory.Exists(cloneDir))
+            return new { error = "Repository not cloned yet" };
+
+        var branches = await _gitService.GetBranchesAsync(cloneDir);
+        var tags = await _gitService.GetTagsAsync(cloneDir);
+        var head = await _gitService.GetHeadRefAsync(cloneDir);
+
+        return new
+        {
+            head,
+            branches = branches.Select(b => new { b.Name, sha = b.HeadCommitSha, b.IsDefault }),
+            tags = tags.Select(t => new { t.Name, sha = t.CommitSha })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_git_tree"), Description("List file tree at a specific git ref with enrichment status")]
+    public async Task<object> GitTree(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Git ref (branch, tag, or SHA)")] string @ref,
+        [Description("Subdirectory path to list (optional)")] string? path = null,
+        [Description("List recursively (default: false)")] bool? recursive = null)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var cloneDir = _gitService.GetCloneDir(_options.DataDir, repo.Id);
+        if (!Directory.Exists(cloneDir))
+            return new { error = "Repository not cloned yet" };
+
+        var resolvedSha = await _gitService.ResolveRefAsync(cloneDir, @ref);
+        if (resolvedSha is null)
+            return new { error = $"Ref '{@ref}' not found" };
+
+        List<GitTreeEntry> entries;
+        try
+        {
+            entries = await _gitService.ListTreeAsync(cloneDir, @ref, path, recursive ?? false);
+        }
+        catch (InvalidOperationException)
+        {
+            return new { error = $"Path '{path}' not found at ref '{@ref}'" };
+        }
+
+        // Get enrichment file paths
+        var dbCommit = await _commitRepo.GetByShaAsync(repo.Id, resolvedSha);
+        var enrichedPaths = new HashSet<string>();
+        if (dbCommit is not null)
+        {
+            enrichedPaths = (await _dbContext.Enrichments
+                .Where(e => e.CommitId == dbCommit.Id && e.FilePath != null)
+                .Select(e => e.FilePath!)
+                .Distinct()
+                .ToListAsync())
+                .ToHashSet();
+        }
+
+        return new
+        {
+            @ref,
+            path,
+            recursive = recursive ?? false,
+            entries = entries.Select(e => new
+            {
+                e.Path, e.Name, e.Type, e.Hash, e.Size, e.Language,
+                hasEnrichments = e.Type == "blob" && enrichedPaths.Contains(e.Path)
+            })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_commit_summary"), Description("Get enrichment summary for a specific commit")]
+    public async Task<object> CommitSummary(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Commit SHA")] string sha)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var commit = await _commitRepo.GetByShaAsync(repo.Id, sha);
+        if (commit is null)
+            return new { error = $"Commit '{sha}' not found in repository '{repo_url}'" };
+
+        var countsBySubtype = await _dbContext.Enrichments
+            .Where(e => e.CommitId == commit.Id)
+            .GroupBy(e => e.Subtype)
+            .Select(g => new { Subtype = g.Key.ToString(), Count = g.Count() })
+            .ToDictionaryAsync(g => g.Subtype, g => g.Count);
+
+        var filesIndexed = await _dbContext.RepositoryFiles
+            .CountAsync(f => f.CommitId == commit.Id);
+
+        var enrichmentIds = await _dbContext.Enrichments
+            .Where(e => e.CommitId == commit.Id)
+            .Select(e => e.Id)
+            .ToListAsync();
+
+        var embeddingsCount = enrichmentIds.Count > 0
+            ? await _dbContext.ContentEmbeddings
+                .CountAsync(ce => enrichmentIds.Contains(ce.EnrichmentId))
+            : 0;
+
+        return new
+        {
+            sha = commit.Sha,
+            isIndexed = commit.IsIndexed,
+            totalEnrichments = countsBySubtype.Values.Sum(),
+            filesIndexed,
+            embeddingsCount,
+            countsBySubtype
         };
     }
 

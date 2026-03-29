@@ -23,5 +23,6 @@ public enum TaskOperation
     CreateOwnershipDocs,
     CreateSecurityDocs,
     CreateOperationsDocs,
-    CreateQualityDocs
+    CreateQualityDocs,
+    ExtractDocumentText
 }

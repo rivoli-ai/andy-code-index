@@ -20,19 +20,25 @@ public class ChatService : IChatService
     private readonly ISearchService _searchService;
     private readonly IApiKeyResolver _apiKeyResolver;
     private readonly IQuestionClassifier _classifier;
+    private readonly IChatFileAccessService _fileAccessService;
     private readonly EnrichmentLlmOptions _llmOptions;
+    private readonly ChatFileAccessOptions _fileAccessOptions;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ChatService> _logger;
 
     // Available if any key source exists (user or system)
     public bool IsAvailable => true; // Actual check done at runtime via resolver
 
+    public bool FileAccessEnabled => _fileAccessOptions.Enabled;
+
     public ChatService(
         CodeIndexDbContext context,
         ISearchService searchService,
         IApiKeyResolver apiKeyResolver,
         IQuestionClassifier classifier,
+        IChatFileAccessService fileAccessService,
         IOptions<EnrichmentLlmOptions> llmOptions,
+        IOptions<ChatFileAccessOptions> fileAccessOptions,
         IHttpClientFactory httpClientFactory,
         ILogger<ChatService> logger)
     {
@@ -40,7 +46,9 @@ public class ChatService : IChatService
         _searchService = searchService;
         _apiKeyResolver = apiKeyResolver;
         _classifier = classifier;
+        _fileAccessService = fileAccessService;
         _llmOptions = llmOptions.Value;
+        _fileAccessOptions = fileAccessOptions.Value;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -156,11 +164,13 @@ public class ChatService : IChatService
 
         // 3. Build repo context
         var repoContext = "";
+        string? repoName = null;
         if (request.RepositoryId.HasValue)
         {
             var repo = await _context.Repositories.FindAsync([request.RepositoryId.Value], ct);
             if (repo is not null)
             {
+                repoName = repo.Name;
                 var enrichmentCount = await _context.Enrichments.CountAsync(e => e.RepositoryId == repo.Id, ct);
                 var languages = await _context.Enrichments
                     .Where(e => e.RepositoryId == repo.Id && e.Language != null)
@@ -202,8 +212,28 @@ public class ChatService : IChatService
             ? $"\nThe user is likely asking about: {classification.MatchedQuestionText} (dimension: {classification.DimensionLabel})\n"
             : "";
 
+        // Build file access instructions if enabled
+        var fileAccessInstructions = "";
+        if (_fileAccessOptions.Enabled && request.RepositoryId.HasValue)
+        {
+            var defaultRef = request.Ref ?? "HEAD";
+            fileAccessInstructions = $@"
+
+You have access to a `get_file` tool that can fetch source code files from the repository at any git ref (branch, tag, or commit SHA).
+Use it when the user asks about specific files or when you need to read actual source code to answer accurately.
+
+Usage: call get_file with repository_name, ref (branch/tag/SHA), and file_path.
+Default ref: {defaultRef}
+
+Examples:
+- get_file(repository_name=""{repoName ?? "repo"}"", ref=""main"", file_path=""src/Program.cs"")
+- get_file(repository_name=""{repoName ?? "repo"}"", ref=""v1.0"", file_path=""README.md"")
+
+You can fetch up to {_fileAccessOptions.MaxFilesPerTurn} files per turn. Provide line-referenced answers when citing source code.";
+        }
+
         var systemPrompt = $@"You are a code assistant with access to indexed source code repositories. Answer questions about the codebase using the provided context. Be specific, reference file paths and line numbers when relevant. If you don't have enough context, say so.
-{classificationHint}{repoContext}{codeContext}";
+{classificationHint}{repoContext}{codeContext}{fileAccessInstructions}";
 
         var messages = new List<object>
         {
@@ -218,29 +248,24 @@ public class ChatService : IChatService
 
         messages.Add(new { role = "user", content = request.Message });
 
-        // 5. Call LLM
+        // 5. Call LLM (with function calling loop)
         var client = _httpClientFactory.CreateClient("Chat");
         client.BaseAddress = new Uri(_llmOptions.BaseUrl.TrimEnd('/') + "/");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         client.Timeout = TimeSpan.FromSeconds(_llmOptions.TimeoutSeconds);
 
-        var llmRequest = new
-        {
-            model,  // Uses resolved model (from user settings or system config)
-            messages,
-            max_tokens = 2000,
-            temperature = 0.3
-        };
+        var useTools = _fileAccessOptions.Enabled && request.RepositoryId.HasValue;
+        var toolDefinitions = useTools ? BuildToolDefinitions() : null;
 
         string reply;
+        var fileCounter = new FileCounter();
+
         try
         {
-            var response = await client.PostAsJsonAsync("chat/completions", llmRequest, ct);
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadFromJsonAsync<LlmResponse>(
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
-            reply = result?.Choices?.FirstOrDefault()?.Message?.Content ?? "No response from model.";
+            reply = await CallLlmWithToolsAsync(
+                client, model, messages, toolDefinitions,
+                request, repoName, userId, sources,
+                fileCounter, ct);
         }
         catch (Exception ex)
         {
@@ -272,19 +297,280 @@ public class ChatService : IChatService
         };
     }
 
-    private class LlmResponse
+    private async Task<string> CallLlmWithToolsAsync(
+        HttpClient client,
+        string model,
+        List<object> messages,
+        List<object>? tools,
+        ChatRequest request,
+        string? repoName,
+        string? userId,
+        List<ChatSource> sources,
+        FileCounter fileCounter,
+        CancellationToken ct)
+    {
+        var maxIterations = _fileAccessOptions.MaxIterations;
+
+        for (var iteration = 0; iteration <= maxIterations; iteration++)
+        {
+            object llmRequest;
+            if (tools is not null && iteration < maxIterations)
+            {
+                llmRequest = new
+                {
+                    model,
+                    messages,
+                    max_tokens = 2000,
+                    temperature = 0.3,
+                    tools
+                };
+            }
+            else
+            {
+                // Final iteration or no tools: don't send tools to force text response
+                llmRequest = new
+                {
+                    model,
+                    messages,
+                    max_tokens = 2000,
+                    temperature = 0.3
+                };
+            }
+
+            var response = await client.PostAsJsonAsync("chat/completions", llmRequest, ct);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync(ct);
+            var result = JsonSerializer.Deserialize<LlmResponse>(responseJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            var choice = result?.Choices?.FirstOrDefault();
+            if (choice is null)
+                return "No response from model.";
+
+            var msg = choice.Message;
+
+            // Check if the model wants to call tools
+            if (msg?.ToolCalls is { Count: > 0 } && iteration < maxIterations)
+            {
+                // Add assistant message with tool calls to conversation
+                messages.Add(JsonSerializer.Deserialize<object>(
+                    JsonSerializer.Serialize(msg, LlmJsonOptions))!);
+
+                // Process each tool call
+                foreach (var toolCall in msg.ToolCalls)
+                {
+                    var toolResult = await ProcessToolCallAsync(
+                        toolCall, request, repoName, userId, sources,
+                        fileCounter, ct);
+
+                    messages.Add(new
+                    {
+                        role = "tool",
+                        tool_call_id = toolCall.Id,
+                        content = toolResult
+                    });
+                }
+
+                // Continue loop to call LLM again with tool results
+                continue;
+            }
+
+            // Model returned a text response
+            return msg?.Content ?? "No response from model.";
+        }
+
+        return "Max iterations reached. The assistant could not complete the request.";
+    }
+
+    private async Task<string> ProcessToolCallAsync(
+        LlmToolCall toolCall,
+        ChatRequest request,
+        string? repoName,
+        string? userId,
+        List<ChatSource> sources,
+        FileCounter fileCounter,
+        CancellationToken ct)
+    {
+        if (toolCall.Function?.Name != "get_file")
+        {
+            return JsonSerializer.Serialize(new { error = $"Unknown tool: {toolCall.Function?.Name}" });
+        }
+
+        // Parse arguments
+        GetFileArgs? args;
+        try
+        {
+            args = JsonSerializer.Deserialize<GetFileArgs>(
+                toolCall.Function.Arguments ?? "{}",
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch
+        {
+            return JsonSerializer.Serialize(new { error = "Invalid tool arguments" });
+        }
+
+        if (args is null || string.IsNullOrEmpty(args.FilePath))
+        {
+            return JsonSerializer.Serialize(new { error = "Missing file_path argument" });
+        }
+
+        // Check max files per turn
+        if (fileCounter.Count >= _fileAccessOptions.MaxFilesPerTurn)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                error = $"Maximum files per turn reached ({_fileAccessOptions.MaxFilesPerTurn})",
+                suggestion = "Prioritize the most relevant files"
+            });
+        }
+
+        // Resolve repository
+        if (!request.RepositoryId.HasValue)
+        {
+            return JsonSerializer.Serialize(new { error = "No repository context for file access" });
+        }
+
+        var gitRef = args.Ref ?? request.Ref ?? "HEAD";
+
+        // Fetch file
+        var fileContent = await _fileAccessService.FetchFileForChatAsync(
+            request.RepositoryId.Value, gitRef, args.FilePath, userId, ct);
+
+        fileCounter.Count++;
+
+        if (!fileContent.IsSuccess)
+        {
+            // Build error response with suggestions
+            var errorResponse = new Dictionary<string, object> { ["error"] = fileContent.Error! };
+
+            if (fileContent.Error!.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                errorResponse["suggestion"] = "Use grep or ls to find the correct path";
+            else if (fileContent.Error.Contains("too large", StringComparison.OrdinalIgnoreCase))
+                errorResponse["suggestion"] = "Use grep to search for specific patterns";
+            else if (fileContent.IsBinary)
+                errorResponse["metadata"] = new { size = fileContent.Size };
+
+            return JsonSerializer.Serialize(errorResponse);
+        }
+
+        // Add to sources
+        sources.Add(new ChatSource
+        {
+            FilePath = fileContent.FilePath,
+            Content = fileContent.Content!,
+            Language = fileContent.Language,
+            RepositoryName = repoName,
+            Score = 1.0,
+            Ref = gitRef,
+            ResolvedCommitSha = fileContent.ResolvedSha
+        });
+
+        return JsonSerializer.Serialize(new
+        {
+            file_path = fileContent.FilePath,
+            content = fileContent.Content,
+            language = fileContent.Language,
+            size = fileContent.Size,
+            resolved_sha = fileContent.ResolvedSha,
+            line_count = fileContent.Content?.Split('\n').Length ?? 0
+        });
+    }
+
+    private static List<object> BuildToolDefinitions()
+    {
+        return
+        [
+            new
+            {
+                type = "function",
+                function = new
+                {
+                    name = "get_file",
+                    description = "Fetch the content of a source code file from the repository at a specific git ref (branch, tag, or commit SHA).",
+                    parameters = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["repository_name"] = new
+                            {
+                                type = "string",
+                                description = "The repository name"
+                            },
+                            ["ref"] = new
+                            {
+                                type = "string",
+                                description = "Git ref: branch name, tag, or commit SHA (e.g., 'main', 'v1.0', 'abc1234')"
+                            },
+                            ["file_path"] = new
+                            {
+                                type = "string",
+                                description = "Path to the file relative to repository root (e.g., 'src/Program.cs')"
+                            }
+                        },
+                        required = new[] { "file_path" }
+                    }
+                }
+            }
+        ];
+    }
+
+    private static readonly JsonSerializerOptions LlmJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private class GetFileArgs
+    {
+        [JsonPropertyName("repository_name")]
+        public string? RepositoryName { get; set; }
+
+        [JsonPropertyName("ref")]
+        public string? Ref { get; set; }
+
+        [JsonPropertyName("file_path")]
+        public string? FilePath { get; set; }
+    }
+
+    internal class LlmResponse
     {
         public List<LlmChoice>? Choices { get; set; }
     }
 
-    private class LlmChoice
+    internal class LlmChoice
     {
         public LlmMessage? Message { get; set; }
+
+        [JsonPropertyName("finish_reason")]
+        public string? FinishReason { get; set; }
     }
 
-    private class LlmMessage
+    internal class LlmMessage
     {
+        public string? Role { get; set; }
         public string? Content { get; set; }
+
+        [JsonPropertyName("tool_calls")]
+        public List<LlmToolCall>? ToolCalls { get; set; }
     }
 
+    internal class LlmToolCall
+    {
+        public string? Id { get; set; }
+        public string? Type { get; set; }
+        public LlmFunctionCall? Function { get; set; }
+    }
+
+    internal class LlmFunctionCall
+    {
+        public string? Name { get; set; }
+        public string? Arguments { get; set; }
+    }
+
+    private class FileCounter
+    {
+        public int Count { get; set; }
+    }
 }

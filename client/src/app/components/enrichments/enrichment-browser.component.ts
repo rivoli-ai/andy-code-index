@@ -40,6 +40,7 @@ import { environment } from '../../../environments/environment';
         <div><strong>Security</strong> -- Authentication, authorization, secrets management, input validation, and encryption analysis</div>
         <div><strong>Operations</strong> -- CI/CD pipelines, containerization, deployment, infrastructure, monitoring, and environment management</div>
         <div><strong>Quality</strong> -- Testing strategy, test frameworks, coverage analysis, quality tooling, and CI quality gates</div>
+        <div><strong>Document Text</strong> -- Text content extracted from binary documents (PDF) with metadata and page structure</div>
       </div>
     </div>
 
@@ -151,6 +152,7 @@ export class EnrichmentBrowserComponent implements OnInit {
     'Security': 'Security',
     'Operations': 'Operations',
     'Quality': 'Quality',
+    'DocumentText': 'Document Text',
   };
 
   typeOptions = ['Architecture', 'Development', 'History', 'Usage'];
@@ -170,6 +172,7 @@ export class EnrichmentBrowserComponent implements OnInit {
       { value: 'Example', label: 'Example' },
       { value: 'ExampleSummary', label: 'Example Summary' },
       { value: 'Quality', label: 'Quality' },
+      { value: 'DocumentText', label: 'Document Text' },
     ],
     'History': [
       { value: 'CommitDescription', label: 'Commit Desc' },

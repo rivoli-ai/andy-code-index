@@ -31,5 +31,8 @@ public enum EnrichmentSubtype
     Ownership,
     Security,
     Operations,
-    Quality
+    Quality,
+
+    // Documents
+    DocumentText
 }
