@@ -971,6 +971,39 @@ public class CodeIndexTools
         };
     }
 
+    [McpServerTool(Name = "code_index_committers"), Description("Get unique committers/contributors for a repository with commit counts")]
+    public async Task<object> GetCommitters(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var committers = await _dbContext.Commits
+            .Where(c => c.RepositoryId == repo.Id)
+            .GroupBy(c => new { c.AuthorName, c.AuthorEmail })
+            .Select(g => new
+            {
+                name = g.Key.AuthorName,
+                email = g.Key.AuthorEmail,
+                commits = g.Count(),
+                firstCommit = g.Min(c => c.CommittedAt),
+                lastCommit = g.Max(c => c.CommittedAt)
+            })
+            .OrderByDescending(c => c.commits)
+            .ToListAsync();
+
+        var totalCommits = committers.Sum(c => c.commits);
+
+        return new
+        {
+            repository = repo.Name,
+            totalCommits,
+            uniqueCommitters = committers.Count,
+            committers
+        };
+    }
+
     // --- Helpers ---
 
     private async Task<RepositoryDto?> ResolveRepo(string urlOrName)

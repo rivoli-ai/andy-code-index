@@ -229,7 +229,9 @@ Examples:
 - get_file(repository_name=""{repoName ?? "repo"}"", ref=""main"", file_path=""src/Program.cs"")
 - get_file(repository_name=""{repoName ?? "repo"}"", ref=""v1.0"", file_path=""README.md"")
 
-You can fetch up to {_fileAccessOptions.MaxFilesPerTurn} files per turn. Provide line-referenced answers when citing source code.";
+You can fetch up to {_fileAccessOptions.MaxFilesPerTurn} files per turn. Provide line-referenced answers when citing source code.
+
+You also have a `get_committers` tool that returns all unique committers/contributors with their commit counts, first and last commit dates. Use it when asked about contributors, authors, team members, or who worked on the code.";
         }
 
         var systemPrompt = $@"You are a code assistant with access to indexed source code repositories. Answer questions about the codebase using the provided context. Be specific, reference file paths and line numbers when relevant. If you don't have enough context, say so.
@@ -392,6 +394,11 @@ You can fetch up to {_fileAccessOptions.MaxFilesPerTurn} files per turn. Provide
         FileCounter fileCounter,
         CancellationToken ct)
     {
+        if (toolCall.Function?.Name == "get_committers")
+        {
+            return await ProcessGetCommittersAsync(request, ct);
+        }
+
         if (toolCall.Function?.Name != "get_file")
         {
             return JsonSerializer.Serialize(new { error = $"Unknown tool: {toolCall.Function?.Name}" });
@@ -477,6 +484,55 @@ You can fetch up to {_fileAccessOptions.MaxFilesPerTurn} files per turn. Provide
         });
     }
 
+    private async Task<string> ProcessGetCommittersAsync(ChatRequest request, CancellationToken ct)
+    {
+        if (!request.RepositoryId.HasValue)
+        {
+            // Query across all repos
+            var allCommitters = await _context.Commits
+                .GroupBy(c => new { c.AuthorName, c.AuthorEmail, c.Repository!.Name })
+                .Select(g => new
+                {
+                    repository = g.Key.Name,
+                    name = g.Key.AuthorName,
+                    email = g.Key.AuthorEmail,
+                    commits = g.Count(),
+                    firstCommit = g.Min(c => c.CommittedAt),
+                    lastCommit = g.Max(c => c.CommittedAt)
+                })
+                .OrderBy(c => c.repository).ThenByDescending(c => c.commits)
+                .ToListAsync(ct);
+
+            return JsonSerializer.Serialize(new
+            {
+                totalCommitters = allCommitters.Select(c => c.email).Distinct().Count(),
+                totalCommits = allCommitters.Sum(c => c.commits),
+                committersByRepository = allCommitters
+            });
+        }
+
+        var committers = await _context.Commits
+            .Where(c => c.RepositoryId == request.RepositoryId.Value)
+            .GroupBy(c => new { c.AuthorName, c.AuthorEmail })
+            .Select(g => new
+            {
+                name = g.Key.AuthorName,
+                email = g.Key.AuthorEmail,
+                commits = g.Count(),
+                firstCommit = g.Min(c => c.CommittedAt),
+                lastCommit = g.Max(c => c.CommittedAt)
+            })
+            .OrderByDescending(c => c.commits)
+            .ToListAsync(ct);
+
+        return JsonSerializer.Serialize(new
+        {
+            totalCommitters = committers.Count,
+            totalCommits = committers.Sum(c => c.commits),
+            committers
+        });
+    }
+
     private static List<object> BuildToolDefinitions()
     {
         return
@@ -510,6 +566,21 @@ You can fetch up to {_fileAccessOptions.MaxFilesPerTurn} files per turn. Provide
                             }
                         },
                         required = new[] { "file_path" }
+                    }
+                }
+            },
+            new
+            {
+                type = "function",
+                function = new
+                {
+                    name = "get_committers",
+                    description = "Get the list of unique committers/contributors for the repository, with commit counts and date ranges.",
+                    parameters = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>(),
+                        required = Array.Empty<string>()
                     }
                 }
             }
