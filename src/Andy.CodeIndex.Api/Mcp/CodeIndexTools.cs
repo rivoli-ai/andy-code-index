@@ -24,6 +24,7 @@ public class CodeIndexTools
     private readonly IIndexingTaskRepository _taskRepo;
     private readonly IRepoDiscoveryService _discoveryService;
     private readonly IQuestionClassifier _questionClassifier;
+    private readonly IReportService _reportService;
     private readonly CodeIndexDbContext _dbContext;
     private readonly IndexingOptions _options;
 
@@ -38,6 +39,7 @@ public class CodeIndexTools
         IIndexingTaskRepository taskRepo,
         IRepoDiscoveryService discoveryService,
         IQuestionClassifier questionClassifier,
+        IReportService reportService,
         CodeIndexDbContext dbContext,
         IOptions<IndexingOptions> options)
     {
@@ -51,6 +53,7 @@ public class CodeIndexTools
         _taskRepo = taskRepo;
         _discoveryService = discoveryService;
         _questionClassifier = questionClassifier;
+        _reportService = reportService;
         _dbContext = dbContext;
         _options = options.Value;
     }
@@ -1054,6 +1057,64 @@ public class CodeIndexTools
             uniqueCommitters = committers.Count,
             committers
         };
+    }
+
+    [McpServerTool(Name = "code_index_report"), Description("Get the full insight analysis report for a repository with ratings, feedback, health score, and improvements")]
+    public async Task<object> GetReport(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        try
+        {
+            var report = await _reportService.GenerateReportAsync(repo.Id);
+            return new
+            {
+                repository = report.RepositoryName,
+                generatedAt = report.GeneratedAt,
+                overallHealthScore = report.OverallHealthScore,
+                velocity = report.Velocity,
+                layers = report.Layers.Select(l => new
+                {
+                    l.Name, l.Subtype,
+                    l.MaturityRating, l.QualityRating, l.RiskRating,
+                    l.Strengths, l.Weaknesses, l.Recommendations,
+                    l.HasMermaidDiagrams
+                }),
+                top5Improvements = report.Top5Improvements
+            };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new { error = ex.Message };
+        }
+    }
+
+    [McpServerTool(Name = "code_index_health_score"), Description("Get the overall health score and top improvements for a repository")]
+    public async Task<object> GetHealthScore(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        try
+        {
+            var report = await _reportService.GenerateReportAsync(repo.Id);
+            return new
+            {
+                repository = report.RepositoryName,
+                overallHealthScore = report.OverallHealthScore,
+                velocity = report.Velocity,
+                top5Improvements = report.Top5Improvements
+            };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new { error = ex.Message };
+        }
     }
 
     // --- Helpers ---

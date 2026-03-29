@@ -49,6 +49,7 @@ public class CodeIndexToolsTests
             _taskRepoMock.Object,
             _discoveryServiceMock.Object,
             _classifierMock.Object,
+            new Mock<IReportService>().Object,
             dbContext,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }));
 

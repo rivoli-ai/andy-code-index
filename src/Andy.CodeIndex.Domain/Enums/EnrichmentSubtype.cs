@@ -46,5 +46,6 @@ public enum EnrichmentSubtype
     SecurityAnalysis,
     DeploymentAnalysis,
     OperationsAnalysis,
-    LocalSetupGuide
+    LocalSetupGuide,
+    InsightReport
 }

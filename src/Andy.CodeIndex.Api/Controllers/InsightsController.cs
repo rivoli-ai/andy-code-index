@@ -14,6 +14,7 @@ public class InsightsController : ControllerBase
 {
     private readonly IEnrichmentGeneratorService _enrichmentService;
     private readonly ITaskQueue _taskQueue;
+    private readonly IReportService _reportService;
 
     private static readonly Dictionary<string, EnrichmentSubtype> LayerMap = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -29,10 +30,11 @@ public class InsightsController : ControllerBase
         ["localsetupguide"] = EnrichmentSubtype.LocalSetupGuide,
     };
 
-    public InsightsController(IEnrichmentGeneratorService enrichmentService, ITaskQueue taskQueue)
+    public InsightsController(IEnrichmentGeneratorService enrichmentService, ITaskQueue taskQueue, IReportService reportService)
     {
         _enrichmentService = enrichmentService;
         _taskQueue = taskQueue;
+        _reportService = reportService;
     }
 
     /// <summary>Get all insight layers for a repository.</summary>
@@ -93,5 +95,49 @@ public class InsightsController : ControllerBase
     {
         var task = await _taskQueue.EnqueueAsync(repositoryId, TaskOperation.CreateInsights, priority: 5, ct: ct);
         return Accepted(new { taskId = task.Id, operation = "CreateInsights", message = "Insight generation queued." });
+    }
+
+    /// <summary>Get the insight analysis report for a repository.</summary>
+    [HttpGet("~/api/v1/repositories/{repositoryId:guid}/report")]
+    [RequirePermission("repository:read")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetReport(Guid repositoryId, CancellationToken ct = default)
+    {
+        try
+        {
+            var report = await _reportService.GenerateReportAsync(repositoryId, ct);
+            return Ok(report);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Get the insight analysis report as self-contained HTML.</summary>
+    [HttpGet("~/api/v1/repositories/{repositoryId:guid}/report/html")]
+    [RequirePermission("repository:read")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetReportHtml(Guid repositoryId, CancellationToken ct = default)
+    {
+        try
+        {
+            var html = await _reportService.ExportHtmlAsync(repositoryId, ct);
+            return Content(html, "text/html");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 }
