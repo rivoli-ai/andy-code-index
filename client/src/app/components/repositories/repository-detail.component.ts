@@ -56,6 +56,19 @@ interface CommitComparison {
         </div>
       </div>
 
+      <!-- Tab Navigation -->
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem">
+        <button *ngFor="let tab of ['Overview', 'Insights', 'History', 'Analytics']"
+                (click)="activeTab = tab"
+                [style.border-bottom]="activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent'"
+                style="padding:0.75rem 1.25rem;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-size:var(--font-sm);font-weight:500;color:var(--text-muted);margin-bottom:-2px;transition:all 0.15s"
+                [style.color]="activeTab === tab ? 'var(--primary)' : 'var(--text-muted)'">
+          {{ tab }}
+        </button>
+      </div>
+
+      <!-- Overview Tab -->
+      <div *ngIf="activeTab === 'Overview'">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
         <div class="card">
           <h3 style="margin-bottom:1rem;font-size:1rem">Details</h3>
@@ -202,7 +215,10 @@ interface CommitComparison {
         </div>
       </div>
 
-      <!-- Insights & Report -->
+      </div><!-- End Overview Tab -->
+
+      <!-- Insights Tab -->
+      <div *ngIf="activeTab === 'Insights'">
       <div class="card" style="margin-top:1.5rem">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
           <h3 style="font-size:1rem;margin:0">Insights & Report</h3>
@@ -273,8 +289,17 @@ interface CommitComparison {
         </div>
       </div>
 
-      <app-repository-history [repositoryId]="repo.id" style="margin-top:1.5rem;display:block" />
-      <app-repository-analytics [repositoryId]="repo.id" />
+      </div><!-- End Insights Tab -->
+
+      <!-- History Tab -->
+      <div *ngIf="activeTab === 'History'">
+        <app-repository-history [repositoryId]="repo.id" style="display:block" />
+      </div>
+
+      <!-- Analytics Tab -->
+      <div *ngIf="activeTab === 'Analytics'">
+        <app-repository-analytics [repositoryId]="repo.id" />
+      </div>
     </div>
 
     <div *ngIf="!loading && !repo" class="empty-state card">
@@ -315,6 +340,7 @@ export class RepositoryDetailComponent implements OnInit {
   syncIntervalValue = 'null';
   syncIntervalSaving = false;
   syncIntervalSaved = false;
+  activeTab = 'Overview';
 
   // Insights & Report
   insightLayers: any[] = [];
