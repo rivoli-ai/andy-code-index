@@ -333,6 +333,12 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasMaxLength(4096)
                         .HasColumnType("character varying(4096)");
 
+                    b.Property<int>("FilesFiltered")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FilesSkipped")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("RepositoryId")
                         .HasColumnType("uuid");
 

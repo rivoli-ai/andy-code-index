@@ -66,6 +66,8 @@ public class CodeIndexDbContext : DbContext
             builder.Property(r => r.Status).IsRequired().HasMaxLength(32);
             builder.Property(r => r.Provider).HasConversion<string>().HasMaxLength(32);
 
+            builder.Property(r => r.FileFilterOverrides).HasMaxLength(4096);
+
             builder.HasIndex(r => r.Url).IsUnique();
             builder.HasIndex(r => r.Name);
             builder.HasIndex(r => r.Status);

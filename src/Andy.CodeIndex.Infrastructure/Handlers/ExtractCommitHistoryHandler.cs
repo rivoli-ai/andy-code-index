@@ -39,6 +39,12 @@ public class ExtractCommitHistoryHandler : ITaskHandler
         var commits = await _gitService.GetCommitsAsync(cloneDir, limit: 200, ct: ct);
         var tags = await _gitService.GetTagsAsync(cloneDir, ct);
 
+        // Look up the commit record to set CommitId on enrichments
+        var commitSha = repo.LastIndexedCommitSha ?? "HEAD";
+        var commitRecord = await _context.Commits
+            .FirstOrDefaultAsync(c => c.RepositoryId == repo.Id && c.Sha == commitSha, ct);
+        var commitId = commitRecord?.Id;
+
         // Delete existing commit history enrichments
         var existing = await _context.Enrichments
             .Where(e => e.RepositoryId == repo.Id && e.Subtype == EnrichmentSubtype.CommitHistory)
@@ -77,6 +83,7 @@ public class ExtractCommitHistoryHandler : ITaskHandler
         {
             Id = Guid.NewGuid(),
             RepositoryId = repo.Id,
+            CommitId = commitId,
             Type = EnrichmentType.History,
             Subtype = EnrichmentSubtype.CommitHistory,
             Title = $"Commit History ({commits.Count} commits, {tags.Count} tags)",

@@ -132,8 +132,9 @@ public class CloneRepositoryHandlerTests : IDisposable
     }
 }
 
-public class ScanCommitHandlerTests
+public class ScanCommitHandlerTests : IDisposable
 {
+    private readonly Andy.CodeIndex.Infrastructure.Data.CodeIndexDbContext _context;
     private readonly Mock<ICodeRepositoryRepository> _repoRepoMock = new();
     private readonly Mock<ICommitRepository> _commitRepoMock = new();
     private readonly Mock<IGitService> _gitServiceMock = new();
@@ -142,10 +143,12 @@ public class ScanCommitHandlerTests
 
     public ScanCommitHandlerTests()
     {
+        _context = Helpers.TestDbContextFactory.Create();
         _handler = new ScanCommitHandler(
             _repoRepoMock.Object,
             _commitRepoMock.Object,
             _gitServiceMock.Object,
+            _context,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }),
             NullLogger<ScanCommitHandler>.Instance);
 
@@ -155,6 +158,8 @@ public class ScanCommitHandlerTests
             Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
         };
     }
+
+    public void Dispose() => _context.Dispose();
 
     [Fact]
     public void Operation_IsScanCommit()
@@ -173,6 +178,8 @@ public class ScanCommitHandlerTests
                 new GitCommitInfo { Sha = "abc123", Message = "First", AuthorName = "Test", CommittedAt = DateTime.UtcNow },
                 new GitCommitInfo { Sha = "def456", Message = "Second", AuthorName = "Test", CommittedAt = DateTime.UtcNow }
             ]);
+        _gitServiceMock.Setup(g => g.ListFilesAsync("/tmp/test/repos/x", It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new GitFileInfo { Path = "Program.cs", Size = 100, Language = "csharp", Hash = "abc1234567890" }]);
         _commitRepoMock.Setup(r => r.ExistsAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
@@ -216,16 +223,22 @@ public class ExtractSnippetsHandlerTests : IDisposable
     private readonly Andy.CodeIndex.Infrastructure.Data.CodeIndexDbContext _context;
     private readonly Mock<IGitService> _gitServiceMock = new();
     private readonly Mock<IChunkingService> _chunkingServiceMock = new();
+    private readonly Mock<IFileFilterService> _fileFilterServiceMock = new();
     private readonly ExtractSnippetsHandler _handler;
     private readonly Repository _testRepo;
 
     public ExtractSnippetsHandlerTests()
     {
         _context = Helpers.TestDbContextFactory.Create();
+        // Default: never skip any files
+        _fileFilterServiceMock.Setup(f => f.ShouldSkip(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<Repository?>()))
+            .Returns((false, (string?)null));
+
         _handler = new ExtractSnippetsHandler(
             _context,
             _gitServiceMock.Object,
             _chunkingServiceMock.Object,
+            _fileFilterServiceMock.Object,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }),
             NullLogger<ExtractSnippetsHandler>.Instance);
 
@@ -380,6 +393,7 @@ public class CreateApiDocsHandlerTests
 {
     private readonly Mock<ICodeRepositoryRepository> _repoRepoMock = new();
     private readonly Mock<IEnrichmentRepository> _enrichmentRepoMock = new();
+    private readonly Mock<ICommitRepository> _commitRepoMock = new();
     private readonly Mock<IGitService> _gitServiceMock = new();
     private readonly Mock<ICodeAnalysisService> _codeAnalysisMock = new();
     private readonly CreateApiDocsHandler _handler;
@@ -390,6 +404,7 @@ public class CreateApiDocsHandlerTests
         _handler = new CreateApiDocsHandler(
             _repoRepoMock.Object,
             _enrichmentRepoMock.Object,
+            _commitRepoMock.Object,
             _gitServiceMock.Object,
             _codeAnalysisMock.Object,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }),

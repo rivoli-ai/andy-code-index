@@ -12,6 +12,8 @@ public interface IGitService
     Task<string?> ReadFileAsync(string repoDir, string commitSha, string filePath, CancellationToken ct = default);
     Task<List<GitFileInfo>> ListFilesAsync(string repoDir, string commitSha, string? globPattern = null, CancellationToken ct = default);
     Task<List<GrepResult>> GrepAsync(string repoDir, string pattern, string? globFilter = null, int limit = 50, CancellationToken ct = default);
+    Task<string?> ResolveRefAsync(string repoDir, string gitRef, CancellationToken ct = default);
+    Task<string?> GetTreeHashAsync(string repoDir, string gitRef, CancellationToken ct = default);
     string GetCloneDir(string dataDir, Guid repositoryId);
 }
 
@@ -42,6 +44,7 @@ public class GitFileInfo
     public required string Path { get; set; }
     public long Size { get; set; }
     public string? Language { get; set; }
+    public string? Hash { get; set; }
 }
 
 public class GrepResult

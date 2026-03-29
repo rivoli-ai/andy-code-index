@@ -16,6 +16,7 @@ public class ExtractSnippetsHandler : ITaskHandler
     private readonly CodeIndexDbContext _context;
     private readonly IGitService _gitService;
     private readonly IChunkingService _chunkingService;
+    private readonly IFileFilterService _fileFilterService;
     private readonly IndexingOptions _indexingOptions;
     private readonly ILogger<ExtractSnippetsHandler> _logger;
 
@@ -25,12 +26,14 @@ public class ExtractSnippetsHandler : ITaskHandler
         CodeIndexDbContext context,
         IGitService gitService,
         IChunkingService chunkingService,
+        IFileFilterService fileFilterService,
         IOptions<IndexingOptions> indexingOptions,
         ILogger<ExtractSnippetsHandler> logger)
     {
         _context = context;
         _gitService = gitService;
         _chunkingService = chunkingService;
+        _fileFilterService = fileFilterService;
         _indexingOptions = indexingOptions.Value;
         _logger = logger;
     }
@@ -44,10 +47,79 @@ public class ExtractSnippetsHandler : ITaskHandler
         var commitSha = repo.LastIndexedCommitSha ?? "HEAD";
         var files = await _gitService.ListFilesAsync(cloneDir, commitSha, ct: ct);
 
-        // Build new chunks from current file state
-        var newChunks = new List<(string filePath, string language, CodeChunk chunk, string contentHash)>();
-        foreach (var file in files.Where(f => f.Language is not null))
+        // Apply file filters
+        var filesFiltered = 0;
+        var filteredExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var acceptedFiles = new List<GitFileInfo>();
+        foreach (var file in files)
         {
+            var (skip, reason) = _fileFilterService.ShouldSkip(file.Path, file.Size, repo);
+            if (skip)
+            {
+                filesFiltered++;
+                var ext = Path.GetExtension(file.Path);
+                if (!string.IsNullOrEmpty(ext))
+                    filteredExtensions.Add(ext);
+            }
+            else
+            {
+                acceptedFiles.Add(file);
+            }
+        }
+
+        if (filesFiltered > 0)
+        {
+            _logger.LogInformation(
+                "Filtered {Count} files ({Extensions}) for {Name}",
+                filesFiltered, string.Join(", ", filteredExtensions.Order()), repo.Name);
+        }
+
+        // Look up the commit record to set CommitId on enrichments
+        var commitRecord = await _context.Commits
+            .FirstOrDefaultAsync(c => c.RepositoryId == repo.Id && c.Sha == commitSha, ct);
+        var commitId = commitRecord?.Id;
+
+        // Build a lookup of previous file blob SHAs for skip-if-unchanged
+        var previousFileHashes = new Dictionary<string, string>();
+        if (commitRecord != null)
+        {
+            var previousCommitWithFiles = await _context.Commits
+                .Where(c => c.RepositoryId == repo.Id && c.Id != commitRecord.Id)
+                .OrderByDescending(c => c.CommittedAt)
+                .Select(c => c.Id)
+                .FirstOrDefaultAsync(ct);
+
+            if (previousCommitWithFiles != Guid.Empty)
+            {
+                var prevFiles = await _context.RepositoryFiles
+                    .Where(f => f.CommitId == previousCommitWithFiles)
+                    .ToListAsync(ct);
+                foreach (var pf in prevFiles)
+                {
+                    if (pf.Hash != null)
+                        previousFileHashes[pf.Path] = pf.Hash;
+                }
+            }
+        }
+
+        // Build new chunks from current file state, skipping unchanged files
+        var newChunks = new List<(string filePath, string language, CodeChunk chunk, string contentHash)>();
+        int filesSkipped = 0;
+        var skippedFilePaths = new HashSet<string>();
+
+        foreach (var file in acceptedFiles.Where(f => f.Language is not null))
+        {
+            // Skip-if-unchanged: if blob SHA matches previous commit, skip this file
+            if (file.Hash != null &&
+                previousFileHashes.TryGetValue(file.Path, out var prevHash) &&
+                prevHash == file.Hash)
+            {
+                filesSkipped++;
+                skippedFilePaths.Add(file.Path);
+                _logger.LogDebug("Skipping {File}: blob SHA unchanged since previous commit", file.Path);
+                continue;
+            }
+
             var content = await _gitService.ReadFileAsync(cloneDir, commitSha, file.Path, ct);
             if (content is null || content.Length == 0) continue;
 
@@ -87,10 +159,12 @@ public class ExtractSnippetsHandler : ITaskHandler
                     // Modified — update content, preserve ID and embeddings
                     existing.Content = chunk.Content;
                     existing.Language = language;
+                    existing.CommitId = commitId;
                     updated++;
                 }
                 else
                 {
+                    existing.CommitId = commitId;
                     unchanged++;
                 }
             }
@@ -101,6 +175,7 @@ public class ExtractSnippetsHandler : ITaskHandler
                 {
                     Id = Guid.NewGuid(),
                     RepositoryId = repo.Id,
+                    CommitId = commitId,
                     Type = EnrichmentType.Development,
                     Subtype = EnrichmentSubtype.Chunk,
                     Content = chunk.Content,
@@ -111,6 +186,17 @@ public class ExtractSnippetsHandler : ITaskHandler
                     CreatedAt = DateTime.UtcNow
                 });
                 added++;
+            }
+        }
+
+        // For skipped files, mark their existing enrichments so they aren't deleted
+        foreach (var existing in existingChunks)
+        {
+            if (existing.FilePath != null && skippedFilePaths.Contains(existing.FilePath))
+            {
+                var skipKey = $"{existing.FilePath}:{existing.StartLine}:{existing.EndLine}";
+                processedKeys.Add(skipKey);
+                existing.CommitId = commitId;
             }
         }
 
@@ -138,6 +224,8 @@ public class ExtractSnippetsHandler : ITaskHandler
             SnippetsUpdated = updated,
             SnippetsDeleted = deleted,
             SnippetsUnchanged = unchanged,
+            FilesFiltered = filesFiltered,
+            FilesSkipped = filesSkipped,
             CreatedAt = DateTime.UtcNow
         });
 
@@ -154,8 +242,8 @@ public class ExtractSnippetsHandler : ITaskHandler
         await _context.SaveChangesAsync(ct);
 
         _logger.LogInformation(
-            "Snippets for {Name}: {Added} added, {Updated} updated, {Deleted} deleted, {Unchanged} unchanged",
-            repo.Name, added, updated, deleted, unchanged);
+            "Snippets for {Name}: {Added} added, {Updated} updated, {Deleted} deleted, {Unchanged} unchanged, {Skipped} files skipped (unchanged blob SHA)",
+            repo.Name, added, updated, deleted, unchanged, filesSkipped);
     }
 
     internal static string ComputeHash(string content)

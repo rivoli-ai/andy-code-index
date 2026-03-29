@@ -53,6 +53,11 @@ public class ExtractDependenciesHandler : ITaskHandler
             allDeps.AddRange(deps);
         }
 
+        // Look up the commit record to set CommitId on enrichments
+        var commitRecord = await _context.Commits
+            .FirstOrDefaultAsync(c => c.RepositoryId == repo.Id && c.Sha == commitSha, ct);
+        var commitId = commitRecord?.Id;
+
         // Delete existing dependency enrichments
         var existing = await _context.Enrichments
             .Where(e => e.RepositoryId == repo.Id && e.Subtype == EnrichmentSubtype.Dependencies)
@@ -85,6 +90,7 @@ public class ExtractDependenciesHandler : ITaskHandler
             {
                 Id = Guid.NewGuid(),
                 RepositoryId = repo.Id,
+                CommitId = commitId,
                 Type = EnrichmentType.Architecture,
                 Subtype = EnrichmentSubtype.Dependencies,
                 Title = $"Dependencies ({allDeps.Count} packages)",

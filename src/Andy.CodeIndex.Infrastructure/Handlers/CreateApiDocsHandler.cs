@@ -11,6 +11,7 @@ public class CreateApiDocsHandler : ITaskHandler
 {
     private readonly ICodeRepositoryRepository _repoRepo;
     private readonly IEnrichmentRepository _enrichmentRepo;
+    private readonly ICommitRepository _commitRepo;
     private readonly IGitService _gitService;
     private readonly ICodeAnalysisService _codeAnalysis;
     private readonly IndexingOptions _options;
@@ -21,6 +22,7 @@ public class CreateApiDocsHandler : ITaskHandler
     public CreateApiDocsHandler(
         ICodeRepositoryRepository repoRepo,
         IEnrichmentRepository enrichmentRepo,
+        ICommitRepository commitRepo,
         IGitService gitService,
         ICodeAnalysisService codeAnalysis,
         IOptions<IndexingOptions> options,
@@ -28,6 +30,7 @@ public class CreateApiDocsHandler : ITaskHandler
     {
         _repoRepo = repoRepo;
         _enrichmentRepo = enrichmentRepo;
+        _commitRepo = commitRepo;
         _gitService = gitService;
         _codeAnalysis = codeAnalysis;
         _options = options.Value;
@@ -46,6 +49,10 @@ public class CreateApiDocsHandler : ITaskHandler
         var commitSha = repo.LastIndexedCommitSha ?? "HEAD";
         var files = await _gitService.ListFilesAsync(cloneDir, commitSha, ct: ct);
 
+        // Look up the commit record to set CommitId on enrichments
+        var commitRecord = await _commitRepo.GetByShaAsync(repo.Id, commitSha, ct);
+        var commitId = commitRecord?.Id;
+
         var docCount = 0;
         foreach (var file in files.Where(f => f.Language is not null && _codeAnalysis.SupportsLanguage(f.Language)))
         {
@@ -63,6 +70,7 @@ public class CreateApiDocsHandler : ITaskHandler
             {
                 Id = Guid.NewGuid(),
                 RepositoryId = repo.Id,
+                CommitId = commitId,
                 Type = EnrichmentType.Usage,
                 Subtype = EnrichmentSubtype.APIDocs,
                 Title = $"API: {file.Path}",

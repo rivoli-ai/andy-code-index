@@ -31,4 +31,20 @@ public class GitServiceTests
         var result = service.GetCloneDir("/data", repoId);
         result.Should().Be(Path.Combine("/data", "repos", "12345678-1234-1234-1234-123456789012"));
     }
+
+    [Theory]
+    [InlineData("main", true)]
+    [InlineData("HEAD", true)]
+    [InlineData("abc123def456", true)]
+    [InlineData("v1.0.0", true)]
+    [InlineData("feature/my-branch", true)]
+    [InlineData("HEAD~1", true)]
+    [InlineData("HEAD^{tree}", true)]
+    [InlineData("refs/heads/main", true)]
+    [InlineData("", false)]
+    [InlineData("   ", false)]
+    public void IsValidRef_ValidatesCorrectly(string gitRef, bool expected)
+    {
+        GitService.IsValidRef(gitRef).Should().Be(expected);
+    }
 }

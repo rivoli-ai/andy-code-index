@@ -118,6 +118,15 @@ public class CreateQualityDocsHandler : BaseLlmEnrichmentHandler
         Format as markdown.
         """;
 
+        // Look up the commit record to set CommitId on enrichments
+        Guid? commitId = null;
+        if (commitSha != "HEAD")
+        {
+            var commitRecord = await Context.Commits
+                .FirstOrDefaultAsync(c => c.RepositoryId == repo.Id && c.Sha == commitSha, ct);
+            commitId = commitRecord?.Id;
+        }
+
         var reply = await CallLlmAsync(apiKey, model, prompt, ct);
         if (string.IsNullOrEmpty(reply)) return;
 
@@ -130,6 +139,7 @@ public class CreateQualityDocsHandler : BaseLlmEnrichmentHandler
         {
             Id = Guid.NewGuid(),
             RepositoryId = repo.Id,
+            CommitId = commitId,
             Type = Type,
             Subtype = Subtype,
             Title = $"Quality & Testing for {repo.Name} ({testFiles.Count} test files)",

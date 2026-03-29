@@ -16,4 +16,5 @@ public class CreateRepositoryRequest
 public class UpdateRepositoryRequest
 {
     public int? SyncIntervalMinutes { get; set; }
+    public FileFilterOverridesDto? FileFilterOverrides { get; set; }
 }

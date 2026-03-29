@@ -13,6 +13,7 @@ public class RepositoryDto
     public DateTime? LastSyncedAt { get; set; }
     public int? SyncIntervalMinutes { get; set; }
     public required string Status { get; set; }
+    public FileFilterOverridesDto? FileFilterOverrides { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public RepositoryStatsDto? Stats { get; set; }

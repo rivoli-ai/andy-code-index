@@ -206,11 +206,50 @@ public class GitService : IGitService
             {
                 Path = path,
                 Size = size,
-                Language = ext.Length > 0 && LanguageMap.TryGetValue(ext, out var lang) ? lang : null
+                Language = ext.Length > 0 && LanguageMap.TryGetValue(ext, out var lang) ? lang : null,
+                Hash = meta[2]
             });
         }
 
         return files;
+    }
+
+    public async Task<string?> ResolveRefAsync(string repoDir, string gitRef, CancellationToken ct = default)
+    {
+        if (!IsValidRef(gitRef)) return null;
+
+        try
+        {
+            var output = await RunGitAsync(repoDir, ["rev-parse", gitRef], ct);
+            var sha = output.Trim();
+            return sha.Length > 0 ? sha : null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<string?> GetTreeHashAsync(string repoDir, string gitRef, CancellationToken ct = default)
+    {
+        if (!IsValidRef(gitRef)) return null;
+
+        try
+        {
+            var output = await RunGitAsync(repoDir, ["rev-parse", $"{gitRef}^{{tree}}"], ct);
+            var hash = output.Trim();
+            return hash.Length > 0 ? hash : null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    internal static bool IsValidRef(string gitRef)
+    {
+        if (string.IsNullOrWhiteSpace(gitRef)) return false;
+        return Regex.IsMatch(gitRef, @"^[a-zA-Z0-9._/\-~^{}]+$");
     }
 
     public async Task<List<GrepResult>> GrepAsync(string repoDir, string pattern, string? globFilter = null, int limit = 50, CancellationToken ct = default)

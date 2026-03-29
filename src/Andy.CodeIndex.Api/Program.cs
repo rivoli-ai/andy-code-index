@@ -108,6 +108,8 @@ builder.Services.AddScoped<IApiKeyResolver, ApiKeyResolver>();
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddScoped<ICommitComparisonService, CommitComparisonService>();
 builder.Services.AddSingleton<IGitService, GitService>();
+builder.Services.AddSingleton<IFileFilterService, FileFilterService>();
+builder.Services.AddSingleton<IBinaryDetectionService, BinaryDetectionService>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();
 builder.Services.AddScoped<ITaskQueue, TaskQueueService>();
 builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
@@ -168,6 +170,7 @@ builder.Services.AddOpenTelemetry()
 
 // --- Options ---
 builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
+builder.Services.Configure<FileFilterOptions>(builder.Configuration.GetSection("Indexing:FileFilters"));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection("Sync"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection(EmbeddingOptions.SectionName));
 builder.Services.Configure<EnrichmentLlmOptions>(builder.Configuration.GetSection(EnrichmentLlmOptions.SectionName));

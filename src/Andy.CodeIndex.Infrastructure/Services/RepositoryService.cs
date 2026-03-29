@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain;
@@ -159,6 +160,13 @@ public class RepositoryService : IRepositoryService
             throw new ArgumentException($"Invalid sync interval value: {request.SyncIntervalMinutes}. Allowed values: null (default), 0 (manual only), 15, 30, 60, 120, 360, 720, 1440.");
 
         repo.SyncIntervalMinutes = request.SyncIntervalMinutes;
+
+        if (request.FileFilterOverrides is not null)
+        {
+            repo.FileFilterOverrides = JsonSerializer.Serialize(request.FileFilterOverrides,
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        }
+
         repo.UpdatedAt = DateTime.UtcNow;
 
         await _repositoryRepo.SaveChangesAsync(ct);
@@ -240,6 +248,21 @@ public class RepositoryService : IRepositoryService
 
     private static RepositoryDto MapToDto(Repository repo)
     {
+        FileFilterOverridesDto? filterOverrides = null;
+        if (repo.FileFilterOverrides is not null)
+        {
+            try
+            {
+                filterOverrides = JsonSerializer.Deserialize<FileFilterOverridesDto>(
+                    repo.FileFilterOverrides,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (JsonException)
+            {
+                // Invalid JSON — leave null
+            }
+        }
+
         return new RepositoryDto
         {
             Id = repo.Id,
@@ -251,6 +274,7 @@ public class RepositoryService : IRepositoryService
             LastSyncedAt = repo.LastSyncedAt,
             SyncIntervalMinutes = repo.SyncIntervalMinutes,
             Status = repo.Status,
+            FileFilterOverrides = filterOverrides,
             CreatedAt = repo.CreatedAt,
             UpdatedAt = repo.UpdatedAt
         };

@@ -50,6 +50,16 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
             return;
         }
 
+        // Look up the commit record to set CommitId on enrichments
+        var commitSha = repo.LastIndexedCommitSha;
+        Guid? commitId = null;
+        if (commitSha != null)
+        {
+            var commitRecord = await Context.Commits
+                .FirstOrDefaultAsync(c => c.RepositoryId == repo.Id && c.Sha == commitSha, ct);
+            commitId = commitRecord?.Id;
+        }
+
         // Get sample chunks for context
         var chunks = await Context.Enrichments
             .Where(e => e.RepositoryId == repo.Id && e.Subtype == EnrichmentSubtype.Chunk)
@@ -74,6 +84,7 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
         {
             Id = Guid.NewGuid(),
             RepositoryId = repo.Id,
+            CommitId = commitId,
             Type = Type,
             Subtype = Subtype,
             Title = $"{Subtype} for {repo.Name}",

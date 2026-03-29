@@ -60,6 +60,16 @@ public class CreateSecurityDocsHandler : BaseLlmEnrichmentHandler
             securityChunks = generalChunks;
         }
 
+        // Look up the commit record to set CommitId on enrichments
+        var commitSha = repo.LastIndexedCommitSha;
+        Guid? commitId = null;
+        if (commitSha != null)
+        {
+            var commitRecord = await Context.Commits
+                .FirstOrDefaultAsync(c => c.RepositoryId == repo.Id && c.Sha == commitSha, ct);
+            commitId = commitRecord?.Id;
+        }
+
         var prompt = BuildPrompt(repo, securityChunks);
         var reply = await CallLlmAsync(apiKey, model, prompt, ct);
         if (string.IsNullOrEmpty(reply)) return;
@@ -73,6 +83,7 @@ public class CreateSecurityDocsHandler : BaseLlmEnrichmentHandler
         {
             Id = Guid.NewGuid(),
             RepositoryId = repo.Id,
+            CommitId = commitId,
             Type = Type,
             Subtype = Subtype,
             Title = $"Security Analysis for {repo.Name}",

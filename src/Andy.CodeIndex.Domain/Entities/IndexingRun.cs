@@ -14,6 +14,8 @@ public class IndexingRun
     public int SnippetsUnchanged { get; set; }
     public int ApiDocsGenerated { get; set; }
     public int CommitsScanned { get; set; }
+    public int FilesFiltered { get; set; }
+    public int FilesSkipped { get; set; }
     public string? ErrorMessage { get; set; }
     public DateTime CreatedAt { get; set; }
 
