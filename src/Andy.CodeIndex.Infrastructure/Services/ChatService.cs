@@ -214,7 +214,7 @@ public class ChatService : IChatService
 
         // Build file access instructions if enabled
         var fileAccessInstructions = "";
-        if (_fileAccessOptions.Enabled && request.RepositoryId.HasValue)
+        if (_fileAccessOptions.Enabled)
         {
             var defaultRef = request.Ref ?? "HEAD";
             fileAccessInstructions = $@"
@@ -256,8 +256,8 @@ You also have a `get_committers` tool that returns all unique committers/contrib
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         client.Timeout = TimeSpan.FromSeconds(_llmOptions.TimeoutSeconds);
 
-        var useTools = _fileAccessOptions.Enabled && request.RepositoryId.HasValue;
-        var toolDefinitions = useTools ? BuildToolDefinitions() : null;
+        var useTools = _fileAccessOptions.Enabled;
+        var toolDefinitions = useTools ? BuildToolDefinitions(request.RepositoryId.HasValue) : null;
 
         string reply;
         var fileCounter = new FileCounter();
@@ -533,11 +533,13 @@ You also have a `get_committers` tool that returns all unique committers/contrib
         });
     }
 
-    private static List<object> BuildToolDefinitions()
+    private static List<object> BuildToolDefinitions(bool hasRepoContext)
     {
-        return
-        [
-            new
+        var tools = new List<object>();
+
+        if (hasRepoContext)
+        {
+            tools.Add(new
             {
                 type = "function",
                 function = new
@@ -568,23 +570,26 @@ You also have a `get_committers` tool that returns all unique committers/contrib
                         required = new[] { "file_path" }
                     }
                 }
-            },
-            new
+            });
+        }
+
+        tools.Add(new
+        {
+            type = "function",
+            function = new
             {
-                type = "function",
-                function = new
+                name = "get_committers",
+                description = "Get the list of unique committers/contributors for all indexed repositories (or the current one if scoped), with commit counts and date ranges.",
+                parameters = new
                 {
-                    name = "get_committers",
-                    description = "Get the list of unique committers/contributors for the repository, with commit counts and date ranges.",
-                    parameters = new
-                    {
-                        type = "object",
-                        properties = new Dictionary<string, object>(),
-                        required = Array.Empty<string>()
-                    }
+                    type = "object",
+                    properties = new Dictionary<string, object>(),
+                    required = Array.Empty<string>()
                 }
             }
-        ];
+        });
+
+        return tools;
     }
 
     private static readonly JsonSerializerOptions LlmJsonOptions = new()

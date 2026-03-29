@@ -86,8 +86,8 @@ public class CreateQualityDocsHandler : BaseLlmEnrichmentHandler
         var chunks = await Context.Enrichments
             .Where(e => e.RepositoryId == repo.Id && e.Subtype == EnrichmentSubtype.Chunk)
             .Where(e => e.FilePath != null && (
-                e.FilePath.Contains("test", StringComparison.OrdinalIgnoreCase) ||
-                e.FilePath.Contains("spec", StringComparison.OrdinalIgnoreCase)))
+                EF.Functions.ILike(e.FilePath!, "%test%") ||
+                EF.Functions.ILike(e.FilePath!, "%spec%")))
             .OrderBy(e => e.FilePath)
             .Take(20)
             .ToListAsync(ct);
