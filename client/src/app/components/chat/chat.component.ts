@@ -4,6 +4,8 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { marked } from 'marked';
 import { environment } from '../../../environments/environment';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -30,6 +32,20 @@ interface SuggestionDimension {
   id: string;
   name: string;
   questions: string[];
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  updatedAt: string;
+  messageCount: number;
+  isPinned: boolean;
+  pinnedAt: string | null;
+}
+
+interface ConversationGroup {
+  label: string;
+  conversations: Conversation[];
 }
 
 @Component({
@@ -74,18 +90,37 @@ interface SuggestionDimension {
               <i class="bi bi-plus-lg"></i>
             </button>
           </div>
+          <input class="form-control sidebar-search" [(ngModel)]="convSearchQuery"
+                 placeholder="Search conversations..." (input)="onConvSearchInput()"
+                 style="margin-bottom:0.5rem">
           <div class="conversation-list">
-            <div *ngFor="let conv of conversations" class="conversation-item"
-                 [class.active]="conversationId === conv.id"
-                 (click)="resumeConversation(conv.id)">
-              <div class="conv-title">{{ conv.title }}</div>
-              <div class="conv-meta">
-                <span>{{ formatTimeAgo(conv.updatedAt) }}</span>
-                <button class="btn-icon-sm" (click)="deleteConversation(conv.id, $event)" title="Delete">
-                  <i class="bi bi-trash3"></i>
-                </button>
+            <ng-container *ngFor="let group of groupedConversations">
+              <div class="conv-group-header" *ngIf="group.conversations.length > 0">{{ group.label }}</div>
+              <div *ngFor="let conv of group.conversations" class="conversation-item"
+                   [class.active]="conversationId === conv.id"
+                   (click)="resumeConversation(conv.id)">
+                <div class="conv-title-row">
+                  <div class="conv-title" *ngIf="editingConvId !== conv.id"
+                       (dblclick)="startRename(conv, $event)">{{ conv.title }}</div>
+                  <input *ngIf="editingConvId === conv.id" class="conv-title-input"
+                         [(ngModel)]="editingTitle"
+                         (keydown.enter)="saveRename(conv)"
+                         (keydown.escape)="cancelRename()"
+                         (blur)="saveRename(conv)"
+                         (click)="$event.stopPropagation()">
+                  <button class="btn-icon-sm" (click)="togglePin(conv, $event)"
+                          [title]="conv.isPinned ? 'Unpin' : 'Pin'">
+                    <i class="bi" [ngClass]="conv.isPinned ? 'bi-pin-fill' : 'bi-pin'"></i>
+                  </button>
+                </div>
+                <div class="conv-meta">
+                  <span>{{ formatTimeAgo(conv.updatedAt) }}</span>
+                  <button class="btn-icon-sm" (click)="deleteConversation(conv.id, $event)" title="Delete">
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </div>
               </div>
-            </div>
+            </ng-container>
             <div *ngIf="conversations.length === 0" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem">
               No conversations yet.
             </div>
@@ -198,8 +233,19 @@ interface SuggestionDimension {
     }
     .conversation-item:hover { background: var(--surface); border-color: var(--border); }
     .conversation-item.active { background: rgba(0,102,204,0.06); border-color: var(--primary-light); }
-    .conv-title { font-size: var(--font-xs); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conv-title-row { display: flex; align-items: center; gap: 0.25rem; }
+    .conv-title { font-size: var(--font-xs); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+    .conv-title-input {
+      font-size: var(--font-xs); font-weight: 500; flex: 1; min-width: 0;
+      border: 1px solid var(--primary); border-radius: var(--radius);
+      padding: 0.125rem 0.375rem; background: var(--surface); color: var(--text);
+      outline: none;
+    }
     .conv-meta { display: flex; justify-content: space-between; align-items: center; font-size: var(--font-xs); color: var(--text-muted); margin-top: 0.125rem; }
+    .conv-group-header {
+      font-size: var(--font-xs); font-weight: 600; color: var(--text-muted);
+      padding: 0.375rem 0.625rem 0.125rem; text-transform: uppercase; letter-spacing: 0.03em;
+    }
     .btn-icon {
       background: none; border: 1px solid var(--border); border-radius: var(--radius);
       cursor: pointer; padding: 0.25rem 0.5rem; color: var(--text-muted);
@@ -211,6 +257,8 @@ interface SuggestionDimension {
       color: var(--text-light); transition: all var(--transition); font-size: var(--font-xs);
     }
     .btn-icon-sm:hover { color: var(--danger); }
+    .btn-icon-sm .bi-pin-fill { color: var(--primary); }
+    .btn-icon-sm .bi-pin:hover { color: var(--primary); }
 
     /* --- Right chat area --- */
     .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -279,10 +327,18 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   chatAvailable = false;
   activeCategory = '';
   searchQuery = '';
+  convSearchQuery = '';
+
+  // Inline rename state
+  editingConvId: string | null = null;
+  editingTitle = '';
 
   allCategories: SuggestionDimension[] = [];
   visibleQuestions: string[] = [];
-  conversations: { id: string; title: string; updatedAt: string; messageCount: number }[] = [];
+  conversations: Conversation[] = [];
+  groupedConversations: ConversationGroup[] = [];
+
+  private convSearchSubject = new Subject<string>();
 
   private searchAliases: Record<string, string[]> = {
     'db': ['database', 'schema', 'table', 'migration', 'entity'],
@@ -324,6 +380,14 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       next: s => this.chatAvailable = s.available
     });
     this.loadConversations();
+
+    // Debounced conversation search
+    this.convSearchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(term => {
+      this.loadConversations(term || undefined);
+    });
   }
 
   ngAfterViewChecked() {
@@ -364,10 +428,64 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  loadConversations() {
-    this.http.get<any>(`${environment.apiUrl}/chat/conversations?limit=50`).subscribe({
-      next: res => this.conversations = res.conversations || []
+  onConvSearchInput() {
+    this.convSearchSubject.next(this.convSearchQuery);
+  }
+
+  loadConversations(search?: string) {
+    let url = `${environment.apiUrl}/chat/conversations?limit=50`;
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+    this.http.get<any>(url).subscribe({
+      next: res => {
+        this.conversations = (res.conversations || []).map((c: any) => ({
+          ...c,
+          isPinned: c.isPinned || false,
+          pinnedAt: c.pinnedAt || null
+        }));
+        this.groupedConversations = this.groupConversations(this.conversations);
+      }
     });
+  }
+
+  groupConversations(conversations: Conversation[]): ConversationGroup[] {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfYesterday = new Date(startOfToday.getTime() - 86400000);
+    const startOf7Days = new Date(startOfToday.getTime() - 7 * 86400000);
+    const startOf30Days = new Date(startOfToday.getTime() - 30 * 86400000);
+
+    const groups: ConversationGroup[] = [
+      { label: 'Pinned', conversations: [] },
+      { label: 'Today', conversations: [] },
+      { label: 'Yesterday', conversations: [] },
+      { label: 'Previous 7 Days', conversations: [] },
+      { label: 'Previous 30 Days', conversations: [] },
+      { label: 'Older', conversations: [] },
+    ];
+
+    for (const conv of conversations) {
+      if (conv.isPinned) {
+        groups[0].conversations.push(conv);
+        continue;
+      }
+
+      const date = new Date(conv.updatedAt);
+      if (date >= startOfToday) {
+        groups[1].conversations.push(conv);
+      } else if (date >= startOfYesterday) {
+        groups[2].conversations.push(conv);
+      } else if (date >= startOf7Days) {
+        groups[3].conversations.push(conv);
+      } else if (date >= startOf30Days) {
+        groups[4].conversations.push(conv);
+      } else {
+        groups[5].conversations.push(conv);
+      }
+    }
+
+    return groups;
   }
 
   newChat() {
@@ -395,7 +513,50 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     this.http.delete(`${environment.apiUrl}/chat/conversations/${id}`).subscribe({
       next: () => {
         this.conversations = this.conversations.filter(c => c.id !== id);
+        this.groupedConversations = this.groupConversations(this.conversations);
         if (this.conversationId === id) this.newChat();
+      }
+    });
+  }
+
+  // --- Inline rename ---
+  startRename(conv: Conversation, event: Event) {
+    event.stopPropagation();
+    this.editingConvId = conv.id;
+    this.editingTitle = conv.title;
+    // Focus the input after Angular renders it
+    setTimeout(() => {
+      const input = document.querySelector('.conv-title-input') as HTMLInputElement;
+      if (input) { input.focus(); input.select(); }
+    }, 0);
+  }
+
+  saveRename(conv: Conversation) {
+    if (this.editingConvId !== conv.id) return;
+    const newTitle = this.editingTitle.trim();
+    this.editingConvId = null;
+    if (!newTitle || newTitle === conv.title) return;
+
+    this.http.patch<any>(`${environment.apiUrl}/chat/conversations/${conv.id}`, { title: newTitle }).subscribe({
+      next: res => {
+        conv.title = res.title;
+      }
+    });
+  }
+
+  cancelRename() {
+    this.editingConvId = null;
+  }
+
+  // --- Pin/Unpin ---
+  togglePin(conv: Conversation, event: Event) {
+    event.stopPropagation();
+    const newPinned = !conv.isPinned;
+    this.http.patch<any>(`${environment.apiUrl}/chat/conversations/${conv.id}`, { isPinned: newPinned }).subscribe({
+      next: res => {
+        conv.isPinned = res.isPinned;
+        conv.pinnedAt = res.pinnedAt;
+        this.groupedConversations = this.groupConversations(this.conversations);
       }
     });
   }
@@ -418,6 +579,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     if (!this.input.trim() || this.sending) return;
 
     const message = this.input.trim();
+    const isNewConversation = !this.conversationId;
     this.messages.push({ role: 'user', content: message });
     this.input = '';
     this.sending = true;
@@ -435,6 +597,13 @@ export class ChatComponent implements OnInit, AfterViewChecked {
           showSources: false
         });
         this.sending = false;
+
+        // Auto-title: if this was a new conversation, update title with first ~50 chars
+        if (isNewConversation && message.length > 0) {
+          const autoTitle = message.length > 50 ? message.substring(0, 47) + '...' : message;
+          this.http.patch<any>(`${environment.apiUrl}/chat/conversations/${res.conversationId}`, { title: autoTitle }).subscribe();
+        }
+
         this.loadConversations();
       },
       error: () => {

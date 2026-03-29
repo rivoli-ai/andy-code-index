@@ -2,7 +2,9 @@ using Andy.CodeIndex.Api.Mcp;
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
+using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.CodeIndex.Tests.Unit.Helpers;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -16,6 +18,10 @@ public class CodeIndexToolsTests
     private readonly Mock<IEnrichmentGeneratorService> _enrichmentServiceMock = new();
     private readonly Mock<IGitService> _gitServiceMock = new();
     private readonly Mock<ICommitRepository> _commitRepoMock = new();
+    private readonly Mock<IChatService> _chatServiceMock = new();
+    private readonly Mock<IIndexingTaskRepository> _taskRepoMock = new();
+    private readonly Mock<IRepoDiscoveryService> _discoveryServiceMock = new();
+    private readonly Mock<IQuestionClassifier> _classifierMock = new();
     private readonly CodeIndexTools _tools;
 
     private readonly RepositoryDto _testRepo = new()
@@ -30,14 +36,18 @@ public class CodeIndexToolsTests
 
     public CodeIndexToolsTests()
     {
-        var chatServiceMock = new Mock<IChatService>();
+        var dbContext = TestDbContextFactory.Create();
         _tools = new CodeIndexTools(
             _repoServiceMock.Object,
             _searchServiceMock.Object,
             _enrichmentServiceMock.Object,
             _gitServiceMock.Object,
-            chatServiceMock.Object,
+            _chatServiceMock.Object,
             _commitRepoMock.Object,
+            _taskRepoMock.Object,
+            _discoveryServiceMock.Object,
+            _classifierMock.Object,
+            dbContext,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }));
 
         _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
@@ -421,5 +431,495 @@ public class CodeIndexToolsTests
 
         var result = await _tools.GetEnrichmentCounts("nonexistent");
         result.Should().NotBeNull();
+    }
+
+    // --- GetRepository (NEW) ---
+
+    [Fact]
+    public async Task GetRepository_ExistingRepo_ReturnsDetails()
+    {
+        var detailedRepo = new RepositoryDto
+        {
+            Id = _testRepo.Id, Name = "andy-docs",
+            Url = "https://github.com/rivoli-ai/andy-docs",
+            Provider = GitProvider.GitHub, Status = "indexed",
+            DefaultBranch = "main",
+            Stats = new RepositoryStatsDto { CommitCount = 10, FileCount = 50 },
+            Branches = [new BranchDto { Name = "main", HeadCommitSha = "abc123", IsDefault = true }],
+            Tags = [new TagDto { Name = "v1.0", CommitSha = "abc123" }]
+        };
+        _repoServiceMock.Setup(s => s.GetDetailsByIdAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(detailedRepo);
+
+        var result = await _tools.GetRepository("andy-docs");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("andy-docs");
+        json.Should().Contain("main");
+        json.Should().Contain("v1.0");
+    }
+
+    [Fact]
+    public async Task GetRepository_NonExistentRepo_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _tools.GetRepository("nonexistent");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
+    }
+
+    // --- HybridSearch (NEW) ---
+
+    [Fact]
+    public async Task HybridSearch_CallsHybridSearchService()
+    {
+        _searchServiceMock.Setup(s => s.HybridSearchAsync(
+            "find controllers", It.IsAny<SearchFilter>(), 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SearchResultsDto
+            {
+                Results = [new SearchResultItem { EnrichmentId = Guid.NewGuid(), Content = "controller code", Score = 0.85 }],
+                TotalCount = 1, SearchMode = "hybrid"
+            });
+
+        var result = await _tools.HybridSearch("find controllers");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("hybrid");
+        json.Should().Contain("controller code");
+    }
+
+    [Fact]
+    public async Task HybridSearch_WithRepoFilter_ResolvesRepoId()
+    {
+        _searchServiceMock.Setup(s => s.HybridSearchAsync(
+            "query", It.Is<SearchFilter>(f => f.RepositoryIds!.Contains(_testRepo.Id)), 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SearchResultsDto());
+
+        await _tools.HybridSearch("query", source_repo: "andy-docs");
+
+        _searchServiceMock.Verify(s => s.HybridSearchAsync(
+            "query", It.Is<SearchFilter>(f => f.RepositoryIds!.Contains(_testRepo.Id)), 10, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task HybridSearch_WithLanguageFilter_SetsLanguage()
+    {
+        _searchServiceMock.Setup(s => s.HybridSearchAsync(
+            "query", It.Is<SearchFilter>(f => f.Languages != null && f.Languages.Contains("csharp")), 5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SearchResultsDto());
+
+        await _tools.HybridSearch("query", language: "csharp", limit: 5);
+
+        _searchServiceMock.Verify(s => s.HybridSearchAsync(
+            "query", It.Is<SearchFilter>(f => f.Languages!.Contains("csharp")), 5, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // --- QueryEnrichments (NEW) ---
+
+    [Fact]
+    public async Task QueryEnrichments_NoFilters_ReturnsAllEnrichments()
+    {
+        _enrichmentServiceMock.Setup(s => s.QueryAsync(
+            null, null, null, null, null, null, 0, 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new EnrichmentDto { Id = Guid.NewGuid(), Content = "test content", Type = EnrichmentType.Development, Subtype = EnrichmentSubtype.Chunk }]);
+        _enrichmentServiceMock.Setup(s => s.QueryCountAsync(
+            null, null, null, null, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _tools.QueryEnrichments();
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("test content");
+        json.Should().Contain("Chunk");
+    }
+
+    [Fact]
+    public async Task QueryEnrichments_WithSubtypeFilter_ParsesEnum()
+    {
+        _enrichmentServiceMock.Setup(s => s.QueryAsync(
+            null, EnrichmentSubtype.APIDocs, null, null, null, null, 0, 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _enrichmentServiceMock.Setup(s => s.QueryCountAsync(
+            null, EnrichmentSubtype.APIDocs, null, null, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        await _tools.QueryEnrichments(subtype: "APIDocs");
+
+        _enrichmentServiceMock.Verify(s => s.QueryAsync(
+            null, EnrichmentSubtype.APIDocs, null, null, null, null, 0, 50, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task QueryEnrichments_WithRepoFilter_ResolvesRepoId()
+    {
+        _enrichmentServiceMock.Setup(s => s.QueryAsync(
+            null, null, _testRepo.Id, null, null, null, 0, 50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _enrichmentServiceMock.Setup(s => s.QueryCountAsync(
+            null, null, _testRepo.Id, null, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        await _tools.QueryEnrichments(repo_url: "andy-docs");
+
+        _enrichmentServiceMock.Verify(s => s.QueryAsync(
+            null, null, _testRepo.Id, null, null, null, 0, 50, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task QueryEnrichments_WithPagination_PassesOffsetAndLimit()
+    {
+        _enrichmentServiceMock.Setup(s => s.QueryAsync(
+            null, null, null, null, null, null, 10, 5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _enrichmentServiceMock.Setup(s => s.QueryCountAsync(
+            null, null, null, null, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        var result = await _tools.QueryEnrichments(offset: 10, limit: 5);
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("\"offset\":10");
+        json.Should().Contain("\"limit\":5");
+    }
+
+    // --- GetEnrichment (NEW) ---
+
+    [Fact]
+    public async Task GetEnrichment_ExistingId_ReturnsEnrichment()
+    {
+        var enrichmentId = Guid.NewGuid();
+        _enrichmentServiceMock.Setup(s => s.GetByIdAsync(enrichmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EnrichmentDto
+            {
+                Id = enrichmentId, Content = "Full enrichment content",
+                Title = "Test Enrichment", Type = EnrichmentType.Architecture,
+                Subtype = EnrichmentSubtype.Physical, Quality = 0.95
+            });
+
+        var result = await _tools.GetEnrichment(enrichmentId.ToString());
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("Full enrichment content");
+        json.Should().Contain("Test Enrichment");
+        json.Should().Contain("Physical");
+    }
+
+    [Fact]
+    public async Task GetEnrichment_NonExistentId_ReturnsError()
+    {
+        var id = Guid.NewGuid();
+        _enrichmentServiceMock.Setup(s => s.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((EnrichmentDto?)null);
+
+        var result = await _tools.GetEnrichment(id.ToString());
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
+    }
+
+    [Fact]
+    public async Task GetEnrichment_InvalidGuid_ReturnsError()
+    {
+        var result = await _tools.GetEnrichment("not-a-guid");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("Invalid enrichment ID");
+    }
+
+    // --- ChatSuggestions (NEW) ---
+
+    [Fact]
+    public void GetChatSuggestions_ReturnsDimensions()
+    {
+        _classifierMock.Setup(c => c.GetSuggestions())
+            .Returns([
+                new SuggestionDimension
+                {
+                    Id = "architecture", Label = "Architecture",
+                    Questions = [new SuggestionQuestion { Id = "q1", Text = "What is the architecture?" }]
+                }
+            ]);
+
+        var result = _tools.GetChatSuggestions();
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("Architecture");
+        json.Should().Contain("What is the architecture?");
+    }
+
+    // --- ChatStatus (NEW) ---
+
+    [Fact]
+    public void GetChatStatus_WhenAvailable_ReturnsTrue()
+    {
+        _chatServiceMock.Setup(c => c.IsAvailable).Returns(true);
+
+        var result = _tools.GetChatStatus();
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("true");
+    }
+
+    [Fact]
+    public void GetChatStatus_WhenUnavailable_ReturnsFalse()
+    {
+        _chatServiceMock.Setup(c => c.IsAvailable).Returns(false);
+
+        var result = _tools.GetChatStatus();
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("false");
+    }
+
+    // --- QueueTasks (NEW) ---
+
+    [Fact]
+    public async Task ListQueueTasks_ReturnsTasks()
+    {
+        _taskRepoMock.Setup(t => t.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new IndexingTask
+                {
+                    Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+                    Operation = TaskOperation.SyncRepository,
+                    Status = IndexingTaskStatus.Running,
+                    Progress = 50, Priority = 5,
+                    CreatedAt = DateTime.UtcNow
+                }
+            ]);
+
+        var result = await _tools.ListQueueTasks();
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("SyncRepository");
+        json.Should().Contain("Running");
+        json.Should().Contain("\"total\":1");
+    }
+
+    [Fact]
+    public async Task ListQueueTasks_EmptyQueue_ReturnsEmptyList()
+    {
+        _taskRepoMock.Setup(t => t.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _tools.ListQueueTasks();
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("\"total\":0");
+    }
+
+    // --- QueueTask (NEW) ---
+
+    [Fact]
+    public async Task GetQueueTask_ExistingTask_ReturnsDetails()
+    {
+        var taskId = Guid.NewGuid();
+        _taskRepoMock.Setup(t => t.GetByIdAsync(taskId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IndexingTask
+            {
+                Id = taskId, RepositoryId = _testRepo.Id,
+                Operation = TaskOperation.CreateCodeEmbeddings,
+                Status = IndexingTaskStatus.Completed,
+                Progress = 100, Priority = 5,
+                CreatedAt = DateTime.UtcNow,
+                CompletedAt = DateTime.UtcNow
+            });
+
+        var result = await _tools.GetQueueTask(taskId.ToString());
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("CreateCodeEmbeddings");
+        json.Should().Contain("Completed");
+    }
+
+    [Fact]
+    public async Task GetQueueTask_NonExistentTask_ReturnsError()
+    {
+        var taskId = Guid.NewGuid();
+        _taskRepoMock.Setup(t => t.GetByIdAsync(taskId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IndexingTask?)null);
+
+        var result = await _tools.GetQueueTask(taskId.ToString());
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
+    }
+
+    [Fact]
+    public async Task GetQueueTask_InvalidGuid_ReturnsError()
+    {
+        var result = await _tools.GetQueueTask("not-a-guid");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("Invalid task ID");
+    }
+
+    // --- GetCommit (NEW) ---
+
+    [Fact]
+    public async Task GetCommit_ExistingCommit_ReturnsDetails()
+    {
+        _commitRepoMock.Setup(c => c.GetByShaAsync(_testRepo.Id, "abc123", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Domain.Entities.Commit
+            {
+                Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+                Sha = "abc123", Message = "Fix bug in auth",
+                AuthorName = "Dev", AuthorEmail = "dev@test.com",
+                CommittedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow,
+                IsIndexed = true
+            });
+
+        var result = await _tools.GetCommit("andy-docs", "abc123");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("abc123");
+        json.Should().Contain("Fix bug in auth");
+        json.Should().Contain("true"); // IsIndexed
+    }
+
+    [Fact]
+    public async Task GetCommit_NonExistentCommit_ReturnsError()
+    {
+        _commitRepoMock.Setup(c => c.GetByShaAsync(_testRepo.Id, "nonexistent", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Domain.Entities.Commit?)null);
+
+        var result = await _tools.GetCommit("andy-docs", "nonexistent");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
+    }
+
+    [Fact]
+    public async Task GetCommit_NonExistentRepo_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _tools.GetCommit("nonexistent", "abc123");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
+    }
+
+    // --- DiscoverGitHub (NEW) ---
+
+    [Fact]
+    public async Task DiscoverGitHub_ReturnsDiscoveredRepos()
+    {
+        _discoveryServiceMock.Setup(d => d.DiscoverGitHubAsync("rivoli-ai", null, true, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new DiscoveredRepo
+                {
+                    Name = "andy-docs", FullName = "rivoli-ai/andy-docs",
+                    CloneUrl = "https://github.com/rivoli-ai/andy-docs.git",
+                    Provider = "GitHub", DefaultBranch = "main",
+                    Description = "Documentation repo", AlreadyTracked = true
+                }
+            ]);
+
+        var result = await _tools.DiscoverGitHub("rivoli-ai");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("rivoli-ai");
+        json.Should().Contain("andy-docs");
+        json.Should().Contain("AlreadyTracked");
+    }
+
+    [Fact]
+    public async Task DiscoverGitHub_WithOptions_PassesParameters()
+    {
+        _discoveryServiceMock.Setup(d => d.DiscoverGitHubAsync("org", "token", false, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        await _tools.DiscoverGitHub("org", pat: "token", exclude_archived: false, exclude_forks: false);
+
+        _discoveryServiceMock.Verify(d => d.DiscoverGitHubAsync("org", "token", false, false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // --- DiscoverAzureDevOps (NEW) ---
+
+    [Fact]
+    public async Task DiscoverAzureDevOps_ReturnsDiscoveredRepos()
+    {
+        _discoveryServiceMock.Setup(d => d.DiscoverAzureDevOpsAsync("myorg", "myproject", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new DiscoveredRepo
+                {
+                    Name = "backend-api", FullName = "myorg/myproject/backend-api",
+                    CloneUrl = "https://dev.azure.com/myorg/myproject/_git/backend-api",
+                    Provider = "AzureDevOps", DefaultBranch = "main"
+                }
+            ]);
+
+        var result = await _tools.DiscoverAzureDevOps("myorg", project: "myproject");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("myorg");
+        json.Should().Contain("backend-api");
+        json.Should().Contain("AzureDevOps");
+    }
+
+    // --- SyncDiscovered (NEW) ---
+
+    [Fact]
+    public async Task SyncDiscovered_AddsNewRepos()
+    {
+        var newRepo = new RepositoryDto
+        {
+            Id = Guid.NewGuid(), Name = "new-repo",
+            Url = "https://github.com/test/new-repo",
+            Provider = GitProvider.GitHub, Status = "pending"
+        };
+        _repoServiceMock.Setup(s => s.AddAsync(
+            It.Is<CreateRepositoryRequest>(r => r.Url == "https://github.com/test/new-repo"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(newRepo);
+
+        var result = await _tools.SyncDiscovered(["https://github.com/test/new-repo"]);
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("new-repo");
+        json.Should().Contain("\"addedCount\":1");
+        json.Should().Contain("\"skippedCount\":0");
+    }
+
+    [Fact]
+    public async Task SyncDiscovered_SkipsDuplicates()
+    {
+        _repoServiceMock.Setup(s => s.AddAsync(It.IsAny<CreateRepositoryRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("already exists"));
+
+        var result = await _tools.SyncDiscovered(["https://github.com/test/existing"]);
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("\"addedCount\":0");
+        json.Should().Contain("\"skippedCount\":1");
+        json.Should().Contain("existing");
+    }
+
+    [Fact]
+    public async Task SyncDiscovered_MixedResults_ReportsAddedAndSkipped()
+    {
+        var newRepo = new RepositoryDto
+        {
+            Id = Guid.NewGuid(), Name = "new-repo",
+            Url = "https://github.com/test/new-repo",
+            Provider = GitProvider.GitHub, Status = "pending"
+        };
+        _repoServiceMock.Setup(s => s.AddAsync(
+            It.Is<CreateRepositoryRequest>(r => r.Url == "https://github.com/test/new-repo"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(newRepo);
+        _repoServiceMock.Setup(s => s.AddAsync(
+            It.Is<CreateRepositoryRequest>(r => r.Url == "https://github.com/test/existing"), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("already exists"));
+
+        var result = await _tools.SyncDiscovered(
+            ["https://github.com/test/new-repo", "https://github.com/test/existing"]);
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("\"addedCount\":1");
+        json.Should().Contain("\"skippedCount\":1");
+    }
+
+    // --- IndexingHistory (NEW) ---
+
+    [Fact]
+    public async Task GetIndexingHistory_ExistingRepo_ReturnsRuns()
+    {
+        // The indexing history tool uses DbContext directly, which is configured
+        // with in-memory DB -- so no runs will be returned, but no error either
+        var result = await _tools.GetIndexingHistory("andy-docs");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("andy-docs");
+        json.Should().Contain("\"total\":0");
+    }
+
+    [Fact]
+    public async Task GetIndexingHistory_NonExistentRepo_ReturnsError()
+    {
+        _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _tools.GetIndexingHistory("nonexistent");
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        json.Should().Contain("not found");
     }
 }

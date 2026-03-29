@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ApiService } from '../../services/api.service';
 import { Repository } from '../../models/repository.model';
@@ -8,16 +9,43 @@ import { RepositoryHistoryComponent } from './repository-history.component';
 import { RepositoryAnalyticsComponent } from './repository-analytics.component';
 import { environment } from '../../../environments/environment';
 
+interface CommitSummary {
+  id: string;
+  sha: string;
+  message: string;
+  authorName?: string;
+  committedAt: string;
+  isIndexed: boolean;
+}
+
+interface CommitComparison {
+  from: string;
+  to: string;
+  added: any[];
+  removed: any[];
+  changed: any[];
+}
+
 @Component({
   selector: 'app-repository-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, RepositoryHistoryComponent, RepositoryAnalyticsComponent],
+  imports: [CommonModule, FormsModule, RouterLink, RepositoryHistoryComponent, RepositoryAnalyticsComponent],
   template: `
     <div *ngIf="loading" style="display:flex;justify-content:center;padding:3rem"><div class="spinner"></div></div>
 
     <div *ngIf="!loading && repo">
       <div class="page-header">
-        <h1>{{ repo.name }}</h1>
+        <div>
+          <h1>{{ repo.name }}</h1>
+          <div style="display:flex;gap:0.75rem;align-items:center;margin-top:0.25rem" *ngIf="repo.lastIndexedCommitSha || repo.defaultBranch">
+            <span *ngIf="repo.defaultBranch" class="badge badge-primary" style="font-size:0.75rem">
+              <i class="bi bi-diagram-2"></i> {{ repo.defaultBranch }}
+            </span>
+            <code *ngIf="repo.lastIndexedCommitSha" style="font-size:0.75rem;color:var(--text-muted)">
+              {{ repo.lastIndexedCommitSha.substring(0, 7) }}
+            </code>
+          </div>
+        </div>
         <div style="display:flex;gap:0.75rem">
           <button class="btn btn-secondary" (click)="sync()" [disabled]="syncing">
             <i class="bi bi-arrow-repeat"></i> Sync
@@ -36,6 +64,23 @@ import { environment } from '../../../environments/environment';
           <div class="detail-row"><span class="label">Status</span><span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span></div>
           <div class="detail-row"><span class="label">Default Branch</span><span>{{ repo.defaultBranch || '—' }}</span></div>
           <div class="detail-row"><span class="label">Last Synced</span><span>{{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'medium') : 'Never' }}</span></div>
+          <div class="detail-row">
+            <span class="label">Sync Interval</span>
+            <select [ngModel]="syncIntervalValue" (ngModelChange)="onSyncIntervalChange($event)"
+                    style="padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem">
+              <option value="null">Default</option>
+              <option value="0">Manual Only</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60">1 hour</option>
+              <option value="120">2 hours</option>
+              <option value="360">6 hours</option>
+              <option value="720">12 hours</option>
+              <option value="1440">Daily</option>
+            </select>
+            <span *ngIf="syncIntervalSaving" style="margin-left:0.5rem;font-size:0.75rem;color:var(--text-muted)">Saving...</span>
+            <span *ngIf="syncIntervalSaved" style="margin-left:0.5rem;font-size:0.75rem;color:var(--success)">Saved</span>
+          </div>
         </div>
         <div class="card" *ngIf="repo.stats">
           <h3 style="margin-bottom:1rem;font-size:1rem">Statistics</h3>
@@ -97,6 +142,66 @@ import { environment } from '../../../environments/environment';
         </div>
       </div>
 
+      <!-- Commit Comparison -->
+      <div class="card" style="margin-top:1.5rem" *ngIf="commits.length >= 2">
+        <h3 style="margin-bottom:1rem;font-size:1rem">Compare Commits</h3>
+        <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap">
+          <div>
+            <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem">From</label>
+            <select [(ngModel)]="compareFrom" style="padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:200px">
+              <option value="">Select commit...</option>
+              <option *ngFor="let c of commits" [value]="c.sha">{{ c.sha.substring(0, 7) }} - {{ c.message | slice:0:40 }}</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem">To</label>
+            <select [(ngModel)]="compareTo" style="padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:200px">
+              <option value="">Select commit...</option>
+              <option *ngFor="let c of commits" [value]="c.sha">{{ c.sha.substring(0, 7) }} - {{ c.message | slice:0:40 }}</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" (click)="compareCommits()" [disabled]="!compareFrom || !compareTo || comparing" style="font-size:0.8125rem">
+            <i class="bi bi-arrow-left-right"></i> Compare
+          </button>
+        </div>
+        <div *ngIf="compareError" style="margin-top:0.75rem;color:var(--danger);font-size:0.8125rem">{{ compareError }}</div>
+
+        <!-- Comparison Results -->
+        <div *ngIf="comparison" style="margin-top:1rem">
+          <div style="display:flex;gap:1rem;margin-bottom:1rem">
+            <span class="stat-badge added" style="cursor:pointer" (click)="toggleSection('added')">+ {{ comparison.added.length }} added</span>
+            <span class="stat-badge deleted" style="cursor:pointer" (click)="toggleSection('removed')">- {{ comparison.removed.length }} removed</span>
+            <span class="stat-badge updated" style="cursor:pointer" (click)="toggleSection('changed')">~ {{ comparison.changed.length }} changed</span>
+          </div>
+
+          <div *ngIf="expandedSection === 'added' && comparison.added.length > 0" style="margin-top:0.75rem">
+            <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--success)">Added Enrichments</h4>
+            <div *ngFor="let e of comparison.added" class="compare-item">
+              <div style="font-weight:500;font-size:0.8125rem">{{ e.filePath || '(no file)' }}</div>
+              <span class="badge badge-muted" style="font-size:0.6875rem">{{ e.subtype }}</span>
+              <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;white-space:pre-wrap;max-height:4rem;overflow:hidden">{{ e.content | slice:0:200 }}</div>
+            </div>
+          </div>
+
+          <div *ngIf="expandedSection === 'removed' && comparison.removed.length > 0" style="margin-top:0.75rem">
+            <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--danger)">Removed Enrichments</h4>
+            <div *ngFor="let e of comparison.removed" class="compare-item">
+              <div style="font-weight:500;font-size:0.8125rem">{{ e.filePath || '(no file)' }}</div>
+              <span class="badge badge-muted" style="font-size:0.6875rem">{{ e.subtype }}</span>
+              <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;white-space:pre-wrap;max-height:4rem;overflow:hidden">{{ e.content | slice:0:200 }}</div>
+            </div>
+          </div>
+
+          <div *ngIf="expandedSection === 'changed' && comparison.changed.length > 0" style="margin-top:0.75rem">
+            <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--accent)">Changed Enrichments</h4>
+            <div *ngFor="let c of comparison.changed" class="compare-item">
+              <div style="font-weight:500;font-size:0.8125rem">{{ c.to.filePath || '(no file)' }}</div>
+              <span class="badge badge-muted" style="font-size:0.6875rem">{{ c.to.subtype }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <app-repository-history [repositoryId]="repo.id" style="margin-top:1.5rem;display:block" />
       <app-repository-analytics [repositoryId]="repo.id" />
     </div>
@@ -116,6 +221,12 @@ import { environment } from '../../../environments/environment';
     .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
     .stat-label { font-size: 0.8125rem; color: var(--text-muted); }
     .tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .stat-badge { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.625rem; border-radius: 100px; }
+    .stat-badge.added { background: rgba(40,167,69,0.1); color: var(--success); }
+    .stat-badge.updated { background: rgba(0,164,220,0.1); color: var(--accent); }
+    .stat-badge.deleted { background: rgba(220,53,69,0.1); color: var(--danger); }
+    .compare-item { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+    .compare-item:last-child { border-bottom: none; }
   `]
 })
 export class RepositoryDetailComponent implements OnInit {
@@ -123,17 +234,35 @@ export class RepositoryDetailComponent implements OnInit {
   loading = true;
   syncing = false;
   summary: any = null;
+  commits: CommitSummary[] = [];
+  compareFrom = '';
+  compareTo = '';
+  comparing = false;
+  comparison: CommitComparison | null = null;
+  compareError = '';
+  expandedSection: string | null = null;
+  syncIntervalValue = 'null';
+  syncIntervalSaving = false;
+  syncIntervalSaved = false;
 
   constructor(private api: ApiService, private route: ActivatedRoute, private router: Router, private http: HttpClient) {}
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
     this.api.getRepository(id).subscribe({
-      next: repo => { this.repo = repo; this.loading = false; },
+      next: repo => {
+        this.repo = repo;
+        this.syncIntervalValue = repo.syncIntervalMinutes != null ? String(repo.syncIntervalMinutes) : 'null';
+        this.loading = false;
+      },
       error: () => { this.loading = false; }
     });
     this.http.get(`${environment.apiUrl}/repositories/${id}/analytics/summary`).subscribe({
       next: (s: any) => this.summary = s,
+      error: () => {}
+    });
+    this.http.get<CommitSummary[]>(`${environment.apiUrl}/repositories/${id}/commits?limit=100`).subscribe({
+      next: (commits) => this.commits = commits,
       error: () => {}
     });
   }
@@ -152,6 +281,47 @@ export class RepositoryDetailComponent implements OnInit {
     this.api.deleteRepository(this.repo.id).subscribe({
       next: () => this.router.navigate(['/repositories'])
     });
+  }
+
+  compareCommits() {
+    if (!this.repo || !this.compareFrom || !this.compareTo) return;
+    this.comparing = true;
+    this.comparison = null;
+    this.compareError = '';
+    this.expandedSection = null;
+    this.http.get<CommitComparison>(
+      `${environment.apiUrl}/repositories/${this.repo.id}/commits/compare`,
+      { params: { from: this.compareFrom, to: this.compareTo } }
+    ).subscribe({
+      next: (result) => { this.comparison = result; this.comparing = false; },
+      error: (err) => {
+        this.compareError = err.error?.error || 'Failed to compare commits.';
+        this.comparing = false;
+      }
+    });
+  }
+
+  onSyncIntervalChange(value: string) {
+    if (!this.repo) return;
+    this.syncIntervalValue = value;
+    this.syncIntervalSaving = true;
+    this.syncIntervalSaved = false;
+    const syncIntervalMinutes = value === 'null' ? null : parseInt(value, 10);
+    this.api.updateRepository(this.repo.id, { syncIntervalMinutes }).subscribe({
+      next: (updated) => {
+        this.repo = updated;
+        this.syncIntervalSaving = false;
+        this.syncIntervalSaved = true;
+        setTimeout(() => this.syncIntervalSaved = false, 2000);
+      },
+      error: () => {
+        this.syncIntervalSaving = false;
+      }
+    });
+  }
+
+  toggleSection(section: string) {
+    this.expandedSection = this.expandedSection === section ? null : section;
   }
 
   getRelativeTime(dateStr: string): string {

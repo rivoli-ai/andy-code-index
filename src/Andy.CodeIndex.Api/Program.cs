@@ -106,6 +106,7 @@ builder.Services.AddDataProtection();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<IApiKeyResolver, ApiKeyResolver>();
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
+builder.Services.AddScoped<ICommitComparisonService, CommitComparisonService>();
 builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();
 builder.Services.AddScoped<ITaskQueue, TaskQueueService>();

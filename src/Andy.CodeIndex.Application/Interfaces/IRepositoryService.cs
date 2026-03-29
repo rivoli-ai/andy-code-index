@@ -9,6 +9,7 @@ public interface IRepositoryService
     Task<RepositoryDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<RepositoryDto?> GetDetailsByIdAsync(Guid id, CancellationToken ct = default);
     Task<List<RepositoryDto>> ListAsync(GitProvider? provider = null, string? status = null, CancellationToken ct = default);
+    Task<RepositoryDto> UpdateAsync(Guid id, UpdateRepositoryRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
     Task SyncAsync(Guid id, CancellationToken ct = default);
 }

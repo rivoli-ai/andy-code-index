@@ -90,6 +90,9 @@ public class EnrichmentRepository : RepositoryBase<Enrichment>, IEnrichmentRepos
             .ToDictionaryAsync(g => g.Subtype, g => g.Count, ct);
     }
 
+    public async Task<List<Enrichment>> GetByCommitIdAsync(Guid commitId, CancellationToken ct = default)
+        => await DbSet.Where(e => e.CommitId == commitId).ToListAsync(ct);
+
     private IQueryable<Enrichment> BuildQuery(
         EnrichmentType? type,
         EnrichmentSubtype? subtype,

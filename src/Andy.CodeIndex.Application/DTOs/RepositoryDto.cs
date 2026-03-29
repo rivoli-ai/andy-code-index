@@ -11,6 +11,7 @@ public class RepositoryDto
     public string? DefaultBranch { get; set; }
     public string? LastIndexedCommitSha { get; set; }
     public DateTime? LastSyncedAt { get; set; }
+    public int? SyncIntervalMinutes { get; set; }
     public required string Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

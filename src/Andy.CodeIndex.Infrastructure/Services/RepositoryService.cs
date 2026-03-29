@@ -1,5 +1,6 @@
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.CodeIndex.Domain;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
 using Andy.CodeIndex.Infrastructure.Data;
@@ -35,6 +36,9 @@ public class RepositoryService : IRepositoryService
         if (existingRepo is not null)
             throw new InvalidOperationException($"Repository with URL '{request.Url}' already exists.");
 
+        if (!SyncIntervalValidator.IsValid(request.SyncIntervalMinutes))
+            throw new ArgumentException($"Invalid sync interval value: {request.SyncIntervalMinutes}. Allowed values: null (default), 0 (manual only), 15, 30, 60, 120, 360, 720, 1440.");
+
         var provider = ParseProvider(request.Url);
         var name = ParseName(request.Url);
 
@@ -46,6 +50,7 @@ public class RepositoryService : IRepositoryService
             CloneUrl = request.Url,
             Provider = provider,
             PersonalAccessToken = request.PersonalAccessToken,
+            SyncIntervalMinutes = request.SyncIntervalMinutes,
             Status = "pending",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -145,6 +150,21 @@ public class RepositoryService : IRepositoryService
         return dtos;
     }
 
+    public async Task<RepositoryDto> UpdateAsync(Guid id, UpdateRepositoryRequest request, CancellationToken ct = default)
+    {
+        var repo = await _repositoryRepo.GetByIdAsync(id, ct)
+            ?? throw new KeyNotFoundException($"Repository {id} not found.");
+
+        if (!SyncIntervalValidator.IsValid(request.SyncIntervalMinutes))
+            throw new ArgumentException($"Invalid sync interval value: {request.SyncIntervalMinutes}. Allowed values: null (default), 0 (manual only), 15, 30, 60, 120, 360, 720, 1440.");
+
+        repo.SyncIntervalMinutes = request.SyncIntervalMinutes;
+        repo.UpdatedAt = DateTime.UtcNow;
+
+        await _repositoryRepo.SaveChangesAsync(ct);
+        return MapToDto(repo);
+    }
+
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var repo = await _repositoryRepo.GetByIdAsync(id, ct)
@@ -229,6 +249,7 @@ public class RepositoryService : IRepositoryService
             DefaultBranch = repo.DefaultBranch,
             LastIndexedCommitSha = repo.LastIndexedCommitSha,
             LastSyncedAt = repo.LastSyncedAt,
+            SyncIntervalMinutes = repo.SyncIntervalMinutes,
             Status = repo.Status,
             CreatedAt = repo.CreatedAt,
             UpdatedAt = repo.UpdatedAt

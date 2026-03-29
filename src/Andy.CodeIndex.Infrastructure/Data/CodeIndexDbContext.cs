@@ -358,6 +358,7 @@ public class CodeIndexDbContext : DbContext
             builder.Property(c => c.Title).IsRequired().HasMaxLength(256);
             builder.HasOne(c => c.Repository).WithMany().HasForeignKey(c => c.RepositoryId).OnDelete(DeleteBehavior.SetNull);
             builder.HasIndex(c => new { c.UserId, c.UpdatedAt });
+            builder.HasIndex(c => new { c.UserId, c.IsPinned });
         });
 
         modelBuilder.Entity<ChatMessage>(builder =>

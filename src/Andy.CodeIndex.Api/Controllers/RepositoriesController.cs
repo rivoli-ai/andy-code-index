@@ -55,6 +55,10 @@ public class RepositoriesController : ControllerBase
         {
             return Conflict(new { error = ex.Message });
         }
+        catch (ArgumentException ex)
+        {
+            return UnprocessableEntity(new { error = ex.Message });
+        }
         catch (UriFormatException)
         {
             return UnprocessableEntity(new { error = "Invalid repository URL format." });
@@ -70,6 +74,32 @@ public class RepositoriesController : ControllerBase
     {
         var repo = await _service.GetDetailsByIdAsync(id, ct);
         return repo is null ? NotFound() : Ok(repo);
+    }
+
+    /// <summary>Update repository settings (e.g. sync interval).</summary>
+    [HttpPut("{id:guid}")]
+    [RequirePermission("repository:write")]
+    [ProducesResponseType(typeof(RepositoryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> Update(
+        Guid id,
+        [FromBody] UpdateRepositoryRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var repo = await _service.UpdateAsync(id, request, ct);
+            return Ok(repo);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ArgumentException ex)
+        {
+            return UnprocessableEntity(new { error = ex.Message });
+        }
     }
 
     /// <summary>Delete a repository and all associated data.</summary>

@@ -38,4 +38,6 @@ public interface IEnrichmentRepository : IRepository<Enrichment>
         EnrichmentType? type = null,
         Guid? repositoryId = null,
         CancellationToken ct = default);
+
+    Task<List<Enrichment>> GetByCommitIdAsync(Guid commitId, CancellationToken ct = default);
 }

@@ -8,6 +8,8 @@ public class ChatConversation
     public Guid? RepositoryId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public bool IsPinned { get; set; }
+    public DateTimeOffset? PinnedAt { get; set; }
 
     public Repository? Repository { get; set; }
     public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();

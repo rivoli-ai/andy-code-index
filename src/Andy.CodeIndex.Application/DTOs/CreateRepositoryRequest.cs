@@ -9,4 +9,11 @@ public class CreateRepositoryRequest
     public required string Url { get; set; }
 
     public string? PersonalAccessToken { get; set; }
+
+    public int? SyncIntervalMinutes { get; set; }
+}
+
+public class UpdateRepositoryRequest
+{
+    public int? SyncIntervalMinutes { get; set; }
 }

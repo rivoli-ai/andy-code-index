@@ -26,6 +26,10 @@ export class ApiService {
     return this.http.post<Repository>(`${this.baseUrl}/repositories`, request);
   }
 
+  updateRepository(id: string, update: { syncIntervalMinutes?: number | null }): Observable<Repository> {
+    return this.http.put<Repository>(`${this.baseUrl}/repositories/${id}`, update);
+  }
+
   deleteRepository(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/repositories/${id}`);
   }

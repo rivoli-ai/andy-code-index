@@ -6,6 +6,7 @@ export interface Repository {
   defaultBranch?: string;
   lastIndexedCommitSha?: string;
   lastSyncedAt?: string;
+  syncIntervalMinutes?: number | null;
   status: string;
   createdAt: string;
   updatedAt: string;

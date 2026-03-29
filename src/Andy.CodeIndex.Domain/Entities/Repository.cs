@@ -13,6 +13,7 @@ public class Repository
     public string? PersonalAccessToken { get; set; }
     public string? LastIndexedCommitSha { get; set; }
     public DateTime? LastSyncedAt { get; set; }
+    public int? SyncIntervalMinutes { get; set; } // null=default, 0=manual only, 15/30/60/120/360/720/1440
     public string Status { get; set; } = "pending"; // pending, cloning, indexing, indexed, error
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

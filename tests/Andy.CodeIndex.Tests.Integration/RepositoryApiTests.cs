@@ -117,4 +117,103 @@ public class RepositoryApiTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.GetAsync($"/api/v1/enrichments/{Guid.NewGuid()}");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task CreateRepository_WithSyncInterval_ReturnsSyncInterval()
+    {
+        var request = new CreateRepositoryRequest
+        {
+            Url = "https://github.com/rivoli-ai/sync-create-" + Guid.NewGuid(),
+            SyncIntervalMinutes = 60
+        };
+        var response = await _client.PostAsJsonAsync("/api/v1/repositories", request);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var repo = await response.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
+        repo.Should().NotBeNull();
+        repo!.SyncIntervalMinutes.Should().Be(60);
+    }
+
+    [Fact]
+    public async Task CreateRepository_WithInvalidSyncInterval_Returns422()
+    {
+        var request = new CreateRepositoryRequest
+        {
+            Url = "https://github.com/rivoli-ai/sync-invalid-" + Guid.NewGuid(),
+            SyncIntervalMinutes = 45
+        };
+        var response = await _client.PostAsJsonAsync("/api/v1/repositories", request);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task UpdateRepository_SetSyncInterval_Returns200()
+    {
+        var url = "https://github.com/rivoli-ai/sync-update-" + Guid.NewGuid();
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories", new CreateRepositoryRequest { Url = url });
+        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
+
+        var updateResponse = await _client.PutAsJsonAsync(
+            $"/api/v1/repositories/{created!.Id}",
+            new UpdateRepositoryRequest { SyncIntervalMinutes = 120 });
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var updated = await updateResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
+        updated!.SyncIntervalMinutes.Should().Be(120);
+    }
+
+    [Fact]
+    public async Task UpdateRepository_SetSyncIntervalToNull_Returns200()
+    {
+        var url = "https://github.com/rivoli-ai/sync-null-" + Guid.NewGuid();
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories",
+            new CreateRepositoryRequest { Url = url, SyncIntervalMinutes = 60 });
+        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
+
+        var updateResponse = await _client.PutAsJsonAsync(
+            $"/api/v1/repositories/{created!.Id}",
+            new UpdateRepositoryRequest { SyncIntervalMinutes = null });
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var updated = await updateResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
+        updated!.SyncIntervalMinutes.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateRepository_InvalidSyncInterval_Returns422()
+    {
+        var url = "https://github.com/rivoli-ai/sync-bad-" + Guid.NewGuid();
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories", new CreateRepositoryRequest { Url = url });
+        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
+
+        var updateResponse = await _client.PutAsJsonAsync(
+            $"/api/v1/repositories/{created!.Id}",
+            new UpdateRepositoryRequest { SyncIntervalMinutes = 99 });
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task UpdateRepository_NonExistentId_Returns404()
+    {
+        var response = await _client.PutAsJsonAsync(
+            $"/api/v1/repositories/{Guid.NewGuid()}",
+            new UpdateRepositoryRequest { SyncIntervalMinutes = 60 });
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task UpdateRepository_ManualOnly_Returns200()
+    {
+        var url = "https://github.com/rivoli-ai/sync-manual-" + Guid.NewGuid();
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/repositories", new CreateRepositoryRequest { Url = url });
+        var created = await createResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
+
+        var updateResponse = await _client.PutAsJsonAsync(
+            $"/api/v1/repositories/{created!.Id}",
+            new UpdateRepositoryRequest { SyncIntervalMinutes = 0 });
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var updated = await updateResponse.Content.ReadFromJsonAsync<RepositoryDto>(TestJson.Options);
+        updated!.SyncIntervalMinutes.Should().Be(0);
+    }
 }

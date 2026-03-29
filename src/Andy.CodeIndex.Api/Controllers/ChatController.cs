@@ -52,16 +52,30 @@ public class ChatController : ControllerBase
     [RequirePermission("search:read")]
     [HttpGet("conversations")]
     public async Task<IActionResult> ListConversations(
-        [FromQuery] int offset = 0, [FromQuery] int limit = 20, CancellationToken ct = default)
+        [FromQuery] int offset = 0, [FromQuery] int limit = 20,
+        [FromQuery] string? search = null, CancellationToken ct = default)
     {
         var userId = GetUserId();
-        var conversations = await _context.ChatConversations
-            .Where(c => c.UserId == userId)
-            .OrderByDescending(c => c.UpdatedAt)
+        var query = _context.ChatConversations
+            .Where(c => c.UserId == userId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(c =>
+                c.Title.ToLower().Contains(term) ||
+                c.Messages.Any(m => m.Content.ToLower().Contains(term)));
+        }
+
+        var conversations = await query
+            .OrderByDescending(c => c.IsPinned)
+            .ThenByDescending(c => c.PinnedAt)
+            .ThenByDescending(c => c.UpdatedAt)
             .Skip(offset).Take(limit)
             .Select(c => new
             {
                 c.Id, c.Title, c.RepositoryId, c.CreatedAt, c.UpdatedAt,
+                c.IsPinned, c.PinnedAt,
                 messageCount = c.Messages.Count
             })
             .ToListAsync(ct);
@@ -86,6 +100,7 @@ public class ChatController : ControllerBase
         {
             conversation.Id, conversation.Title, conversation.RepositoryId,
             conversation.CreatedAt, conversation.UpdatedAt,
+            conversation.IsPinned, conversation.PinnedAt,
             messages = conversation.Messages.OrderBy(m => m.CreatedAt).Select(m => new
             {
                 m.Id, m.Role, m.Content, m.SourcesJson, m.CreatedAt
@@ -107,6 +122,34 @@ public class ChatController : ControllerBase
         _context.ChatConversations.Remove(conversation);
         await _context.SaveChangesAsync(ct);
         return NoContent();
+    }
+
+    /// <summary>Update a conversation (title and/or pinned status).</summary>
+    [RequirePermission("search:read")]
+    [HttpPatch("conversations/{id:guid}")]
+    public async Task<IActionResult> UpdateConversation(
+        Guid id, [FromBody] UpdateConversationRequest request, CancellationToken ct = default)
+    {
+        var userId = GetUserId();
+        var conversation = await _context.ChatConversations
+            .FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId, ct);
+
+        if (conversation is null) return NotFound();
+
+        if (request.Title is not null)
+        {
+            conversation.Title = request.Title;
+        }
+
+        if (request.IsPinned.HasValue)
+        {
+            conversation.IsPinned = request.IsPinned.Value;
+            conversation.PinnedAt = request.IsPinned.Value ? DateTimeOffset.UtcNow : null;
+        }
+
+        conversation.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(ct);
+        return Ok(new { conversation.Id, conversation.Title, conversation.IsPinned, conversation.PinnedAt });
     }
 
     /// <summary>Rename a conversation.</summary>
@@ -137,3 +180,5 @@ public class ChatController : ControllerBase
 }
 
 public record RenameRequest(string Title);
+
+public record UpdateConversationRequest(string? Title = null, bool? IsPinned = null);

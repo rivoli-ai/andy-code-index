@@ -4,7 +4,9 @@ using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.CodeIndex.Infrastructure.Data;
 using ModelContextProtocol.Server;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Andy.CodeIndex.Api.Mcp;
@@ -18,6 +20,10 @@ public class CodeIndexTools
     private readonly IGitService _gitService;
     private readonly IChatService _chatService;
     private readonly ICommitRepository _commitRepo;
+    private readonly IIndexingTaskRepository _taskRepo;
+    private readonly IRepoDiscoveryService _discoveryService;
+    private readonly IQuestionClassifier _questionClassifier;
+    private readonly CodeIndexDbContext _dbContext;
     private readonly IndexingOptions _options;
 
     public CodeIndexTools(
@@ -27,6 +33,10 @@ public class CodeIndexTools
         IGitService gitService,
         IChatService chatService,
         ICommitRepository commitRepo,
+        IIndexingTaskRepository taskRepo,
+        IRepoDiscoveryService discoveryService,
+        IQuestionClassifier questionClassifier,
+        CodeIndexDbContext dbContext,
         IOptions<IndexingOptions> options)
     {
         _repoService = repoService;
@@ -35,6 +45,10 @@ public class CodeIndexTools
         _gitService = gitService;
         _chatService = chatService;
         _commitRepo = commitRepo;
+        _taskRepo = taskRepo;
+        _discoveryService = discoveryService;
+        _questionClassifier = questionClassifier;
+        _dbContext = dbContext;
         _options = options.Value;
     }
 
@@ -425,6 +439,291 @@ public class CodeIndexTools
 
         var counts = await _enrichmentService.GetCountsBySubtypeAsync(repositoryId: repoId);
         return new { total = counts.Values.Sum(), counts };
+    }
+
+    [McpServerTool(Name = "code_index_get_repository"), Description("Get detailed information about a specific repository including branches, tags, and stats")]
+    public async Task<object> GetRepository(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var details = await _repoService.GetDetailsByIdAsync(repo.Id);
+        if (details is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        return new
+        {
+            details.Id, details.Name, details.Url,
+            provider = details.Provider.ToString(),
+            details.DefaultBranch, details.LastIndexedCommitSha,
+            details.LastSyncedAt, details.Status,
+            stats = details.Stats,
+            branches = details.Branches?.Select(b => new { b.Name, b.HeadCommitSha, b.IsDefault }),
+            tags = details.Tags?.Select(t => new { t.Name, t.CommitSha })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_hybrid_search"), Description("Search code using hybrid mode combining semantic similarity and keyword matching via Reciprocal Rank Fusion")]
+    public async Task<object> HybridSearch(
+        [Description("Search query")] string query,
+        [Description("Programming language filter")] string? language = null,
+        [Description("Repository URL to search within")] string? source_repo = null,
+        [Description("Maximum results to return")] int? limit = null)
+    {
+        var filter = await BuildSearchFilter(language, source_repo);
+        var results = await _searchService.HybridSearchAsync(query, filter, limit ?? 10);
+        return FormatSearchResults(results);
+    }
+
+    [McpServerTool(Name = "code_index_query_enrichments"), Description("Query enrichments with filters for type, subtype, repository, language, and file path")]
+    public async Task<object> QueryEnrichments(
+        [Description("Enrichment type filter (e.g., Code, Documentation)")] string? type = null,
+        [Description("Enrichment subtype filter (e.g., Chunk, APIDocs, Physical)")] string? subtype = null,
+        [Description("Repository URL or name")] string? repo_url = null,
+        [Description("Programming language filter")] string? language = null,
+        [Description("File path filter")] string? file_path = null,
+        [Description("Offset for pagination")] int? offset = null,
+        [Description("Maximum results to return")] int? limit = null)
+    {
+        Guid? repoId = null;
+        if (repo_url is not null)
+        {
+            var repo = await ResolveRepo(repo_url);
+            if (repo is not null) repoId = repo.Id;
+        }
+
+        EnrichmentType? parsedType = type is not null && Enum.TryParse<EnrichmentType>(type, true, out var t) ? t : null;
+        EnrichmentSubtype? parsedSubtype = subtype is not null && Enum.TryParse<EnrichmentSubtype>(subtype, true, out var s) ? s : null;
+
+        var results = await _enrichmentService.QueryAsync(
+            parsedType, parsedSubtype, repoId, null, language, file_path, offset ?? 0, limit ?? 50);
+        var total = await _enrichmentService.QueryCountAsync(
+            parsedType, parsedSubtype, repoId, null, language, file_path);
+
+        return new
+        {
+            results = results.Select(r => new { r.Id, r.Title, r.Content, r.FilePath, r.Language, r.StartLine, r.EndLine, type = r.Type.ToString(), subtype = r.Subtype.ToString() }),
+            totalCount = total,
+            offset = offset ?? 0,
+            limit = limit ?? 50
+        };
+    }
+
+    [McpServerTool(Name = "code_index_get_enrichment"), Description("Get a specific enrichment by its ID with full content")]
+    public async Task<object> GetEnrichment(
+        [Description("Enrichment ID (GUID)")] string enrichment_id)
+    {
+        if (!Guid.TryParse(enrichment_id, out var id))
+            return new { error = "Invalid enrichment ID format. Expected a GUID." };
+
+        var enrichment = await _enrichmentService.GetByIdAsync(id);
+        if (enrichment is null)
+            return new { error = $"Enrichment '{enrichment_id}' not found" };
+
+        return new
+        {
+            enrichment.Id, enrichment.Title, enrichment.Content,
+            enrichment.FilePath, enrichment.Language,
+            enrichment.StartLine, enrichment.EndLine,
+            type = enrichment.Type.ToString(),
+            subtype = enrichment.Subtype.ToString(),
+            enrichment.RepositoryName, enrichment.Quality,
+            enrichment.CreatedAt
+        };
+    }
+
+    [McpServerTool(Name = "code_index_chat_suggestions"), Description("Get suggested questions organized by dimension for the chat interface")]
+    public object GetChatSuggestions()
+    {
+        var suggestions = _questionClassifier.GetSuggestions();
+        return new
+        {
+            dimensions = suggestions.Select(d => new
+            {
+                d.Id, d.Label,
+                questions = d.Questions.Select(q => new { q.Id, q.Text })
+            })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_chat_status"), Description("Check if the chat feature is available (LLM configured)")]
+    public object GetChatStatus()
+    {
+        return new { available = _chatService.IsAvailable };
+    }
+
+    [McpServerTool(Name = "code_index_queue_tasks"), Description("List all indexing tasks in the queue with their status and progress")]
+    public async Task<object> ListQueueTasks()
+    {
+        var tasks = await _taskRepo.GetAllAsync();
+        return new
+        {
+            total = tasks.Count,
+            tasks = tasks
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new
+                {
+                    t.Id, t.RepositoryId, t.CommitId,
+                    operation = t.Operation.ToString(),
+                    status = t.Status.ToString(),
+                    t.Progress, t.ErrorMessage, t.ChainId, t.Priority,
+                    t.CreatedAt, t.StartedAt, t.CompletedAt
+                })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_queue_task"), Description("Get details of a specific indexing task by ID")]
+    public async Task<object> GetQueueTask(
+        [Description("Task ID (GUID)")] string task_id)
+    {
+        if (!Guid.TryParse(task_id, out var id))
+            return new { error = "Invalid task ID format. Expected a GUID." };
+
+        var task = await _taskRepo.GetByIdAsync(id);
+        if (task is null)
+            return new { error = $"Task '{task_id}' not found" };
+
+        return new
+        {
+            task.Id, task.RepositoryId, task.CommitId,
+            operation = task.Operation.ToString(),
+            status = task.Status.ToString(),
+            task.Progress, task.ErrorMessage, task.ChainId, task.Priority,
+            task.CreatedAt, task.StartedAt, task.CompletedAt
+        };
+    }
+
+    [McpServerTool(Name = "code_index_get_commit"), Description("Get details of a specific commit by SHA")]
+    public async Task<object> GetCommit(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Commit SHA")] string sha)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var commit = await _commitRepo.GetByShaAsync(repo.Id, sha);
+        if (commit is null)
+            return new { error = $"Commit '{sha}' not found in repository '{repo_url}'" };
+
+        return new
+        {
+            commit.Id, commit.Sha, commit.Message,
+            commit.AuthorName, commit.AuthorEmail,
+            commit.CommittedAt, commit.IsIndexed
+        };
+    }
+
+    [McpServerTool(Name = "code_index_discover_github"), Description("Discover repositories in a GitHub organization")]
+    public async Task<object> DiscoverGitHub(
+        [Description("GitHub organization name")] string org,
+        [Description("Personal access token (optional, for private repos)")] string? pat = null,
+        [Description("Exclude archived repositories")] bool? exclude_archived = null,
+        [Description("Exclude forked repositories")] bool? exclude_forks = null)
+    {
+        var repos = await _discoveryService.DiscoverGitHubAsync(
+            org, pat, exclude_archived ?? true, exclude_forks ?? true);
+        return new
+        {
+            organization = org,
+            total = repos.Count,
+            repositories = repos.Select(r => new
+            {
+                r.Name, r.FullName, r.CloneUrl, r.Provider,
+                r.DefaultBranch, r.Description,
+                r.IsArchived, r.IsFork, r.AlreadyTracked
+            })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_discover_azure_devops"), Description("Discover repositories in an Azure DevOps organization")]
+    public async Task<object> DiscoverAzureDevOps(
+        [Description("Azure DevOps organization name")] string org,
+        [Description("Project name (optional, discovers all projects if omitted)")] string? project = null,
+        [Description("Personal access token (optional)")] string? pat = null)
+    {
+        var repos = await _discoveryService.DiscoverAzureDevOpsAsync(org, project, pat);
+        return new
+        {
+            organization = org,
+            project,
+            total = repos.Count,
+            repositories = repos.Select(r => new
+            {
+                r.Name, r.FullName, r.CloneUrl, r.Provider,
+                r.DefaultBranch, r.Description,
+                r.IsArchived, r.IsFork, r.AlreadyTracked
+            })
+        };
+    }
+
+    [McpServerTool(Name = "code_index_discover_sync"), Description("Add discovered repositories for indexing")]
+    public async Task<object> SyncDiscovered(
+        [Description("List of repository URLs to add")] List<string> repository_urls,
+        [Description("Personal access token for private repos")] string? pat = null)
+    {
+        var added = new List<object>();
+        var skipped = new List<string>();
+
+        foreach (var url in repository_urls)
+        {
+            try
+            {
+                var repo = await _repoService.AddAsync(
+                    new CreateRepositoryRequest { Url = url, PersonalAccessToken = pat });
+                added.Add(new { repo.Id, repo.Name, repo.Url, repo.Status });
+            }
+            catch (InvalidOperationException)
+            {
+                skipped.Add(url);
+            }
+        }
+
+        return new
+        {
+            added = added,
+            addedCount = added.Count,
+            skipped = skipped,
+            skippedCount = skipped.Count
+        };
+    }
+
+    [McpServerTool(Name = "code_index_indexing_history"), Description("Get indexing run history for a repository")]
+    public async Task<object> GetIndexingHistory(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Maximum history entries to return")] int? limit = null)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var runs = await _dbContext.IndexingRuns
+            .Where(r => r.RepositoryId == repo.Id)
+            .OrderByDescending(r => r.StartedAt)
+            .Take(limit ?? 20)
+            .Select(r => new
+            {
+                r.Id, r.RepositoryId,
+                r.StartedAt, r.CompletedAt,
+                durationSeconds = r.CompletedAt.HasValue
+                    ? (r.CompletedAt.Value - r.StartedAt).TotalSeconds
+                    : (double?)null,
+                r.Status,
+                r.SnippetsAdded, r.SnippetsUpdated,
+                r.SnippetsDeleted, r.SnippetsUnchanged,
+                r.ApiDocsGenerated, r.CommitsScanned,
+                r.ErrorMessage
+            })
+            .ToListAsync();
+
+        return new
+        {
+            repository = repo.Name,
+            total = runs.Count,
+            runs
+        };
     }
 
     // --- Helpers ---
