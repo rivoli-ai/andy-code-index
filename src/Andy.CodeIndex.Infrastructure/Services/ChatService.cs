@@ -232,11 +232,13 @@ Examples:
 You can fetch up to {_fileAccessOptions.MaxFilesPerTurn} files per turn. Provide line-referenced answers when citing source code.
 
 You also have these tools:
-- `get_committers`: returns all unique committers/contributors with commit counts and date ranges. Use for questions about contributors, authors, or team members.
-- `get_commits`: returns recent commits with SHA, message, author, and date. Use for questions about recent changes, history, or what was modified. Accepts optional repository_name and limit.
-- `get_commit_details`: returns details about a specific commit including its enrichments. Use to understand what happened in a particular commit. Requires repository_name and sha.
+- `get_committers`: returns unique committers/contributors with commit counts and date ranges.
+- `get_commits`: returns recent commits with SHA, message, author, date. Accepts optional repository_name and limit.
+- `get_commit_details`: returns details about a specific commit and its enrichments. Requires repository_name and sha.
+- `list_files`: lists files in a repository, filterable by path pattern (e.g., 'test', 'migration', 'schema'). Use to explore repo structure.
+- `search_code`: searches indexed code by keywords. Returns matching snippets with file paths and line numbers.
 
-Always use these tools to answer questions about commits, contributors, and history — never say you don't have access to this data.";
+IMPORTANT: Always use these tools to answer questions. Never say you don't have access to data — you have full access to commit history, file listings, and code search. Use list_files to find tests, migrations, schemas, configs. Use search_code to find specific code patterns.";
         }
 
         var systemPrompt = $@"You are a code assistant with access to indexed source code repositories. Answer questions about the codebase using the provided context. Be specific, reference file paths and line numbers when relevant. If you don't have enough context, say so.
@@ -412,6 +414,16 @@ Always use these tools to answer questions about commits, contributors, and hist
         if (toolCall.Function?.Name == "get_commit_details")
         {
             return await ProcessGetCommitDiffAsync(toolCall.Function.Arguments, ct);
+        }
+
+        if (toolCall.Function?.Name == "list_files")
+        {
+            return await ProcessListFilesAsync(request, toolCall.Function.Arguments, ct);
+        }
+
+        if (toolCall.Function?.Name == "search_code")
+        {
+            return await ProcessSearchCodeAsync(request, toolCall.Function.Arguments, ct);
         }
 
         if (toolCall.Function?.Name != "get_file")
@@ -660,6 +672,89 @@ Always use these tools to answer questions about commits, contributors, and hist
         }
     }
 
+    private async Task<string> ProcessListFilesAsync(ChatRequest request, string? arguments, CancellationToken ct)
+    {
+        string? pattern = null, repoName = null;
+        if (!string.IsNullOrEmpty(arguments))
+        {
+            try
+            {
+                var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(arguments,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (args?.TryGetValue("pattern", out var p) == true) pattern = p.GetString();
+                if (args?.TryGetValue("repository_name", out var rn) == true) repoName = rn.GetString();
+            }
+            catch { }
+        }
+
+        // Resolve repo
+        Guid? repoId = request.RepositoryId;
+        if (!repoId.HasValue && !string.IsNullOrEmpty(repoName))
+        {
+            var repo = await _context.Repositories.FirstOrDefaultAsync(r => r.Name == repoName, ct);
+            repoId = repo?.Id;
+        }
+
+        if (!repoId.HasValue)
+            return JsonSerializer.Serialize(new { error = "No repository specified. Provide repository_name." });
+
+        // Query RepositoryFile records from DB (no git process needed)
+        var query = _context.Set<Domain.Entities.RepositoryFile>()
+            .Where(f => f.Commit.RepositoryId == repoId.Value);
+
+        if (!string.IsNullOrEmpty(pattern))
+            query = query.Where(f => EF.Functions.ILike(f.Path, $"%{pattern}%"));
+
+        var files = await query
+            .OrderBy(f => f.Path)
+            .Take(100)
+            .Select(f => new { f.Path, f.Size, f.Language })
+            .ToListAsync(ct);
+
+        return JsonSerializer.Serialize(new { count = files.Count, files = files });
+    }
+
+    private async Task<string> ProcessSearchCodeAsync(ChatRequest request, string? arguments, CancellationToken ct)
+    {
+        string? query = null, repoName = null;
+        if (!string.IsNullOrEmpty(arguments))
+        {
+            try
+            {
+                var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(arguments,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (args?.TryGetValue("query", out var q) == true) query = q.GetString();
+                if (args?.TryGetValue("repository_name", out var rn) == true) repoName = rn.GetString();
+            }
+            catch { }
+        }
+
+        if (string.IsNullOrEmpty(query))
+            return JsonSerializer.Serialize(new { error = "Missing query parameter" });
+
+        var filter = new SearchFilter();
+        Guid? repoId = request.RepositoryId;
+        if (!repoId.HasValue && !string.IsNullOrEmpty(repoName))
+        {
+            var repo = await _context.Repositories.FirstOrDefaultAsync(r => r.Name == repoName, ct);
+            repoId = repo?.Id;
+        }
+        if (repoId.HasValue)
+            filter.RepositoryIds = [repoId.Value];
+
+        var results = await _searchService.KeywordSearchAsync(query, filter, limit: 10, ct);
+
+        return JsonSerializer.Serialize(new
+        {
+            total = results.TotalCount,
+            results = results.Results.Select(r => new
+            {
+                r.FilePath, r.StartLine, r.EndLine, r.Language, r.RepositoryName,
+                content = r.Content.Length > 500 ? r.Content[..500] + "..." : r.Content
+            })
+        });
+    }
+
     private static List<object> BuildToolDefinitions(bool hasRepoContext)
     {
         var tools = new List<object>();
@@ -752,6 +847,46 @@ Always use these tools to answer questions about commits, contributors, and hist
                         ["sha"] = new { type = "string", description = "Commit SHA (full or abbreviated)" }
                     },
                     required = new[] { "repository_name", "sha" }
+                }
+            }
+        });
+
+        tools.Add(new
+        {
+            type = "function",
+            function = new
+            {
+                name = "list_files",
+                description = "List files in a repository, optionally filtered by a path pattern. Use this to explore the repository structure, find test files, config files, migrations, etc.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new Dictionary<string, object>
+                    {
+                        ["repository_name"] = new { type = "string", description = "Repository name" },
+                        ["pattern"] = new { type = "string", description = "Filter files by path pattern (e.g., 'test', 'migration', '.config')" }
+                    },
+                    required = Array.Empty<string>()
+                }
+            }
+        });
+
+        tools.Add(new
+        {
+            type = "function",
+            function = new
+            {
+                name = "search_code",
+                description = "Search for code across the indexed repositories using keyword search. Returns matching code snippets with file paths and line numbers.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new Dictionary<string, object>
+                    {
+                        ["query"] = new { type = "string", description = "Search query (keywords to find in code)" },
+                        ["repository_name"] = new { type = "string", description = "Repository name (optional, searches all if omitted)" }
+                    },
+                    required = new[] { "query" }
                 }
             }
         });
