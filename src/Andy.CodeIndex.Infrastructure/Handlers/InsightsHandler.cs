@@ -62,9 +62,19 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
         var layers = GetInsightLayers(repo, existingContext, codeContext);
         var generatedCount = 0;
 
+        const string systemInstruction = """
+            IMPORTANT RULES:
+            - Output ONLY the requested content in well-formatted markdown.
+            - Do NOT include any preamble, explanation, or meta-commentary about what you are doing.
+            - Do NOT say "I'll analyze..." or "Based on the provided context..." or similar.
+            - Do NOT output raw JSON unless the format specifically requests it — prefer markdown tables.
+            - Start directly with the content (headings, lists, diagrams).
+            - Use the provided context to give specific, accurate analysis — not generic templates.
+            """;
+
         foreach (var layer in layers)
         {
-            var prompt = layer.Prompt;
+            var prompt = systemInstruction + "\n\n" + layer.Prompt;
             var reply = await CallLlmAsync(apiKey, model, prompt, ct);
             if (string.IsNullOrEmpty(reply)) continue;
 
@@ -141,8 +151,8 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                 Prompt = $"""
                     Analyze the repository "{repoName}" and create a structured feature inventory.
                     For each feature, assign a stable ID in format feat:[category]:[name] (e.g., feat:auth:login, feat:search:semantic).
-                    Include: ID, name, description, entry files, status (active/deprecated), complexity (low/medium/high).
-                    Format as a JSON array.
+                    Present as a markdown table with columns: ID, Feature Name, Description, Entry Files, Status (active/deprecated), Complexity (low/medium/high).
+                    Group features by category with section headings.
 
                     Existing knowledge:
                     {existingContext}

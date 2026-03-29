@@ -235,7 +235,7 @@ interface CommitComparison {
             <button class="btn btn-secondary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
               <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
             </button>
-            <a *ngIf="reportData" [href]="'/api/v1/repositories/' + repo.id + '/report/html'" target="_blank" class="btn btn-secondary btn-sm">
+            <button *ngIf="reportData" (click)="exportHtml()" class="btn btn-secondary btn-sm">
               <i class="bi bi-download"></i> Export HTML
             </a>
             <button *ngIf="insightLayers.length > 0" class="btn btn-secondary btn-sm" (click)="printReport()">
@@ -1175,6 +1175,22 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
    */
   printReport() {
     window.print();
+  }
+
+  exportHtml() {
+    if (!this.repo) return;
+    this.http.get(`${environment.apiUrl}/repositories/${this.repo.id}/report/html`, { responseType: 'text' }).subscribe({
+      next: (html) => {
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.repo!.name}-insight-report.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (err) => { console.error('Export failed', err); }
+    });
   }
 
   getInsightLabel(subtype: string): string {
