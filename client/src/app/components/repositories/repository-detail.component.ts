@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, AfterViewChecked, ElementRef, NgZone, ViewEncapsulation } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
 import { Repository } from '../../models/repository.model';
 import { RepositoryHistoryComponent } from './repository-history.component';
@@ -219,76 +220,191 @@ interface CommitComparison {
       </div><!-- End Overview Tab -->
 
       <!-- Insights Tab -->
-      <div *ngIf="activeTab === 'Insights'">
-      <div class="card" style="margin-top:1.5rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-          <h3 style="font-size:1rem;margin:0">Insights & Report</h3>
-          <div style="display:flex;gap:0.5rem">
-            <button class="btn btn-secondary" (click)="generateInsights()" [disabled]="generatingInsights" style="font-size:var(--font-xs)">
-              <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating (' + insightLayers.length + '/10)...' : (insightLayers.length > 0 ? 'Regenerate Insights' : 'Generate Insights') }}
+      <div *ngIf="activeTab === 'Insights'" class="insights-tab">
+
+        <!-- Toolbar -->
+        <div class="insights-toolbar">
+          <div class="insights-toolbar-left">
+            <i class="bi bi-journal-richtext" style="font-size:1.125rem;color:var(--primary)"></i>
+            <span style="font-weight:600;font-size:var(--font-sm)">Repository Insights Report</span>
+          </div>
+          <div class="insights-toolbar-right">
+            <button class="btn btn-secondary btn-sm" (click)="generateInsights()" [disabled]="generatingInsights">
+              <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating (' + insightLayers.length + '/10)...' : (insightLayers.length > 0 ? 'Regenerate' : 'Generate Insights') }}
             </button>
-            <button class="btn btn-secondary" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length" style="font-size:var(--font-xs)">
+            <button class="btn btn-secondary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
               <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
             </button>
-            <a *ngIf="reportData" [href]="'/api/v1/repositories/' + repo.id + '/report/html'" target="_blank" class="btn btn-secondary" style="font-size:var(--font-xs)">
+            <a *ngIf="reportData" [href]="'/api/v1/repositories/' + repo.id + '/report/html'" target="_blank" class="btn btn-secondary btn-sm">
               <i class="bi bi-download"></i> Export HTML
             </a>
-          </div>
-        </div>
-
-        <!-- Health Score -->
-        <div *ngIf="reportData" style="display:flex;gap:2rem;align-items:center;margin-bottom:1.5rem;padding:1rem;background:var(--background-alt);border-radius:var(--radius)">
-          <div style="text-align:center">
-            <div style="font-size:2.5rem;font-weight:700" [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
-              {{ reportData.overallHealthScore }}
-            </div>
-            <div class="text-muted" style="font-size:var(--font-xs)">Health Score</div>
-          </div>
-          <div *ngIf="reportData.velocity" style="display:flex;gap:1.5rem">
-            <div class="stat"><div class="stat-value">{{ reportData.velocity.commitsPerMonth }}</div><div class="stat-label">Commits/Month</div></div>
-            <div class="stat"><div class="stat-value">{{ reportData.velocity.activeContributors }}</div><div class="stat-label">Active Contributors</div></div>
-          </div>
-          <div *ngIf="reportData.top5Improvements?.length" style="flex:1">
-            <div class="text-muted" style="font-size:var(--font-xs);font-weight:600;margin-bottom:0.375rem">Top Improvements</div>
-            <div *ngFor="let imp of reportData.top5Improvements; let i = index" style="font-size:var(--font-xs);margin-bottom:0.125rem">
-              {{ i + 1 }}. {{ imp.title }}
-              <span class="badge badge-muted" style="font-size:0.65rem;margin-left:0.25rem">{{ imp.impact }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Insight Layer Tabs -->
-        <div *ngIf="insightLayers.length > 0">
-          <div style="display:flex;flex-wrap:wrap;gap:0.375rem;margin-bottom:1rem">
-            <button *ngFor="let layer of insightLayers" class="badge" style="cursor:pointer;border:none"
-                    [ngClass]="selectedInsightLayer === layer.subtype ? 'badge-primary' : 'badge-muted'"
-                    (click)="selectedInsightLayer = layer.subtype">
-              {{ getInsightLabel(layer.subtype) }}
-              <span *ngIf="getLayerRating(layer.subtype)" style="margin-left:0.25rem">{{ getLayerRating(layer.subtype) }}/5</span>
+            <button *ngIf="insightLayers.length > 0" class="btn btn-secondary btn-sm" (click)="printReport()">
+              <i class="bi bi-printer"></i> Print
             </button>
           </div>
+        </div>
 
-          <!-- Layer Content -->
-          <div *ngFor="let layer of insightLayers">
-            <div *ngIf="selectedInsightLayer === layer.subtype">
-              <!-- Layer Ratings -->
-              <div *ngIf="getLayerReport(layer.subtype) as lr" style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
-                <span class="badge badge-muted"><i class="bi bi-bar-chart"></i> Maturity: {{ lr.maturityRating }}/5</span>
-                <span class="badge badge-muted"><i class="bi bi-star"></i> Quality: {{ lr.qualityRating }}/5</span>
-                <span class="badge" [ngClass]="lr.riskRating >= 4 ? 'badge-danger' : lr.riskRating >= 3 ? 'badge-warning' : 'badge-success'">
-                  <i class="bi bi-shield"></i> Risk: {{ lr.riskRating }}/5
+        <!-- Empty State -->
+        <div *ngIf="insightLayers.length === 0 && !generatingInsights" class="insights-empty card">
+          <i class="bi bi-lightbulb" style="font-size:2.5rem;color:var(--text-light);margin-bottom:1rem;display:block"></i>
+          <h3 style="font-size:var(--font-lg);margin-bottom:0.5rem">No insights yet</h3>
+          <p class="text-muted" style="font-size:var(--font-xs);margin-bottom:1.25rem">Click "Generate Insights" to analyze this repository and produce a comprehensive report.</p>
+          <button class="btn btn-primary" (click)="generateInsights()" [disabled]="generatingInsights">
+            <i class="bi bi-lightbulb"></i> Generate Insights
+          </button>
+        </div>
+
+        <!-- Report Document -->
+        <div *ngIf="insightLayers.length > 0" class="insights-document-wrapper" id="insightsDocumentWrapper">
+
+          <!-- TOC Sidebar -->
+          <nav class="insights-toc" id="insightsToc">
+            <div class="insights-toc-title">Contents</div>
+            <a *ngIf="reportData" class="insights-toc-item"
+               [class.active]="activeTocSection === 'report-summary'"
+               (click)="scrollToSection('report-summary', $event)">
+              <i class="bi bi-speedometer2"></i> Summary
+            </a>
+            <a *ngFor="let layer of insightLayers; let i = index"
+               class="insights-toc-item"
+               [class.active]="activeTocSection === 'layer-' + layer.subtype"
+               (click)="scrollToSection('layer-' + layer.subtype, $event)">
+              <span class="insights-toc-num">{{ i + 1 }}</span>
+              {{ getInsightLabel(layer.subtype) }}
+              <span *ngIf="getLayerRating(layer.subtype) as rating" class="insights-toc-rating">
+                {{ getStarRating(rating) }}
+              </span>
+            </a>
+          </nav>
+
+          <!-- Content Area -->
+          <div class="insights-content-area" id="insightsContentArea" (scroll)="onInsightsScroll($event)">
+
+            <!-- Health Score Header -->
+            <div *ngIf="reportData" class="insights-section" id="report-summary">
+              <div class="insights-health-header">
+                <div class="insights-health-score"
+                     [style.borderColor]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+                  <div class="insights-health-number"
+                       [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+                    {{ reportData.overallHealthScore }}
+                  </div>
+                  <div class="insights-health-label">Health Score</div>
+                  <div class="insights-health-stars" *ngIf="reportData.overallHealthScore != null">
+                    {{ getStarRating(Math.round(reportData.overallHealthScore / 20)) }}
+                  </div>
+                </div>
+
+                <div class="insights-health-details">
+                  <!-- Star Ratings Summary -->
+                  <div class="insights-ratings-summary" *ngIf="reportData.layers?.length">
+                    <div *ngFor="let lr of reportData.layers" class="insights-rating-row">
+                      <span class="insights-rating-label">{{ getInsightLabel(lr.subtype) }}</span>
+                      <span class="insights-rating-stars">{{ getStarRating(lr.qualityRating) }}</span>
+                      <span class="insights-rating-value">{{ lr.qualityRating }}/5</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Velocity Metrics -->
+              <div *ngIf="reportData.velocity" class="insights-velocity-row">
+                <div class="insights-velocity-item">
+                  <div class="insights-velocity-value">{{ reportData.velocity.commitsPerMonth }}</div>
+                  <div class="insights-velocity-label">Commits/Month</div>
+                </div>
+                <div class="insights-velocity-item">
+                  <div class="insights-velocity-value">{{ reportData.velocity.activeContributors }}</div>
+                  <div class="insights-velocity-label">Active Contributors</div>
+                </div>
+                <div class="insights-velocity-item" *ngIf="reportData.velocity.averageCommitsPerDay != null">
+                  <div class="insights-velocity-value">{{ reportData.velocity.averageCommitsPerDay | number:'1.1-1' }}</div>
+                  <div class="insights-velocity-label">Commits/Day</div>
+                </div>
+                <div class="insights-velocity-item" *ngIf="reportData.velocity.deployFrequency">
+                  <div class="insights-velocity-value">{{ reportData.velocity.deployFrequency }}</div>
+                  <div class="insights-velocity-label">Deploy Frequency</div>
+                </div>
+              </div>
+
+              <!-- Top 5 Improvements -->
+              <div *ngIf="reportData.top5Improvements?.length" class="insights-improvements">
+                <h3 class="insights-improvements-title">
+                  <i class="bi bi-arrow-up-circle"></i> Top Improvements
+                </h3>
+                <div *ngFor="let imp of reportData.top5Improvements; let i = index" class="insights-improvement-item">
+                  <span class="insights-improvement-num">{{ i + 1 }}</span>
+                  <div class="insights-improvement-body">
+                    <div class="insights-improvement-title">{{ imp.title }}</div>
+                    <div *ngIf="imp.description" class="insights-improvement-desc">{{ imp.description }}</div>
+                  </div>
+                  <span class="badge insights-impact-badge"
+                        [ngClass]="imp.impact === 'high' || imp.impact === 'critical' ? 'badge-danger' : imp.impact === 'medium' ? 'badge-warning' : 'badge-info'"
+                        style="font-size:0.6875rem;text-transform:capitalize">{{ imp.impact }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Each Insight Layer Section -->
+            <div *ngFor="let layer of insightLayers; let idx = index"
+                 class="insights-section insights-layer-section"
+                 [id]="'layer-' + layer.subtype">
+
+              <!-- Section Heading -->
+              <div class="insights-layer-heading">
+                <div class="insights-layer-heading-left">
+                  <span class="insights-layer-num">{{ idx + 1 }}</span>
+                  <h2 class="insights-layer-title">{{ getInsightLabel(layer.subtype) }}</h2>
+                </div>
+                <div class="insights-layer-stars" *ngIf="getLayerRating(layer.subtype) as rating">
+                  {{ getStarRating(rating) }}
+                </div>
+              </div>
+
+              <!-- Ratings Badges -->
+              <div *ngIf="getLayerReport(layer.subtype) as lr" class="insights-layer-badges">
+                <span class="badge insights-badge-maturity"
+                      [ngClass]="lr.maturityRating >= 4 ? 'badge-success' : lr.maturityRating >= 3 ? 'badge-warning' : 'badge-danger'">
+                  <i class="bi bi-bar-chart-fill"></i> Maturity {{ lr.maturityRating }}/5
+                </span>
+                <span class="badge insights-badge-quality"
+                      [ngClass]="lr.qualityRating >= 4 ? 'badge-success' : lr.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'">
+                  <i class="bi bi-star-fill"></i> Quality {{ lr.qualityRating }}/5
+                </span>
+                <span class="badge insights-badge-risk"
+                      [ngClass]="lr.riskRating <= 2 ? 'badge-success' : lr.riskRating <= 3 ? 'badge-warning' : 'badge-danger'">
+                  <i class="bi bi-shield-fill"></i> Risk {{ lr.riskRating }}/5
                 </span>
               </div>
-              <!-- Content -->
-              <div class="insight-content" style="font-size:var(--font-xs);line-height:1.6;max-height:600px;overflow-y:auto;padding:1rem;background:var(--background-alt);border-radius:var(--radius)" [innerHTML]="renderMarkdown(layer.content || layer.Content)"></div>
-            </div>
-          </div>
-        </div>
 
-        <div *ngIf="insightLayers.length === 0 && !generatingInsights" class="text-muted" style="font-size:var(--font-sm);padding:1rem 0;text-align:center">
-          No insights yet. Click "Generate Insights" to analyze this repository.
-        </div>
-      </div>
+              <!-- Strengths / Weaknesses / Recommendations -->
+              <div *ngIf="getLayerReport(layer.subtype) as lr" class="insights-layer-meta">
+                <div *ngIf="lr.strengths?.length" class="insights-meta-block">
+                  <div class="insights-meta-title insights-meta-strengths"><i class="bi bi-check-circle-fill"></i> Strengths</div>
+                  <ul class="insights-meta-list">
+                    <li *ngFor="let s of lr.strengths" class="insights-strength-item">{{ s }}</li>
+                  </ul>
+                </div>
+                <div *ngIf="lr.weaknesses?.length" class="insights-meta-block">
+                  <div class="insights-meta-title insights-meta-weaknesses"><i class="bi bi-exclamation-triangle-fill"></i> Weaknesses</div>
+                  <ul class="insights-meta-list">
+                    <li *ngFor="let w of lr.weaknesses" class="insights-weakness-item">{{ w }}</li>
+                  </ul>
+                </div>
+                <div *ngIf="lr.recommendations?.length" class="insights-meta-block">
+                  <div class="insights-meta-title insights-meta-recommendations"><i class="bi bi-arrow-right-circle-fill"></i> Recommendations</div>
+                  <ul class="insights-meta-list">
+                    <li *ngFor="let r of lr.recommendations" class="insights-recommendation-item">{{ r }}</li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Rendered Markdown Content -->
+              <div class="insights-layer-content" [innerHTML]="renderInsightHtml(layer)"></div>
+            </div>
+
+          </div><!-- End Content Area -->
+        </div><!-- End Document Wrapper -->
 
       </div><!-- End Insights Tab -->
 
@@ -309,6 +425,7 @@ interface CommitComparison {
       <a routerLink="/repositories" class="btn btn-primary mt-2">Back to Repositories</a>
     </div>
   `,
+  encapsulation: ViewEncapsulation.None,
   styles: [`
     .detail-row { display: flex; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
     .detail-row:last-child { border-bottom: none; }
@@ -324,9 +441,287 @@ interface CommitComparison {
     .stat-badge.deleted { background: rgba(220,53,69,0.1); color: var(--danger); }
     .compare-item { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
     .compare-item:last-child { border-bottom: none; }
+
+    /* ===== Insights Tab Styles ===== */
+
+    .insights-toolbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); margin-bottom: 1rem; box-shadow: var(--shadow);
+    }
+    .insights-toolbar-left { display: flex; align-items: center; gap: 0.5rem; }
+    .insights-toolbar-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+    .insights-empty { text-align: center; padding: 3rem 2rem; }
+
+    /* Document Wrapper: TOC + Content side by side */
+    .insights-document-wrapper {
+      display: flex; gap: 0; min-height: 70vh;
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      background: var(--surface); box-shadow: var(--shadow); overflow: hidden;
+    }
+
+    /* TOC Sidebar */
+    .insights-toc {
+      width: 220px; min-width: 220px; padding: 1.25rem 0;
+      border-right: 1px solid var(--border); background: var(--background-alt);
+      position: sticky; top: 0; align-self: flex-start; max-height: 85vh; overflow-y: auto;
+    }
+    .insights-toc-title {
+      font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-muted); padding: 0 1rem; margin-bottom: 0.75rem;
+    }
+    .insights-toc-item {
+      display: flex; align-items: center; gap: 0.375rem; padding: 0.5rem 1rem;
+      font-size: 0.8125rem; color: var(--text-muted); cursor: pointer;
+      text-decoration: none; transition: all 0.15s; border-left: 3px solid transparent;
+      line-height: 1.3;
+    }
+    .insights-toc-item:hover {
+      color: var(--text); background: rgba(0, 102, 204, 0.04);
+    }
+    .insights-toc-item.active {
+      color: var(--primary); border-left-color: var(--primary);
+      background: rgba(0, 102, 204, 0.06); font-weight: 600;
+    }
+    .insights-toc-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.25rem; height: 1.25rem; border-radius: 50%; font-size: 0.6875rem;
+      background: var(--surface-2); color: var(--text-muted); font-weight: 600; flex-shrink: 0;
+    }
+    .insights-toc-item.active .insights-toc-num {
+      background: var(--primary); color: white;
+    }
+    .insights-toc-rating {
+      margin-left: auto; font-size: 0.625rem; letter-spacing: -0.05em; flex-shrink: 0;
+    }
+
+    /* Content Area */
+    .insights-content-area {
+      flex: 1; padding: 2rem 2.5rem; overflow-y: auto; max-height: 85vh;
+      scroll-behavior: smooth;
+    }
+
+    .insights-section {
+      margin-bottom: 2.5rem; padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .insights-section:last-child { border-bottom: none; margin-bottom: 0; }
+
+    /* Health Score Header */
+    .insights-health-header {
+      display: flex; gap: 2.5rem; align-items: flex-start; margin-bottom: 1.5rem;
+    }
+    .insights-health-score {
+      text-align: center; padding: 1.5rem 2rem; border: 3px solid;
+      border-radius: var(--radius-lg); background: var(--background-alt); min-width: 140px;
+    }
+    .insights-health-number { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .insights-health-label {
+      font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-muted); margin-top: 0.25rem;
+    }
+    .insights-health-stars { font-size: 0.875rem; margin-top: 0.5rem; letter-spacing: 0.05em; }
+
+    .insights-health-details { flex: 1; }
+    .insights-ratings-summary {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 1.5rem;
+    }
+    .insights-rating-row {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0;
+      font-size: 0.8125rem;
+    }
+    .insights-rating-label {
+      flex: 1; color: var(--text); font-weight: 500;
+    }
+    .insights-rating-stars { font-size: 0.75rem; letter-spacing: 0.02em; color: #e6a700; }
+    .insights-rating-value { font-size: 0.75rem; color: var(--text-muted); width: 2rem; text-align: right; }
+
+    /* Velocity Metrics */
+    .insights-velocity-row {
+      display: flex; gap: 1px; margin-bottom: 1.5rem;
+      background: var(--border); border-radius: var(--radius); overflow: hidden;
+    }
+    .insights-velocity-item {
+      flex: 1; text-align: center; padding: 1rem; background: var(--background-alt);
+    }
+    .insights-velocity-value {
+      font-size: 1.5rem; font-weight: 700; color: var(--primary); line-height: 1.2;
+    }
+    .insights-velocity-label {
+      font-size: 0.6875rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-muted); margin-top: 0.25rem;
+    }
+
+    /* Top 5 Improvements */
+    .insights-improvements {
+      background: var(--background-alt); border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; margin-bottom: 0.5rem;
+    }
+    .insights-improvements-title {
+      font-size: 0.9375rem; font-weight: 600; margin-bottom: 1rem; display: flex;
+      align-items: center; gap: 0.5rem; color: var(--primary);
+    }
+    .insights-improvement-item {
+      display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .insights-improvement-item:last-child { border-bottom: none; }
+    .insights-improvement-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.5rem; height: 1.5rem; border-radius: 50%; font-size: 0.75rem;
+      background: var(--primary); color: white; font-weight: 700; flex-shrink: 0; margin-top: 0.125rem;
+    }
+    .insights-improvement-body { flex: 1; }
+    .insights-improvement-title { font-size: 0.875rem; font-weight: 500; color: var(--text); }
+    .insights-improvement-desc { font-size: 0.8125rem; color: var(--text-muted); margin-top: 0.125rem; }
+    .insights-impact-badge { flex-shrink: 0; margin-top: 0.125rem; }
+
+    /* Layer Section Heading */
+    .insights-layer-heading {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--primary);
+    }
+    .insights-layer-heading-left { display: flex; align-items: center; gap: 0.75rem; }
+    .insights-layer-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2rem; height: 2rem; border-radius: 50%; font-size: 0.875rem;
+      background: var(--primary); color: white; font-weight: 700;
+    }
+    .insights-layer-title { font-size: 1.25rem; font-weight: 700; margin: 0; color: var(--text); }
+    .insights-layer-stars { font-size: 1.125rem; letter-spacing: 0.02em; color: #e6a700; }
+
+    /* Layer Badges */
+    .insights-layer-badges {
+      display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap;
+    }
+    .insights-layer-badges .badge {
+      font-size: 0.75rem; padding: 0.3rem 0.75rem; font-weight: 600;
+    }
+    .insights-layer-badges .badge i { margin-right: 0.25rem; }
+
+    /* Strengths / Weaknesses / Recommendations */
+    .insights-layer-meta {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .insights-meta-block {
+      background: var(--background-alt); border-radius: var(--radius); padding: 1rem;
+    }
+    .insights-meta-title {
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 0.625rem; display: flex; align-items: center; gap: 0.375rem;
+    }
+    .insights-meta-strengths { color: var(--success); }
+    .insights-meta-weaknesses { color: #b8860b; }
+    .insights-meta-recommendations { color: var(--primary); }
+
+    .insights-meta-list {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .insights-meta-list li {
+      font-size: 0.8125rem; padding: 0.25rem 0; padding-left: 1.25rem;
+      position: relative; color: var(--text); line-height: 1.4;
+    }
+    .insights-strength-item::before {
+      content: '\\2713'; position: absolute; left: 0; color: var(--success); font-weight: 700;
+    }
+    .insights-weakness-item::before {
+      content: '\\26A0'; position: absolute; left: 0; color: #b8860b; font-size: 0.75rem;
+    }
+    .insights-recommendation-item::before {
+      content: '\\2192'; position: absolute; left: 0; color: var(--primary); font-weight: 700;
+    }
+
+    /* Layer Content (rendered markdown) */
+    .insights-layer-content {
+      font-size: 0.9375rem; line-height: 1.7; color: var(--text);
+    }
+    .insights-layer-content h1 { font-size: 1.375rem; margin: 1.5rem 0 0.75rem; }
+    .insights-layer-content h2 { font-size: 1.1875rem; margin: 1.25rem 0 0.625rem; }
+    .insights-layer-content h3 { font-size: 1.0625rem; margin: 1rem 0 0.5rem; }
+    .insights-layer-content h4 { font-size: 0.9375rem; margin: 0.875rem 0 0.375rem; }
+    .insights-layer-content p { margin-bottom: 0.75rem; }
+    .insights-layer-content ul, .insights-layer-content ol {
+      margin: 0.5rem 0 0.75rem; padding-left: 1.5rem;
+    }
+    .insights-layer-content li { margin-bottom: 0.25rem; }
+    .insights-layer-content table {
+      width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem;
+    }
+    .insights-layer-content th {
+      background: var(--background-alt); font-weight: 600; text-align: left;
+      padding: 0.625rem 0.75rem; border: 1px solid var(--border); font-size: 0.8125rem;
+    }
+    .insights-layer-content td {
+      padding: 0.5rem 0.75rem; border: 1px solid var(--border); font-size: 0.8125rem;
+    }
+    .insights-layer-content blockquote {
+      border-left: 3px solid var(--primary); padding: 0.5rem 1rem; margin: 0.75rem 0;
+      background: rgba(0, 102, 204, 0.04); font-style: italic; color: var(--text-muted);
+    }
+    .insights-layer-content pre {
+      margin: 0.75rem 0; font-size: 0.8125rem;
+    }
+    .insights-layer-content code {
+      font-size: 0.85em;
+    }
+    .insights-layer-content img {
+      max-width: 100%; height: auto; border-radius: var(--radius);
+    }
+
+    /* Mermaid Diagram Wrapper */
+    .insights-mermaid-wrapper {
+      margin: 1.25rem 0; padding: 1.25rem; background: var(--background-alt);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      text-align: center; overflow-x: auto;
+    }
+    .insights-mermaid-wrapper .mermaid-diagram-label {
+      font-size: 0.6875rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.75rem;
+      display: flex; align-items: center; gap: 0.375rem; justify-content: center;
+    }
+    .insights-mermaid-wrapper svg {
+      max-width: 100%; height: auto;
+    }
+
+    /* Mermaid error fallback */
+    .mermaid-error {
+      padding: 0.75rem; background: rgba(220,53,69,0.05); border: 1px solid rgba(220,53,69,0.2);
+      border-radius: var(--radius); font-size: 0.8125rem; color: var(--danger); text-align: left;
+    }
+    .mermaid-error pre {
+      background: var(--surface-2); padding: 0.5rem; margin-top: 0.5rem;
+      border-radius: 4px; font-size: 0.75rem; color: var(--text-muted); white-space: pre-wrap;
+    }
+
+    /* ===== Print Styles ===== */
+    @media print {
+      .insights-toolbar, .page-header, nav.insights-toc,
+      [style*="border-bottom:2px solid"] { display: none !important; }
+
+      .insights-document-wrapper {
+        display: block !important; border: none !important;
+        box-shadow: none !important; overflow: visible !important;
+      }
+      .insights-content-area {
+        max-height: none !important; overflow: visible !important;
+        padding: 0 !important;
+      }
+      .insights-section {
+        page-break-inside: avoid; break-inside: avoid;
+      }
+      .insights-layer-section { page-break-before: auto; }
+      .insights-health-header { flex-direction: column; gap: 1rem; }
+      .insights-velocity-row { flex-wrap: wrap; }
+      .insights-mermaid-wrapper { page-break-inside: avoid; break-inside: avoid; }
+
+      body { font-size: 12pt; }
+      .insights-layer-content { font-size: 11pt; }
+    }
   `]
 })
-export class RepositoryDetailComponent implements OnInit {
+export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   repo: Repository | null = null;
   loading = true;
   syncing = false;
@@ -349,6 +744,17 @@ export class RepositoryDetailComponent implements OnInit {
   generatingInsights = false;
   generatingReport = false;
   reportData: any = null;
+  activeTocSection = '';
+  Math = Math;
+
+  // Mermaid rendering tracking
+  private mermaidLoaded = false;
+  private mermaidModule: any = null;
+  private pendingMermaidRender = false;
+  private renderedMermaidIds = new Set<string>();
+  private mermaidIdCounter = 0;
+  private insightHtmlCache = new Map<string, SafeHtml>();
+  private insightContentVersions = new Map<string, string>();
 
   private insightLabels: Record<string, string> = {
     'FeatureMap': 'Features', 'ArchitectureAnalysis': 'Architecture', 'DesignAnalysis': 'Design',
@@ -361,7 +767,15 @@ export class RepositoryDetailComponent implements OnInit {
     'operationsanalysis': 'Operations', 'localsetupguide': 'Local Setup'
   };
 
-  constructor(private api: ApiService, private route: ActivatedRoute, private router: Router, private http: HttpClient) {}
+  constructor(
+    private api: ApiService,
+    private route: ActivatedRoute,
+    private router: Router,
+    private http: HttpClient,
+    private sanitizer: DomSanitizer,
+    private el: ElementRef,
+    private zone: NgZone
+  ) {}
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -540,9 +954,227 @@ export class RepositoryDetailComponent implements OnInit {
     });
   }
 
+  ngAfterViewChecked() {
+    if (this.pendingMermaidRender && this.activeTab === 'Insights') {
+      this.pendingMermaidRender = false;
+      this.renderMermaidDiagrams();
+    }
+  }
+
   renderMarkdown(content: string): string {
     if (!content) return '';
     return marked.parse(content, { async: false }) as string;
+  }
+
+  /**
+   * Render insight layer content to SafeHtml, extracting mermaid blocks
+   * for post-render processing. Uses a cache to avoid re-parsing unchanged content.
+   */
+  renderInsightHtml(layer: any): SafeHtml {
+    const content = layer.content || layer.Content || '';
+    if (!content) return '';
+
+    const key = layer.subtype;
+    const cached = this.insightContentVersions.get(key);
+    if (cached === content && this.insightHtmlCache.has(key)) {
+      return this.insightHtmlCache.get(key)!;
+    }
+
+    // Extract mermaid blocks before marked parsing
+    const mermaidBlocks: { id: string; code: string }[] = [];
+    let processedContent = content.replace(
+      /```mermaid\s*([\s\S]*?)```/g,
+      (_: string, code: string) => {
+        const id = `insight-mermaid-${++this.mermaidIdCounter}`;
+        mermaidBlocks.push({ id, code: code.trim() });
+        return `<div class="insights-mermaid-wrapper" id="wrap-${id}">
+          <div class="mermaid-diagram-label"><i class="bi bi-diagram-3"></i> Diagram</div>
+          <div class="mermaid-render-target" id="${id}"></div>
+        </div>`;
+      }
+    );
+
+    let html = marked.parse(processedContent, { async: false }) as string;
+
+    const result = this.sanitizer.bypassSecurityTrustHtml(html);
+    this.insightHtmlCache.set(key, result);
+    this.insightContentVersions.set(key, content);
+
+    // Schedule mermaid rendering
+    if (mermaidBlocks.length > 0) {
+      this.pendingMermaidRender = true;
+      // Store mermaid blocks for rendering
+      (this as any)['_pendingMermaidBlocks'] = [
+        ...((this as any)['_pendingMermaidBlocks'] || []),
+        ...mermaidBlocks
+      ];
+    }
+
+    return result;
+  }
+
+  /**
+   * Dynamically load and render mermaid diagrams.
+   * Uses dynamic import to load mermaid from CDN if not available via npm.
+   */
+  private async renderMermaidDiagrams() {
+    const blocks: { id: string; code: string }[] = (this as any)['_pendingMermaidBlocks'] || [];
+    if (blocks.length === 0) return;
+
+    // Clear pending
+    (this as any)['_pendingMermaidBlocks'] = [];
+
+    // Filter to only blocks not yet rendered
+    const toRender = blocks.filter(b => !this.renderedMermaidIds.has(b.id));
+    if (toRender.length === 0) return;
+
+    try {
+      if (!this.mermaidLoaded) {
+        try {
+          // Try npm import first
+          const mod = await import('mermaid');
+          this.mermaidModule = mod.default || mod;
+        } catch {
+          // Fallback: load from CDN
+          await this.loadMermaidFromCDN();
+        }
+
+        if (this.mermaidModule) {
+          this.mermaidModule.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            themeVariables: {
+              primaryColor: '#0066CC',
+              primaryTextColor: '#212529',
+              primaryBorderColor: '#0052A3',
+              lineColor: '#6C757D',
+              secondaryColor: '#F8F9FA',
+              tertiaryColor: '#FFFFFF',
+              background: '#FFFFFF',
+              mainBkg: '#F8F9FA',
+              secondBkg: '#F1F3F5',
+              nodeBorder: '#0052A3',
+              clusterBkg: '#F8F9FA',
+              clusterBorder: '#DEE2E6',
+              titleColor: '#212529',
+              edgeLabelBackground: '#F8F9FA',
+              nodeTextColor: '#212529',
+            },
+            flowchart: { curve: 'basis', padding: 15 },
+            securityLevel: 'loose',
+          });
+          this.mermaidLoaded = true;
+        }
+      }
+
+      if (!this.mermaidModule) return;
+
+      // Wait a tick for DOM to settle
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      for (const block of toRender) {
+        const element = document.getElementById(block.id);
+        if (!element) continue;
+        if (this.renderedMermaidIds.has(block.id)) continue;
+
+        try {
+          const { svg } = await this.mermaidModule.render(block.id + '-svg', block.code);
+          element.innerHTML = svg;
+          this.renderedMermaidIds.add(block.id);
+        } catch (e: any) {
+          console.warn('Mermaid rendering failed for', block.id, e);
+          element.innerHTML = `<div class="mermaid-error">
+            <strong>Diagram could not be rendered</strong>
+            <pre>${this.escapeHtml(block.code)}</pre>
+          </div>`;
+          this.renderedMermaidIds.add(block.id);
+        }
+      }
+    } catch (e) {
+      console.warn('Mermaid loading/rendering error:', e);
+    }
+  }
+
+  /**
+   * Load mermaid.js from CDN as a fallback
+   */
+  private loadMermaidFromCDN(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if ((window as any).mermaid) {
+        this.mermaidModule = (window as any).mermaid;
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+      script.onload = () => {
+        this.mermaidModule = (window as any).mermaid;
+        resolve();
+      };
+      script.onerror = () => reject(new Error('Failed to load mermaid from CDN'));
+      document.head.appendChild(script);
+    });
+  }
+
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * Generate star rating string: filled stars + empty stars
+   */
+  getStarRating(rating: number | null): string {
+    if (rating == null) return '';
+    const r = Math.max(0, Math.min(5, Math.round(rating)));
+    return '\u2605'.repeat(r) + '\u2606'.repeat(5 - r);
+  }
+
+  /**
+   * Scroll to a section in the insights document and update active TOC
+   */
+  scrollToSection(sectionId: string, event: Event) {
+    event.preventDefault();
+    const contentArea = document.getElementById('insightsContentArea');
+    const target = document.getElementById(sectionId);
+    if (contentArea && target) {
+      const offset = target.offsetTop - contentArea.offsetTop;
+      contentArea.scrollTo({ top: offset, behavior: 'smooth' });
+      this.activeTocSection = sectionId;
+    }
+  }
+
+  /**
+   * Track scroll position to highlight active TOC entry
+   */
+  onInsightsScroll(event: Event) {
+    const container = event.target as HTMLElement;
+    if (!container) return;
+
+    const sections = container.querySelectorAll('.insights-section');
+    let currentSection = '';
+
+    sections.forEach((section) => {
+      const el = section as HTMLElement;
+      const sectionTop = el.offsetTop - container.offsetTop;
+      if (container.scrollTop >= sectionTop - 100) {
+        currentSection = el.id;
+      }
+    });
+
+    if (currentSection && currentSection !== this.activeTocSection) {
+      this.zone.run(() => {
+        this.activeTocSection = currentSection;
+      });
+    }
+  }
+
+  /**
+   * Print the report
+   */
+  printReport() {
+    window.print();
   }
 
   getInsightLabel(subtype: string): string {
