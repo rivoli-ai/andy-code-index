@@ -5,5 +5,6 @@ public enum EnrichmentType
     Architecture,
     Development,
     History,
-    Usage
+    Usage,
+    Insights
 }

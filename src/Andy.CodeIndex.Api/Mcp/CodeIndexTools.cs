@@ -312,6 +312,58 @@ public class CodeIndexTools
         return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.Dependencies, "Dependencies");
     }
 
+    [McpServerTool(Name = "code_index_insights"), Description("Get repository insight layers (architecture, design, security, testing, deployment, etc.)")]
+    public async Task<object> GetInsights(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Specific layer to retrieve (featuremap, architectureanalysis, designanalysis, implementationanalysis, dependencyanalysis, testanalysis, securityanalysis, deploymentanalysis, operationsanalysis, localsetupguide). Omit for all layers.")] string? layer = null)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var layerMap = new Dictionary<string, EnrichmentSubtype>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["featuremap"] = EnrichmentSubtype.FeatureMap,
+            ["architectureanalysis"] = EnrichmentSubtype.ArchitectureAnalysis,
+            ["designanalysis"] = EnrichmentSubtype.DesignAnalysis,
+            ["implementationanalysis"] = EnrichmentSubtype.ImplementationAnalysis,
+            ["dependencyanalysis"] = EnrichmentSubtype.DependencyAnalysis,
+            ["testanalysis"] = EnrichmentSubtype.TestAnalysis,
+            ["securityanalysis"] = EnrichmentSubtype.SecurityAnalysis,
+            ["deploymentanalysis"] = EnrichmentSubtype.DeploymentAnalysis,
+            ["operationsanalysis"] = EnrichmentSubtype.OperationsAnalysis,
+            ["localsetupguide"] = EnrichmentSubtype.LocalSetupGuide,
+        };
+
+        if (!string.IsNullOrEmpty(layer))
+        {
+            if (!layerMap.TryGetValue(layer, out var subtype))
+                return new { error = $"Unknown layer '{layer}'. Valid: {string.Join(", ", layerMap.Keys)}" };
+
+            return await GetEnrichmentBySubtype(repo_url, subtype, layer);
+        }
+
+        // Return all layers
+        var results = new Dictionary<string, object?>();
+        foreach (var (name, subtype) in layerMap)
+        {
+            var enrichments = await _enrichmentService.QueryAsync(
+                subtype: subtype, repositoryId: repo.Id, limit: 1);
+            results[name] = enrichments.Count > 0
+                ? new { enrichments[0].Title, enrichments[0].Content, enrichments[0].Quality }
+                : null;
+        }
+
+        return new { repository = repo.Name, layers = results };
+    }
+
+    [McpServerTool(Name = "code_index_feature_map"), Description("Get the structured feature inventory for a repository")]
+    public async Task<object> GetFeatureMap(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.FeatureMap, "Feature map");
+    }
+
     [McpServerTool(Name = "code_index_analytics"), Description("Get repository analytics: languages, file types, top terms, complex files")]
     public async Task<object> GetAnalytics(
         [Description("Repository URL or name")] string repo_url)

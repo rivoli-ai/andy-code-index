@@ -34,5 +34,17 @@ public enum EnrichmentSubtype
     Quality,
 
     // Documents
-    DocumentText
+    DocumentText,
+
+    // Insights
+    FeatureMap,
+    ArchitectureAnalysis,
+    DesignAnalysis,
+    ImplementationAnalysis,
+    DependencyAnalysis,
+    TestAnalysis,
+    SecurityAnalysis,
+    DeploymentAnalysis,
+    OperationsAnalysis,
+    LocalSetupGuide
 }

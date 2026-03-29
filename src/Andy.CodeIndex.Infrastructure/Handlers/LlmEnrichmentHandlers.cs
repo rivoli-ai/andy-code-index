@@ -100,11 +100,9 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
     protected async Task<string?> CallLlmAsync(string apiKey, string model, string prompt, CancellationToken ct)
     {
         var client = HttpClientFactory.CreateClient("Chat");
-        client.BaseAddress = new Uri(LlmOptions.BaseUrl.TrimEnd('/') + "/");
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        client.Timeout = TimeSpan.FromSeconds(LlmOptions.TimeoutSeconds);
+        var baseUrl = LlmOptions.BaseUrl.TrimEnd('/') + "/";
 
-        var request = new
+        var body = new
         {
             model,
             messages = new[] { new { role = "user", content = prompt } },
@@ -114,7 +112,10 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
 
         try
         {
-            var response = await client.PostAsJsonAsync("chat/completions", request, ct);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, baseUrl + "chat/completions");
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            httpRequest.Content = JsonContent.Create(body);
+            var response = await client.SendAsync(httpRequest, ct);
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
             return result.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();

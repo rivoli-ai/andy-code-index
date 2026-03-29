@@ -115,7 +115,8 @@ public class TaskQueueService : ITaskQueue
             TaskOperation.CreateOwnershipDocs,
             TaskOperation.CreateSecurityDocs,
             TaskOperation.CreateOperationsDocs,
-            TaskOperation.CreateQualityDocs
+            TaskOperation.CreateQualityDocs,
+            TaskOperation.CreateInsights
         ],
         TaskChainType.Resync =>
         [
@@ -162,6 +163,7 @@ public class TaskQueueService : ITaskQueue
             TaskOperation.CreateSecurityDocs,
             TaskOperation.CreateOperationsDocs,
             TaskOperation.CreateQualityDocs,
+            TaskOperation.CreateInsights,
         ];
 
         var index = Array.IndexOf(fullChain, current);
@@ -181,6 +183,7 @@ public class TaskQueueService : ITaskQueue
         TaskOperation.CreateSecurityDocs or
         TaskOperation.CreateOperationsDocs or
         TaskOperation.CreateQualityDocs or
+        TaskOperation.CreateInsights or
         TaskOperation.CreateSummaryEnrichments or
         TaskOperation.CreateSummaryEmbeddings;
 

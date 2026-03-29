@@ -41,6 +41,16 @@ import { environment } from '../../../environments/environment';
         <div><strong>Operations</strong> -- CI/CD pipelines, containerization, deployment, infrastructure, monitoring, and environment management</div>
         <div><strong>Quality</strong> -- Testing strategy, test frameworks, coverage analysis, quality tooling, and CI quality gates</div>
         <div><strong>Document Text</strong> -- Text content extracted from binary documents (PDF) with metadata and page structure</div>
+        <div><strong>Feature Map</strong> -- Structured feature inventory with stable IDs, status, and complexity</div>
+        <div><strong>Architecture Analysis</strong> -- Deep architecture analysis with Mermaid component diagrams</div>
+        <div><strong>Design Analysis</strong> -- Design patterns, domain model, and API surface with Mermaid class diagrams</div>
+        <div><strong>Implementation Analysis</strong> -- Code patterns, smells, and improvement suggestions with effort/impact</div>
+        <div><strong>Dependency Analysis</strong> -- Dependency tree, freshness, licenses, and security advisories</div>
+        <div><strong>Test Analysis</strong> -- Test pyramid, coverage gaps, frameworks, and improvement suggestions</div>
+        <div><strong>Security Analysis</strong> -- Auth patterns, OWASP Top 10 exposure, secrets handling, risk ratings</div>
+        <div><strong>Deployment Analysis</strong> -- CI/CD pipelines, environments, and release process with Mermaid flowcharts</div>
+        <div><strong>Operations Analysis</strong> -- Logging audit, monitoring, health checks, alerting, and graceful shutdown</div>
+        <div><strong>Local Setup Guide</strong> -- Step-by-step guide to run the project locally with prerequisites and common issues</div>
       </div>
     </div>
 
@@ -132,6 +142,7 @@ export class EnrichmentBrowserComponent implements OnInit {
     'Development': 'Development',
     'History': 'History',
     'Usage': 'Usage',
+    'Insights': 'Insights',
   };
 
   private subtypeLabels: Record<string, string> = {
@@ -153,9 +164,19 @@ export class EnrichmentBrowserComponent implements OnInit {
     'Operations': 'Operations',
     'Quality': 'Quality',
     'DocumentText': 'Document Text',
+    'FeatureMap': 'Feature Map',
+    'ArchitectureAnalysis': 'Architecture Analysis',
+    'DesignAnalysis': 'Design Analysis',
+    'ImplementationAnalysis': 'Implementation Analysis',
+    'DependencyAnalysis': 'Dependency Analysis',
+    'TestAnalysis': 'Test Analysis',
+    'SecurityAnalysis': 'Security Analysis',
+    'DeploymentAnalysis': 'Deployment Analysis',
+    'OperationsAnalysis': 'Operations Analysis',
+    'LocalSetupGuide': 'Local Setup Guide',
   };
 
-  typeOptions = ['Architecture', 'Development', 'History', 'Usage'];
+  typeOptions = ['Architecture', 'Development', 'History', 'Usage', 'Insights'];
 
   private typeToSubtypes: Record<string, { value: string; label: string }[]> = {
     'Architecture': [
@@ -184,6 +205,18 @@ export class EnrichmentBrowserComponent implements OnInit {
       { value: 'Wiki', label: 'Wiki' },
       { value: 'Operations', label: 'Operations' },
     ],
+    'Insights': [
+      { value: 'FeatureMap', label: 'Feature Map' },
+      { value: 'ArchitectureAnalysis', label: 'Architecture Analysis' },
+      { value: 'DesignAnalysis', label: 'Design Analysis' },
+      { value: 'ImplementationAnalysis', label: 'Implementation Analysis' },
+      { value: 'DependencyAnalysis', label: 'Dependency Analysis' },
+      { value: 'TestAnalysis', label: 'Test Analysis' },
+      { value: 'SecurityAnalysis', label: 'Security Analysis' },
+      { value: 'DeploymentAnalysis', label: 'Deployment Analysis' },
+      { value: 'OperationsAnalysis', label: 'Operations Analysis' },
+      { value: 'LocalSetupGuide', label: 'Local Setup Guide' },
+    ],
   };
 
   private allSubtypes: { value: string; label: string }[] = [
@@ -191,6 +224,7 @@ export class EnrichmentBrowserComponent implements OnInit {
     ...this.typeToSubtypes['Development'],
     ...this.typeToSubtypes['History'],
     ...this.typeToSubtypes['Usage'],
+    ...this.typeToSubtypes['Insights'],
   ];
 
   get availableSubtypes(): { value: string; label: string }[] {

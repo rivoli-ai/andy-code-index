@@ -146,7 +146,7 @@ public class TaskQueueServiceTests
         {
             Id = Guid.NewGuid(),
             RepositoryId = Guid.NewGuid(),
-            Operation = TaskOperation.CreateWiki,
+            Operation = TaskOperation.CreateInsights,
             ChainId = Guid.NewGuid(),
             CreatedAt = DateTime.UtcNow
         };
@@ -176,7 +176,7 @@ public class TaskQueueServiceTests
     [Fact]
     public void GetNextOperation_LastInChain_ReturnsNull()
     {
-        TaskQueueService.GetNextOperation(TaskOperation.CreateQualityDocs).Should().BeNull();
+        TaskQueueService.GetNextOperation(TaskOperation.CreateInsights).Should().BeNull();
     }
 
     [Fact]
