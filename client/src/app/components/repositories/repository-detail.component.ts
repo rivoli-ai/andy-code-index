@@ -410,9 +410,10 @@ interface CommitComparison {
 
       <!-- Report Tab -->
       <div *ngIf="activeTab === 'Report'">
+        <!-- Toolbar -->
         <div style="display:flex;gap:0.75rem;margin-bottom:1.5rem">
           <button class="btn btn-primary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
-            <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating Report...' : 'Generate Report' }}
+            <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
           </button>
           <button *ngIf="reportData" (click)="exportHtml()" class="btn btn-secondary btn-sm">
             <i class="bi bi-download"></i> Export HTML
@@ -420,88 +421,133 @@ interface CommitComparison {
           <button *ngIf="reportData" class="btn btn-secondary btn-sm" (click)="printReport()">
             <i class="bi bi-printer"></i> Print
           </button>
-          <span *ngIf="!insightLayers.length" class="text-muted" style="font-size:var(--font-xs);align-self:center">Generate insights first to create a report.</span>
+          <span *ngIf="!insightLayers.length" class="text-muted" style="font-size:var(--font-xs);align-self:center">Generate insights first.</span>
         </div>
 
+        <!-- Empty state -->
         <div *ngIf="!reportData && !generatingReport" class="card" style="text-align:center;padding:3rem">
           <i class="bi bi-file-earmark-bar-graph" style="font-size:3rem;color:var(--text-muted);display:block;margin-bottom:1rem"></i>
           <h3 style="margin-bottom:0.5rem">No Report Yet</h3>
-          <p class="text-muted">Generate insights first, then click "Generate Report" to create an analysis with ratings and recommendations.</p>
+          <p class="text-muted">Generate insights first, then click "Generate Report".</p>
         </div>
 
+        <!-- Report document with TOC -->
         <div *ngIf="reportData" class="insights-document-wrapper">
-          <!-- Health Score -->
-          <div style="text-align:center;padding:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1.5rem">
-            <div style="font-size:3.5rem;font-weight:700" [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
-              {{ reportData.overallHealthScore }}<span style="font-size:1.5rem;color:var(--text-muted)">/100</span>
-            </div>
-            <div class="text-muted" style="font-size:var(--font-sm);margin-top:0.25rem">Overall Health Score</div>
-          </div>
+          <!-- TOC Sidebar -->
+          <nav class="insights-toc">
+            <div class="insights-toc-title">Report</div>
+            <a class="insights-toc-item" [class.active]="activeReportSection === 'summary'" (click)="activeReportSection = 'summary'" href="javascript:void(0)">
+              <span class="insights-toc-number" [style.background]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">{{ reportData.overallHealthScore }}</span>
+              <span>Summary</span>
+            </a>
+            <a class="insights-toc-item" [class.active]="activeReportSection === 'improvements'" (click)="activeReportSection = 'improvements'" href="javascript:void(0)">
+              <span class="insights-toc-number">{{ reportData.top5Improvements?.length || 0 }}</span>
+              <span>Top Improvements</span>
+            </a>
+            <a *ngFor="let layer of reportData.layers; let i = index" class="insights-toc-item"
+               [class.active]="activeReportSection === layer.subtype"
+               (click)="activeReportSection = layer.subtype" href="javascript:void(0)">
+              <span class="insights-toc-number">{{ i + 1 }}</span>
+              <span>{{ getInsightLabel(layer.subtype) || layer.name }}</span>
+              <span class="insights-toc-stars">{{ getStarRating(layer.qualityRating) }}</span>
+            </a>
+          </nav>
 
-          <!-- Velocity -->
-          <div *ngIf="reportData.velocity" style="display:flex;gap:1.5rem;margin-bottom:1.5rem;flex-wrap:wrap">
-            <div class="card" style="flex:1;min-width:120px;text-align:center">
-              <div style="font-size:1.5rem;font-weight:600">{{ reportData.velocity.commitsPerMonth }}</div>
-              <div class="text-muted" style="font-size:var(--font-xs)">Commits/Month</div>
-            </div>
-            <div class="card" style="flex:1;min-width:120px;text-align:center">
-              <div style="font-size:1.5rem;font-weight:600">{{ reportData.velocity.activeContributors }}</div>
-              <div class="text-muted" style="font-size:var(--font-xs)">Contributors</div>
-            </div>
-            <div class="card" style="flex:1;min-width:120px;text-align:center">
-              <div style="font-size:1.5rem;font-weight:600">{{ reportData.velocity.trend }}</div>
-              <div class="text-muted" style="font-size:var(--font-xs)">Trend</div>
-            </div>
-          </div>
-
-          <!-- Top Improvements -->
-          <div *ngIf="reportData.top5Improvements?.length" class="card" style="margin-bottom:1.5rem">
-            <h3 style="font-size:var(--font-sm);margin-bottom:1rem">Top Improvements</h3>
-            <div *ngFor="let imp of reportData.top5Improvements; let i = index" style="display:flex;align-items:flex-start;gap:0.75rem;margin-bottom:0.75rem">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--primary);color:white;font-size:0.75rem;font-weight:600;flex-shrink:0">{{ i + 1 }}</span>
-              <div>
-                <div style="font-weight:600;font-size:var(--font-xs)">{{ imp.title }}</div>
-                <div class="text-muted" style="font-size:var(--font-xs)">{{ imp.description }}</div>
-                <div style="margin-top:0.25rem">
-                  <span class="badge" [ngClass]="imp.impact === 'high' ? 'badge-danger' : imp.impact === 'medium' ? 'badge-warning' : 'badge-muted'" style="font-size:0.65rem">{{ imp.impact }} impact</span>
-                  <span class="badge badge-muted" style="font-size:0.65rem;margin-left:0.25rem">{{ imp.effort }} effort</span>
+          <!-- Content Area -->
+          <div class="insights-content">
+            <!-- Summary Section -->
+            <div *ngIf="activeReportSection === 'summary'" id="report-summary">
+              <div class="insights-layer-heading">
+                <h2>Summary</h2>
+              </div>
+              <!-- Health Score -->
+              <div style="text-align:center;padding:2rem;background:var(--background-alt);border-radius:var(--radius-lg);margin-bottom:1.5rem">
+                <div style="font-size:4rem;font-weight:700" [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+                  {{ reportData.overallHealthScore }}<span style="font-size:1.5rem;color:var(--text-muted)">/100</span>
+                </div>
+                <div class="text-muted" style="font-size:var(--font-sm)">Overall Health Score</div>
+              </div>
+              <!-- Velocity -->
+              <div *ngIf="reportData.velocity" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem">
+                <div style="text-align:center;padding:1rem;background:var(--background-alt);border-radius:var(--radius)">
+                  <div style="font-size:1.75rem;font-weight:600">{{ reportData.velocity.commitsPerMonth }}</div>
+                  <div class="text-muted" style="font-size:var(--font-xs)">Commits/Month</div>
+                </div>
+                <div style="text-align:center;padding:1rem;background:var(--background-alt);border-radius:var(--radius)">
+                  <div style="font-size:1.75rem;font-weight:600">{{ reportData.velocity.activeContributors }}</div>
+                  <div class="text-muted" style="font-size:var(--font-xs)">Contributors</div>
+                </div>
+                <div style="text-align:center;padding:1rem;background:var(--background-alt);border-radius:var(--radius)">
+                  <div style="font-size:1.75rem;font-weight:600;text-transform:capitalize">{{ reportData.velocity.trend }}</div>
+                  <div class="text-muted" style="font-size:var(--font-xs)">Trend</div>
+                </div>
+              </div>
+              <!-- Layer overview grid -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+                <div *ngFor="let layer of reportData.layers" style="padding:0.75rem;background:var(--background-alt);border-radius:var(--radius);cursor:pointer" (click)="activeReportSection = layer.subtype">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span style="font-weight:500;font-size:var(--font-xs)">{{ getInsightLabel(layer.subtype) || layer.name }}</span>
+                    <span style="font-size:var(--font-xs)">{{ getStarRating(layer.qualityRating) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Per-Layer Ratings -->
-          <div *ngFor="let layer of reportData.layers" class="card" style="margin-bottom:1rem">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
-              <h3 style="font-size:var(--font-sm);margin:0">{{ getInsightLabel(layer.subtype) || layer.name }}</h3>
-              <div style="display:flex;gap:0.5rem">
-                <span class="badge" [ngClass]="layer.qualityRating >= 4 ? 'badge-success' : layer.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'" style="font-size:0.7rem">Quality {{ getStarRating(layer.qualityRating) }}</span>
-                <span class="badge badge-muted" style="font-size:0.7rem">Maturity {{ getStarRating(layer.maturityRating) }}</span>
-                <span class="badge" [ngClass]="layer.riskRating >= 4 ? 'badge-danger' : layer.riskRating >= 3 ? 'badge-warning' : 'badge-success'" style="font-size:0.7rem">Risk {{ getStarRating(layer.riskRating) }}</span>
+            <!-- Top Improvements Section -->
+            <div *ngIf="activeReportSection === 'improvements'" id="report-improvements">
+              <div class="insights-layer-heading">
+                <h2>Top Improvements</h2>
+              </div>
+              <div *ngFor="let imp of reportData.top5Improvements; let i = index" style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.25rem;padding:1rem;background:var(--background-alt);border-radius:var(--radius)">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border-radius:50%;background:var(--primary);color:white;font-size:0.875rem;font-weight:600;flex-shrink:0">{{ i + 1 }}</span>
+                <div style="flex:1">
+                  <div style="font-weight:600;font-size:var(--font-sm);margin-bottom:0.25rem">{{ imp.title }}</div>
+                  <div class="text-muted" style="font-size:var(--font-xs);margin-bottom:0.5rem">{{ imp.description }}</div>
+                  <span class="badge" [ngClass]="imp.impact === 'high' ? 'badge-danger' : imp.impact === 'medium' ? 'badge-warning' : 'badge-muted'" style="font-size:0.7rem">{{ imp.impact }} impact</span>
+                  <span class="badge badge-muted" style="font-size:0.7rem;margin-left:0.375rem">{{ imp.effort }} effort</span>
+                  <span *ngIf="imp.layer" class="badge badge-muted" style="font-size:0.7rem;margin-left:0.375rem">{{ getInsightLabel(imp.layer) || imp.layer }}</span>
+                </div>
               </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;font-size:var(--font-xs)">
-              <!-- Strengths -->
-              <div>
-                <div style="font-weight:600;color:var(--success);margin-bottom:0.375rem"><i class="bi bi-check-circle"></i> Strengths</div>
-                <ul style="padding-left:1rem;margin:0">
-                  <li *ngFor="let s of layer.strengths" style="margin-bottom:0.25rem">{{ s }}</li>
-                </ul>
-              </div>
-              <!-- Weaknesses -->
-              <div>
-                <div style="font-weight:600;color:#e6a700;margin-bottom:0.375rem"><i class="bi bi-exclamation-triangle"></i> Weaknesses</div>
-                <ul style="padding-left:1rem;margin:0">
-                  <li *ngFor="let w of layer.weaknesses" style="margin-bottom:0.25rem">{{ w }}</li>
-                </ul>
-              </div>
-              <!-- Recommendations -->
-              <div>
-                <div style="font-weight:600;color:var(--primary);margin-bottom:0.375rem"><i class="bi bi-arrow-right-circle"></i> Recommendations</div>
-                <ul style="padding-left:1rem;margin:0">
-                  <li *ngFor="let r of layer.recommendations" style="margin-bottom:0.25rem">{{ r }}</li>
-                </ul>
+            <!-- Per-Layer Sections -->
+            <div *ngFor="let layer of reportData.layers">
+              <div *ngIf="activeReportSection === layer.subtype" [id]="'report-' + layer.subtype">
+                <div class="insights-layer-heading">
+                  <h2>{{ getInsightLabel(layer.subtype) || layer.name }}</h2>
+                  <div style="display:flex;gap:0.5rem">
+                    <span class="badge" [ngClass]="layer.qualityRating >= 4 ? 'badge-success' : layer.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'">Quality {{ getStarRating(layer.qualityRating) }}</span>
+                    <span class="badge badge-muted">Maturity {{ getStarRating(layer.maturityRating) }}</span>
+                    <span class="badge" [ngClass]="layer.riskRating >= 4 ? 'badge-danger' : layer.riskRating >= 3 ? 'badge-warning' : 'badge-success'">Risk {{ getStarRating(layer.riskRating) }}</span>
+                  </div>
+                </div>
+
+                <!-- Strengths -->
+                <div style="margin-bottom:1.25rem">
+                  <h3 style="font-size:var(--font-sm);color:var(--success);margin-bottom:0.5rem"><i class="bi bi-check-circle-fill"></i> Strengths</h3>
+                  <div *ngFor="let s of layer.strengths" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.375rem;font-size:var(--font-xs)">
+                    <i class="bi bi-check" style="color:var(--success);flex-shrink:0;margin-top:0.125rem"></i>
+                    <span>{{ s }}</span>
+                  </div>
+                </div>
+
+                <!-- Weaknesses -->
+                <div style="margin-bottom:1.25rem">
+                  <h3 style="font-size:var(--font-sm);color:#e6a700;margin-bottom:0.5rem"><i class="bi bi-exclamation-triangle-fill"></i> Weaknesses</h3>
+                  <div *ngFor="let w of layer.weaknesses" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.375rem;font-size:var(--font-xs)">
+                    <i class="bi bi-exclamation-triangle" style="color:#e6a700;flex-shrink:0;margin-top:0.125rem"></i>
+                    <span>{{ w }}</span>
+                  </div>
+                </div>
+
+                <!-- Recommendations -->
+                <div>
+                  <h3 style="font-size:var(--font-sm);color:var(--primary);margin-bottom:0.5rem"><i class="bi bi-arrow-right-circle-fill"></i> Recommendations</h3>
+                  <div *ngFor="let r of layer.recommendations; let i = index" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.375rem;font-size:var(--font-xs)">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;border-radius:50%;background:var(--primary);color:white;font-size:0.65rem;font-weight:600;flex-shrink:0">{{ i + 1 }}</span>
+                    <span>{{ r }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -837,6 +883,7 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   syncIntervalSaving = false;
   syncIntervalSaved = false;
   activeTab = 'Overview';
+  activeReportSection = 'summary';
 
   // Insights & Report
   insightLayers: any[] = [];
