@@ -8,6 +8,7 @@ import { Repository } from '../../models/repository.model';
 import { RepositoryHistoryComponent } from './repository-history.component';
 import { RepositoryAnalyticsComponent } from './repository-analytics.component';
 import { environment } from '../../../environments/environment';
+import { marked } from 'marked';
 
 interface CommitSummary {
   id: string;
@@ -224,7 +225,7 @@ interface CommitComparison {
           <h3 style="font-size:1rem;margin:0">Insights & Report</h3>
           <div style="display:flex;gap:0.5rem">
             <button class="btn btn-secondary" (click)="generateInsights()" [disabled]="generatingInsights" style="font-size:var(--font-xs)">
-              <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating...' : 'Generate Insights' }}
+              <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating (' + insightLayers.length + '/10)...' : (insightLayers.length > 0 ? 'Regenerate Insights' : 'Generate Insights') }}
             </button>
             <button class="btn btn-secondary" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length" style="font-size:var(--font-xs)">
               <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
@@ -279,7 +280,7 @@ interface CommitComparison {
                 </span>
               </div>
               <!-- Content -->
-              <div style="white-space:pre-wrap;font-size:var(--font-xs);line-height:1.6;max-height:500px;overflow-y:auto;padding:0.5rem;background:var(--background-alt);border-radius:var(--radius)">{{ layer.content }}</div>
+              <div class="insight-content" style="font-size:var(--font-xs);line-height:1.6;max-height:600px;overflow-y:auto;padding:1rem;background:var(--background-alt);border-radius:var(--radius)" [innerHTML]="renderMarkdown(layer.content || layer.Content)"></div>
             </div>
           </div>
         </div>
@@ -353,7 +354,11 @@ export class RepositoryDetailComponent implements OnInit {
     'FeatureMap': 'Features', 'ArchitectureAnalysis': 'Architecture', 'DesignAnalysis': 'Design',
     'ImplementationAnalysis': 'Implementation', 'DependencyAnalysis': 'Dependencies',
     'TestAnalysis': 'Testing', 'SecurityAnalysis': 'Security', 'DeploymentAnalysis': 'Deployment',
-    'OperationsAnalysis': 'Operations', 'LocalSetupGuide': 'Local Setup'
+    'OperationsAnalysis': 'Operations', 'LocalSetupGuide': 'Local Setup',
+    'featuremap': 'Features', 'architectureanalysis': 'Architecture', 'designanalysis': 'Design',
+    'implementationanalysis': 'Implementation', 'dependencyanalysis': 'Dependencies',
+    'testanalysis': 'Testing', 'securityanalysis': 'Security', 'deploymentanalysis': 'Deployment',
+    'operationsanalysis': 'Operations', 'localsetupguide': 'Local Setup'
   };
 
   constructor(private api: ApiService, private route: ActivatedRoute, private router: Router, private http: HttpClient) {}
@@ -377,10 +382,14 @@ export class RepositoryDetailComponent implements OnInit {
       error: () => {}
     });
     // Load insights and report
-    this.http.get<any[]>(`${environment.apiUrl}/repositories/${id}/insights`).subscribe({
-      next: (layers) => {
-        this.insightLayers = layers;
-        if (layers.length > 0) this.selectedInsightLayer = layers[0].subtype;
+    this.http.get<any>(`${environment.apiUrl}/repositories/${id}/insights`).subscribe({
+      next: (data) => {
+        if (data?.layers) {
+          this.insightLayers = Object.entries(data.layers)
+            .filter(([_, v]) => v !== null)
+            .map(([k, v]: any) => ({ subtype: k, ...v }));
+          if (this.insightLayers.length > 0) this.selectedInsightLayer = this.insightLayers[0].subtype;
+        }
       },
       error: () => {}
     });
@@ -474,11 +483,15 @@ export class RepositoryDetailComponent implements OnInit {
 
   loadInsights() {
     if (!this.repo) return;
-    this.http.get<any[]>(`${environment.apiUrl}/repositories/${this.repo.id}/insights`).subscribe({
-      next: (layers) => {
-        this.insightLayers = layers;
-        if (layers.length > 0 && !this.selectedInsightLayer) {
-          this.selectedInsightLayer = layers[0].subtype;
+    this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo.id}/insights`).subscribe({
+      next: (data) => {
+        if (data?.layers) {
+          this.insightLayers = Object.entries(data.layers)
+            .filter(([_, v]) => v !== null)
+            .map(([k, v]: any) => ({ subtype: k, ...v }));
+          if (this.insightLayers.length > 0 && !this.selectedInsightLayer) {
+            this.selectedInsightLayer = this.insightLayers[0].subtype;
+          }
         }
       },
       error: () => {}
@@ -493,7 +506,27 @@ export class RepositoryDetailComponent implements OnInit {
     if (!this.repo) return;
     this.generatingInsights = true;
     this.http.post(`${environment.apiUrl}/repositories/${this.repo.id}/insights/generate`, {}).subscribe({
-      next: () => { this.generatingInsights = false; this.loadInsights(); },
+      next: () => {
+        // Task is queued — poll for results every 5 seconds
+        const pollInterval = setInterval(() => {
+          this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo!.id}/insights`).subscribe({
+            next: (data) => {
+              const layers = data.layers ? Object.entries(data.layers).filter(([_, v]) => v !== null).map(([k, v]: any) => ({ subtype: k, ...v })) : [];
+              if (layers.length > 0) {
+                this.insightLayers = layers;
+                if (!this.selectedInsightLayer) this.selectedInsightLayer = layers[0].subtype;
+              }
+              // Stop polling when we have all 10 layers or after 3 minutes
+              if (layers.length >= 10) {
+                clearInterval(pollInterval);
+                this.generatingInsights = false;
+              }
+            }
+          });
+        }, 5000);
+        // Safety timeout: stop polling after 3 minutes
+        setTimeout(() => { clearInterval(pollInterval); this.generatingInsights = false; }, 180000);
+      },
       error: () => { this.generatingInsights = false; }
     });
   }
@@ -505,6 +538,11 @@ export class RepositoryDetailComponent implements OnInit {
       next: (report) => { this.reportData = report; this.generatingReport = false; },
       error: () => { this.generatingReport = false; }
     });
+  }
+
+  renderMarkdown(content: string): string {
+    if (!content) return '';
+    return marked.parse(content, { async: false }) as string;
   }
 
   getInsightLabel(subtype: string): string {

@@ -263,32 +263,33 @@ public class ReportService : IReportService
 
     internal async Task<VelocityDto> CalculateVelocityAsync(Guid repositoryId, CancellationToken ct)
     {
-        var threeMonthsAgo = DateTime.UtcNow.AddMonths(-3);
-        var sixMonthsAgo = DateTime.UtcNow.AddMonths(-6);
-
-        var recentCommits = await _context.Commits
-            .Where(c => c.RepositoryId == repositoryId && c.CommittedAt >= threeMonthsAgo)
+        var allCommits = await _context.Commits
+            .Where(c => c.RepositoryId == repositoryId)
             .ToListAsync(ct);
 
-        var olderCommits = await _context.Commits
-            .Where(c => c.RepositoryId == repositoryId
-                && c.CommittedAt >= sixMonthsAgo
-                && c.CommittedAt < threeMonthsAgo)
-            .CountAsync(ct);
+        if (allCommits.Count == 0)
+            return new VelocityDto { CommitsPerMonth = 0, ActiveContributors = 0, Trend = "none" };
 
-        var commitsPerMonth = recentCommits.Count / 3.0;
-        var olderPerMonth = olderCommits / 3.0;
+        var earliest = allCommits.Min(c => c.CommittedAt);
+        var latest = allCommits.Max(c => c.CommittedAt);
+        var totalMonths = Math.Max(1, (latest - earliest).TotalDays / 30.0);
+        var commitsPerMonth = allCommits.Count / totalMonths;
 
-        var activeContributors = recentCommits
+        var activeContributors = allCommits
             .Where(c => !string.IsNullOrEmpty(c.AuthorEmail))
             .Select(c => c.AuthorEmail)
             .Distinct()
             .Count();
 
+        // Trend: compare last half vs first half of commits
+        var midpoint = earliest + (latest - earliest) / 2;
+        var firstHalf = allCommits.Count(c => c.CommittedAt < midpoint);
+        var secondHalf = allCommits.Count(c => c.CommittedAt >= midpoint);
+
         string trend;
-        if (commitsPerMonth > olderPerMonth * 1.2)
+        if (secondHalf > firstHalf * 1.2)
             trend = "increasing";
-        else if (commitsPerMonth < olderPerMonth * 0.8)
+        else if (secondHalf < firstHalf * 0.8)
             trend = "decreasing";
         else
             trend = "stable";
