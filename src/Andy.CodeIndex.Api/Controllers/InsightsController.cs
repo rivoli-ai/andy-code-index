@@ -102,11 +102,11 @@ public class InsightsController : ControllerBase
     [RequirePermission("repository:read")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetReport(Guid repositoryId, CancellationToken ct = default)
+    public async Task<IActionResult> GetReport(Guid repositoryId, [FromQuery] bool regenerate = false, CancellationToken ct = default)
     {
         try
         {
-            var report = await _reportService.GenerateReportAsync(repositoryId, ct);
+            var report = await _reportService.GenerateReportAsync(repositoryId, ct, regenerate);
             return Ok(report);
         }
         catch (KeyNotFoundException ex)

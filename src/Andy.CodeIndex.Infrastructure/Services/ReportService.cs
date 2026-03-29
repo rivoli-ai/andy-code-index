@@ -51,28 +51,31 @@ public class ReportService : IReportService
         _logger = logger;
     }
 
-    public async Task<ReportDto> GenerateReportAsync(Guid repositoryId, CancellationToken ct = default)
+    public async Task<ReportDto> GenerateReportAsync(Guid repositoryId, CancellationToken ct = default, bool regenerate = false)
     {
         var repo = await _context.Repositories.FindAsync([repositoryId], ct)
             ?? throw new KeyNotFoundException($"Repository {repositoryId} not found");
 
-        // Check for cached report
-        var cachedReport = await _context.Enrichments
-            .Where(e => e.RepositoryId == repositoryId && e.Subtype == EnrichmentSubtype.InsightReport)
-            .OrderByDescending(e => e.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-
-        if (cachedReport is not null)
+        // Check for cached report (skip if regenerating)
+        if (!regenerate)
         {
-            try
+            var cachedReport = await _context.Enrichments
+                .Where(e => e.RepositoryId == repositoryId && e.Subtype == EnrichmentSubtype.InsightReport)
+                .OrderByDescending(e => e.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (cachedReport is not null)
             {
-                var cached = JsonSerializer.Deserialize<ReportDto>(cachedReport.Content, JsonOptions);
-                if (cached is not null)
-                    return cached;
-            }
-            catch (JsonException)
-            {
-                _logger.LogWarning("Cached report for {Repo} had invalid JSON, regenerating", repo.Name);
+                try
+                {
+                    var cached = JsonSerializer.Deserialize<ReportDto>(cachedReport.Content, JsonOptions);
+                    if (cached is not null)
+                        return cached;
+                }
+                catch (JsonException)
+                {
+                    _logger.LogWarning("Cached report for {Repo} had invalid JSON, regenerating", repo.Name);
+                }
             }
         }
 

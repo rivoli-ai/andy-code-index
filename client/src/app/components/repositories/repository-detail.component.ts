@@ -237,7 +237,7 @@ interface CommitComparison {
             </button>
             <button *ngIf="reportData" (click)="exportHtml()" class="btn btn-secondary btn-sm">
               <i class="bi bi-download"></i> Export HTML
-            </a>
+            </button>
             <button *ngIf="insightLayers.length > 0" class="btn btn-secondary btn-sm" (click)="printReport()">
               <i class="bi bi-printer"></i> Print
             </button>
@@ -948,9 +948,9 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   generateReport() {
     if (!this.repo) return;
     this.generatingReport = true;
-    this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo.id}/report`).subscribe({
+    this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo.id}/report?regenerate=true`).subscribe({
       next: (report) => { this.reportData = report; this.generatingReport = false; },
-      error: () => { this.generatingReport = false; }
+      error: (err) => { this.generatingReport = false; console.error('Report generation failed', err); }
     });
   }
 
