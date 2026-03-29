@@ -1019,27 +1019,40 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   generateInsights() {
     if (!this.repo) return;
     this.generatingInsights = true;
+    // Clear current insights so the UI shows progress from 0
+    const previousCount = this.insightLayers.length;
+    this.insightLayers = [];
+    this.selectedInsightLayer = '';
+    this.insightHtmlCache.clear();
+    this.reportData = null;
+
     this.http.post(`${environment.apiUrl}/repositories/${this.repo.id}/insights/generate`, {}).subscribe({
       next: () => {
-        // Task is queued — poll for results every 5 seconds
-        const pollInterval = setInterval(() => {
-          this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo!.id}/insights`).subscribe({
-            next: (data) => {
-              const layers = data.layers ? Object.entries(data.layers).filter(([_, v]) => v !== null).map(([k, v]: any) => ({ subtype: k, ...v })) : [];
-              if (layers.length > 0) {
+        // Wait a few seconds for the handler to start deleting old insights, then poll
+        setTimeout(() => {
+          const pollInterval = setInterval(() => {
+            this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo!.id}/insights`).subscribe({
+              next: (data) => {
+                const layers = data.layers ? Object.entries(data.layers).filter(([_, v]) => v !== null).map(([k, v]: any) => ({ subtype: k, ...v })) : [];
                 this.insightLayers = layers;
-                if (!this.selectedInsightLayer) this.selectedInsightLayer = layers[0].subtype;
+                if (layers.length > 0 && !this.selectedInsightLayer) {
+                  this.selectedInsightLayer = layers[0].subtype;
+                }
+                // Clear the HTML cache so new content renders
+                this.insightHtmlCache.clear();
+                // Stop when all 10 layers are present
+                if (layers.length >= 10) {
+                  clearInterval(pollInterval);
+                  this.generatingInsights = false;
+                  // Also refresh the report
+                  this.loadInsights();
+                }
               }
-              // Stop polling when we have all 10 layers or after 3 minutes
-              if (layers.length >= 10) {
-                clearInterval(pollInterval);
-                this.generatingInsights = false;
-              }
-            }
-          });
-        }, 5000);
-        // Safety timeout: stop polling after 3 minutes
-        setTimeout(() => { clearInterval(pollInterval); this.generatingInsights = false; }, 180000);
+            });
+          }, 5000);
+          // Safety timeout: stop polling after 5 minutes
+          setTimeout(() => { clearInterval(pollInterval); this.generatingInsights = false; }, 300000);
+        }, 3000); // Initial delay to let handler start
       },
       error: () => { this.generatingInsights = false; }
     });
