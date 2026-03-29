@@ -177,19 +177,20 @@ public class ReportService : IReportService
         }
 
         var prompt = "You are analyzing insight layers for the repository \"" + repoName + "\".\n" +
-            "Rate each layer and provide feedback. Return a JSON object (no markdown fencing).\n\n" +
-            "For each layer, provide:\n" +
-            "- subtype: the EnrichmentSubtype string (e.g., \"FeatureMap\", \"ArchitectureAnalysis\")\n" +
-            "- maturityRating: 1-5 (1=initial, 5=optimized)\n" +
-            "- qualityRating: 1-5 (1=poor, 5=excellent)\n" +
-            "- riskRating: 1-5 (1=low risk, 5=critical risk)\n" +
-            "- strengths: top 3 strengths (string array)\n" +
-            "- weaknesses: top 3 weaknesses (string array)\n" +
-            "- recommendations: top 3 actionable recommendations (string array)\n\n" +
-            "Also provide:\n" +
-            "- overallHealthScore: 0-100 overall health score\n" +
-            "- improvements: top 5 cross-layer improvements with title, description, layer, impact (high/medium/low), effort (high/medium/low)\n\n" +
-            "Return valid JSON only. No markdown fencing.\n\n" +
+            "Rate each layer and provide constructive feedback.\n\n" +
+            "IMPORTANT: Return ONLY a valid JSON object. No preamble, no explanation, no markdown fencing, no text before or after the JSON.\n\n" +
+            "JSON structure:\n" +
+            "- overallHealthScore: number 0-100\n" +
+            "- layers: array of objects, each with:\n" +
+            "  - subtype: string (e.g., \"FeatureMap\")\n" +
+            "  - maturityRating: number 1-5\n" +
+            "  - qualityRating: number 1-5\n" +
+            "  - riskRating: number 1-5\n" +
+            "  - strengths: array of 3 strings (specific, referencing actual code/patterns found)\n" +
+            "  - weaknesses: array of 3 strings (specific, with concrete examples)\n" +
+            "  - recommendations: array of 3 strings (actionable, prioritized)\n" +
+            "- improvements: array of 5 objects with title, description, layer, impact (high/medium/low), effort (high/medium/low)\n\n" +
+            "Base your analysis on the actual content below — be specific, not generic.\n\n" +
             "Insight contents:\n" + sb.ToString();
 
         var client = _httpClientFactory.CreateClient("Chat");
@@ -444,10 +445,10 @@ public class ReportService : IReportService
                 sb.AppendLine("</ul>");
             }
 
-            // Content with mermaid blocks preserved
-            sb.AppendLine("<details><summary>Full Analysis</summary>");
-            sb.AppendLine($"<div class=\"content\"><pre>{Escape(layer.Content)}</pre></div>");
-            sb.AppendLine("</details>");
+            // Full content rendered as HTML (basic markdown to HTML conversion)
+            sb.AppendLine("<div class=\"content\">");
+            sb.AppendLine(MarkdownToHtml(layer.Content));
+            sb.AppendLine("</div>");
 
             sb.AppendLine("</div>");
         }
@@ -473,6 +474,74 @@ public class ReportService : IReportService
 
     private static int Clamp(int value, int min, int max) =>
         Math.Max(min, Math.Min(max, value));
+
+    /// <summary>Basic markdown to HTML conversion for the export.</summary>
+    private static string MarkdownToHtml(string? markdown)
+    {
+        if (string.IsNullOrEmpty(markdown)) return "";
+        var lines = markdown.Split('\n');
+        var sb = new StringBuilder();
+        var inCodeBlock = false;
+        var inList = false;
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.TrimEnd('\r');
+
+            // Code blocks
+            if (line.TrimStart().StartsWith("```"))
+            {
+                if (inCodeBlock)
+                {
+                    sb.AppendLine("</code></pre>");
+                    inCodeBlock = false;
+                }
+                else
+                {
+                    var lang = line.TrimStart().Length > 3 ? line.TrimStart()[3..].Trim() : "";
+                    sb.AppendLine($"<pre><code class=\"language-{Escape(lang)}\">");
+                    inCodeBlock = true;
+                }
+                continue;
+            }
+            if (inCodeBlock) { sb.AppendLine(Escape(line)); continue; }
+
+            // Close list if needed
+            if (inList && !line.TrimStart().StartsWith("- ") && !line.TrimStart().StartsWith("* "))
+            {
+                sb.AppendLine("</ul>"); inList = false;
+            }
+
+            // Headings
+            if (line.StartsWith("### ")) { sb.AppendLine($"<h3>{Escape(line[4..])}</h3>"); continue; }
+            if (line.StartsWith("## ")) { sb.AppendLine($"<h2>{Escape(line[3..])}</h2>"); continue; }
+            if (line.StartsWith("# ")) { sb.AppendLine($"<h1>{Escape(line[2..])}</h1>"); continue; }
+
+            // List items
+            if (line.TrimStart().StartsWith("- ") || line.TrimStart().StartsWith("* "))
+            {
+                if (!inList) { sb.AppendLine("<ul>"); inList = true; }
+                var content = line.TrimStart()[2..];
+                // Bold
+                content = System.Text.RegularExpressions.Regex.Replace(Escape(content), @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+                sb.AppendLine($"<li>{content}</li>");
+                continue;
+            }
+
+            // Empty line
+            if (string.IsNullOrWhiteSpace(line)) { sb.AppendLine("<br/>"); continue; }
+
+            // Regular paragraph with inline formatting
+            var text = Escape(line);
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"`(.+?)`", "<code>$1</code>");
+            sb.AppendLine($"<p>{text}</p>");
+        }
+
+        if (inList) sb.AppendLine("</ul>");
+        if (inCodeBlock) sb.AppendLine("</code></pre>");
+        return sb.ToString();
+    }
 
     private static string NormalizeImpactEffort(string? value, string fallback)
     {
