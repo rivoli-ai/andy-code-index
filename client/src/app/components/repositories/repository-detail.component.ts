@@ -202,6 +202,77 @@ interface CommitComparison {
         </div>
       </div>
 
+      <!-- Insights & Report -->
+      <div class="card" style="margin-top:1.5rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h3 style="font-size:1rem;margin:0">Insights & Report</h3>
+          <div style="display:flex;gap:0.5rem">
+            <button class="btn btn-secondary" (click)="generateInsights()" [disabled]="generatingInsights" style="font-size:var(--font-xs)">
+              <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating...' : 'Generate Insights' }}
+            </button>
+            <button class="btn btn-secondary" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length" style="font-size:var(--font-xs)">
+              <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
+            </button>
+            <a *ngIf="reportData" [href]="'/api/v1/repositories/' + repo.id + '/report/html'" target="_blank" class="btn btn-secondary" style="font-size:var(--font-xs)">
+              <i class="bi bi-download"></i> Export HTML
+            </a>
+          </div>
+        </div>
+
+        <!-- Health Score -->
+        <div *ngIf="reportData" style="display:flex;gap:2rem;align-items:center;margin-bottom:1.5rem;padding:1rem;background:var(--background-alt);border-radius:var(--radius)">
+          <div style="text-align:center">
+            <div style="font-size:2.5rem;font-weight:700" [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+              {{ reportData.overallHealthScore }}
+            </div>
+            <div class="text-muted" style="font-size:var(--font-xs)">Health Score</div>
+          </div>
+          <div *ngIf="reportData.velocity" style="display:flex;gap:1.5rem">
+            <div class="stat"><div class="stat-value">{{ reportData.velocity.commitsPerMonth }}</div><div class="stat-label">Commits/Month</div></div>
+            <div class="stat"><div class="stat-value">{{ reportData.velocity.activeContributors }}</div><div class="stat-label">Active Contributors</div></div>
+          </div>
+          <div *ngIf="reportData.top5Improvements?.length" style="flex:1">
+            <div class="text-muted" style="font-size:var(--font-xs);font-weight:600;margin-bottom:0.375rem">Top Improvements</div>
+            <div *ngFor="let imp of reportData.top5Improvements; let i = index" style="font-size:var(--font-xs);margin-bottom:0.125rem">
+              {{ i + 1 }}. {{ imp.title }}
+              <span class="badge badge-muted" style="font-size:0.65rem;margin-left:0.25rem">{{ imp.impact }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Insight Layer Tabs -->
+        <div *ngIf="insightLayers.length > 0">
+          <div style="display:flex;flex-wrap:wrap;gap:0.375rem;margin-bottom:1rem">
+            <button *ngFor="let layer of insightLayers" class="badge" style="cursor:pointer;border:none"
+                    [ngClass]="selectedInsightLayer === layer.subtype ? 'badge-primary' : 'badge-muted'"
+                    (click)="selectedInsightLayer = layer.subtype">
+              {{ getInsightLabel(layer.subtype) }}
+              <span *ngIf="getLayerRating(layer.subtype)" style="margin-left:0.25rem">{{ getLayerRating(layer.subtype) }}/5</span>
+            </button>
+          </div>
+
+          <!-- Layer Content -->
+          <div *ngFor="let layer of insightLayers">
+            <div *ngIf="selectedInsightLayer === layer.subtype">
+              <!-- Layer Ratings -->
+              <div *ngIf="getLayerReport(layer.subtype) as lr" style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+                <span class="badge badge-muted"><i class="bi bi-bar-chart"></i> Maturity: {{ lr.maturityRating }}/5</span>
+                <span class="badge badge-muted"><i class="bi bi-star"></i> Quality: {{ lr.qualityRating }}/5</span>
+                <span class="badge" [ngClass]="lr.riskRating >= 4 ? 'badge-danger' : lr.riskRating >= 3 ? 'badge-warning' : 'badge-success'">
+                  <i class="bi bi-shield"></i> Risk: {{ lr.riskRating }}/5
+                </span>
+              </div>
+              <!-- Content -->
+              <div style="white-space:pre-wrap;font-size:var(--font-xs);line-height:1.6;max-height:500px;overflow-y:auto;padding:0.5rem;background:var(--background-alt);border-radius:var(--radius)">{{ layer.content }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="insightLayers.length === 0 && !generatingInsights" class="text-muted" style="font-size:var(--font-sm);padding:1rem 0;text-align:center">
+          No insights yet. Click "Generate Insights" to analyze this repository.
+        </div>
+      </div>
+
       <app-repository-history [repositoryId]="repo.id" style="margin-top:1.5rem;display:block" />
       <app-repository-analytics [repositoryId]="repo.id" />
     </div>
@@ -245,6 +316,20 @@ export class RepositoryDetailComponent implements OnInit {
   syncIntervalSaving = false;
   syncIntervalSaved = false;
 
+  // Insights & Report
+  insightLayers: any[] = [];
+  selectedInsightLayer = '';
+  generatingInsights = false;
+  generatingReport = false;
+  reportData: any = null;
+
+  private insightLabels: Record<string, string> = {
+    'FeatureMap': 'Features', 'ArchitectureAnalysis': 'Architecture', 'DesignAnalysis': 'Design',
+    'ImplementationAnalysis': 'Implementation', 'DependencyAnalysis': 'Dependencies',
+    'TestAnalysis': 'Testing', 'SecurityAnalysis': 'Security', 'DeploymentAnalysis': 'Deployment',
+    'OperationsAnalysis': 'Operations', 'LocalSetupGuide': 'Local Setup'
+  };
+
   constructor(private api: ApiService, private route: ActivatedRoute, private router: Router, private http: HttpClient) {}
 
   ngOnInit() {
@@ -263,6 +348,18 @@ export class RepositoryDetailComponent implements OnInit {
     });
     this.http.get<CommitSummary[]>(`${environment.apiUrl}/repositories/${id}/commits?limit=100`).subscribe({
       next: (commits) => this.commits = commits,
+      error: () => {}
+    });
+    // Load insights and report
+    this.http.get<any[]>(`${environment.apiUrl}/repositories/${id}/insights`).subscribe({
+      next: (layers) => {
+        this.insightLayers = layers;
+        if (layers.length > 0) this.selectedInsightLayer = layers[0].subtype;
+      },
+      error: () => {}
+    });
+    this.http.get<any>(`${environment.apiUrl}/repositories/${id}/report`).subscribe({
+      next: (report) => this.reportData = report,
       error: () => {}
     });
   }
@@ -347,5 +444,55 @@ export class RepositoryDetailComponent implements OnInit {
       case 'error': return 'badge-danger';
       default: return 'badge-muted';
     }
+  }
+
+  loadInsights() {
+    if (!this.repo) return;
+    this.http.get<any[]>(`${environment.apiUrl}/repositories/${this.repo.id}/insights`).subscribe({
+      next: (layers) => {
+        this.insightLayers = layers;
+        if (layers.length > 0 && !this.selectedInsightLayer) {
+          this.selectedInsightLayer = layers[0].subtype;
+        }
+      },
+      error: () => {}
+    });
+    this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo.id}/report`).subscribe({
+      next: (report) => this.reportData = report,
+      error: () => {}
+    });
+  }
+
+  generateInsights() {
+    if (!this.repo) return;
+    this.generatingInsights = true;
+    this.http.post(`${environment.apiUrl}/repositories/${this.repo.id}/insights/generate`, {}).subscribe({
+      next: () => { this.generatingInsights = false; this.loadInsights(); },
+      error: () => { this.generatingInsights = false; }
+    });
+  }
+
+  generateReport() {
+    if (!this.repo) return;
+    this.generatingReport = true;
+    this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo.id}/report`).subscribe({
+      next: (report) => { this.reportData = report; this.generatingReport = false; },
+      error: () => { this.generatingReport = false; }
+    });
+  }
+
+  getInsightLabel(subtype: string): string {
+    return this.insightLabels[subtype] || subtype;
+  }
+
+  getLayerRating(subtype: string): number | null {
+    if (!this.reportData?.layers) return null;
+    const layer = this.reportData.layers.find((l: any) => l.subtype === subtype);
+    return layer?.qualityRating || null;
+  }
+
+  getLayerReport(subtype: string): any {
+    if (!this.reportData?.layers) return null;
+    return this.reportData.layers.find((l: any) => l.subtype === subtype);
   }
 }
