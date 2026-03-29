@@ -4,6 +4,7 @@ public class SettingsChangeLog
 {
     public Guid Id { get; set; }
     public required string UserId { get; set; }
+    public string? UserEmail { get; set; }
     public required string Field { get; set; }
     public string? OldValue { get; set; }
     public string? NewValue { get; set; }

@@ -280,6 +280,34 @@
         { "id": "qual-019", "text": "How trustworthy is the test suite?", "keywords": ["trustworthy", "reliable", "signal", "confidence"] },
         { "id": "qual-020", "text": "What code complexity hotspots exist?", "keywords": ["complexity", "cyclomatic", "cognitive", "hotspot"] }
       ]
+    },
+    {
+      "id": "semantic-search",
+      "label": "Semantic Search",
+      "enrichments": ["SnippetSummary"],
+      "fallbackEnrichments": ["Physical", "Wiki"],
+      "questions": [
+        { "id": "sem-001", "text": "Find functions similar to error handling patterns", "keywords": ["find", "similar", "error", "handling", "pattern"], "suggested": true },
+        { "id": "sem-002", "text": "Search for authentication-related code", "keywords": ["search", "authentication", "auth", "login", "code"], "suggested": true },
+        { "id": "sem-003", "text": "Find code that implements retry logic", "keywords": ["find", "retry", "logic", "backoff", "resilience"], "suggested": true },
+        { "id": "sem-004", "text": "Search for data validation patterns across the codebase", "keywords": ["search", "validation", "pattern", "input", "sanitize"], "suggested": true },
+        { "id": "sem-005", "text": "Find implementations of caching strategies", "keywords": ["find", "caching", "cache", "strategy", "implementation"], "suggested": true },
+        { "id": "sem-006", "text": "Search for logging and observability patterns", "keywords": ["search", "logging", "observability", "tracing", "telemetry"], "suggested": true },
+        { "id": "sem-007", "text": "Find code similar to dependency injection setup", "keywords": ["find", "similar", "dependency injection", "di", "container", "registration"], "suggested": false },
+        { "id": "sem-008", "text": "Search for middleware or pipeline patterns", "keywords": ["search", "middleware", "pipeline", "filter", "interceptor"], "suggested": false },
+        { "id": "sem-009", "text": "Find repository or data access patterns", "keywords": ["find", "repository", "data access", "dal", "orm"], "suggested": false },
+        { "id": "sem-010", "text": "Search for configuration loading patterns", "keywords": ["search", "configuration", "loading", "options", "settings"], "suggested": false },
+        { "id": "sem-011", "text": "Find code that handles HTTP requests or responses", "keywords": ["find", "http", "request", "response", "client"], "suggested": false },
+        { "id": "sem-012", "text": "Search for event-driven or pub/sub patterns", "keywords": ["search", "event", "publish", "subscribe", "message"], "suggested": false },
+        { "id": "sem-013", "text": "Find examples of async/await usage", "keywords": ["find", "async", "await", "task", "asynchronous"], "suggested": false },
+        { "id": "sem-014", "text": "Search for factory or builder patterns", "keywords": ["search", "factory", "builder", "pattern", "creational"], "suggested": false },
+        { "id": "sem-015", "text": "Find code related to database transactions", "keywords": ["find", "database", "transaction", "commit", "rollback"], "suggested": false },
+        { "id": "sem-016", "text": "Search for serialization and deserialization code", "keywords": ["search", "serialization", "deserialization", "json", "mapping"], "suggested": false },
+        { "id": "sem-017", "text": "Find background job or worker implementations", "keywords": ["find", "background", "job", "worker", "queue", "hosted service"], "suggested": false },
+        { "id": "sem-018", "text": "Search for exception handling strategies", "keywords": ["search", "exception", "try", "catch", "error boundary"], "suggested": false },
+        { "id": "sem-019", "text": "Find code that implements rate limiting or throttling", "keywords": ["find", "rate limit", "throttle", "quota", "circuit breaker"], "suggested": false },
+        { "id": "sem-020", "text": "Search for test helper utilities and shared fixtures", "keywords": ["search", "test helper", "utility", "fixture", "shared", "base test"], "suggested": false }
+      ]
     }
   ]
 }

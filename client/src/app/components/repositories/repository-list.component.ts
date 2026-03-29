@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+import { HealthService } from '../../services/health.service';
 import { Repository } from '../../models/repository.model';
 
 @Component({
@@ -10,9 +11,13 @@ import { Repository } from '../../models/repository.model';
   standalone: true,
   imports: [CommonModule, RouterLink, FormsModule],
   template: `
+    <div class="warning-banner" *ngIf="!(healthService.isConnected$ | async)">
+      <i class="bi bi-exclamation-triangle"></i> Backend unavailable - some features are disabled
+    </div>
+
     <div class="page-header">
       <h1>Repositories</h1>
-      <a routerLink="/repositories/add" class="btn btn-primary">
+      <a routerLink="/repositories/add" class="btn btn-primary" [class.disabled]="!(healthService.isConnected$ | async)">
         <i class="bi bi-plus-lg"></i> Add Repository
       </a>
     </div>
@@ -110,6 +115,8 @@ import { Repository } from '../../models/repository.model';
   `,
   styles: [`
     .error-message { color: var(--danger); margin-top: 1rem; padding: 0.75rem; background: rgba(220,53,69,0.1); border-radius: var(--radius); }
+    .warning-banner { background: rgba(255,193,7,0.15); color: #856404; border: 1px solid rgba(255,193,7,0.3); border-radius: var(--radius); padding: 0.5rem 1rem; margin-bottom: 1rem; font-size: var(--font-sm); }
+    .btn.disabled { opacity: 0.5; pointer-events: none; }
   `]
 })
 export class RepositoryListComponent implements OnInit {
@@ -123,7 +130,7 @@ export class RepositoryListComponent implements OnInit {
   providerFilter = '';
   sortBy = 'name';
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, public healthService: HealthService) {}
 
   ngOnInit() {
     this.loadRepositories();

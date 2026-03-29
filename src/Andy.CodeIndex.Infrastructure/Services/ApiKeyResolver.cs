@@ -53,6 +53,19 @@ public class ApiKeyResolver : IApiKeyResolver
             return (_embeddingOptions.ApiKey!, "system");
         }
 
+        // Tier 3: Fall back to any user's embedding key (for background tasks that don't have a user context)
+        var anyUserSettings = await _context.UserSettings
+            .FirstOrDefaultAsync(s => s.EmbeddingApiKey != null, ct);
+        if (anyUserSettings?.EmbeddingApiKey is not null)
+        {
+            var decrypted = _encryption.Decrypt(anyUserSettings.EmbeddingApiKey);
+            if (!string.IsNullOrEmpty(decrypted))
+            {
+                _logger.LogDebug("Using fallback embedding key from user {UserId}", anyUserSettings.UserId);
+                return (decrypted, "user-fallback");
+            }
+        }
+
         return (null, "none");
     }
 
@@ -98,6 +111,23 @@ public class ApiKeyResolver : IApiKeyResolver
         {
             _logger.LogDebug("Using embedding key as LLM fallback");
             return (_embeddingOptions.ApiKey!, _llmOptions.Model, "system");
+        }
+
+        // Tier 4: Fall back to any user's key (for background tasks without user context)
+        var anyUser = await _context.UserSettings
+            .FirstOrDefaultAsync(s => s.LlmApiKey != null || s.EmbeddingApiKey != null, ct);
+        if (anyUser is not null)
+        {
+            var key = anyUser.LlmApiKey ?? anyUser.EmbeddingApiKey;
+            if (key is not null)
+            {
+                var decrypted = _encryption.Decrypt(key);
+                if (!string.IsNullOrEmpty(decrypted))
+                {
+                    _logger.LogDebug("Using fallback LLM key from user {UserId}", anyUser.UserId);
+                    return (decrypted, _llmOptions.Model, "user-fallback");
+                }
+            }
         }
 
         return (null, _llmOptions.Model, "none");

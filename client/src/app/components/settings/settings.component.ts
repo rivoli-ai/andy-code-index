@@ -43,7 +43,21 @@ import { environment } from '../../../environments/environment';
 
         <div class="form-group">
           <label>API Key</label>
-          <input class="form-control" type="password" [(ngModel)]="embeddingKey" placeholder="sk-...">
+          <div style="display:flex;gap:0.5rem">
+            <input class="form-control" type="password" [(ngModel)]="embeddingKey" placeholder="sk-..." (keydown.enter)="embeddingKey && saveEmbedding()" style="flex:1">
+            <button class="btn btn-sm btn-secondary" (click)="testConnection('embedding')" [disabled]="testingEmbed" title="Test embedding connection">
+              <span *ngIf="testingEmbed">...</span>
+              <span *ngIf="!testingEmbed">Test</span>
+            </button>
+          </div>
+          <div *ngIf="embedTestResult" style="margin-top:0.375rem;font-size:0.8125rem">
+            <span *ngIf="embedTestResult.success" style="color:var(--success)">
+              <i class="bi bi-check-circle-fill"></i> Connected ({{ embedTestResult.latencyMs }}ms)
+            </span>
+            <span *ngIf="!embedTestResult.success" style="color:var(--danger)">
+              <i class="bi bi-x-circle-fill"></i> {{ embedTestResult.error }}
+            </span>
+          </div>
         </div>
         <div class="form-group">
           <label>Model</label>
@@ -87,18 +101,34 @@ import { environment } from '../../../environments/environment';
 
         <div class="form-group">
           <label>LLM API Key (optional, separate from embedding)</label>
-          <input class="form-control" type="password" [(ngModel)]="llmKey" placeholder="sk-... (leave empty to use embedding key)">
-        </div>
-        <div class="form-group">
-          <label>Supported Models</label>
-          <div class="text-muted" style="font-size:0.8125rem">
-            OpenAI: gpt-4o, gpt-4o-mini, gpt-3.5-turbo.
-            Azure OpenAI, Ollama, or any OpenAI-compatible API.
-            Model is configured server-side via Enrichment:Model.
+          <div style="display:flex;gap:0.5rem">
+            <input class="form-control" type="password" [(ngModel)]="llmKey" placeholder="sk-... (leave empty to use embedding key)" (keydown.enter)="llmKey && saveLlm()" style="flex:1">
+            <button class="btn btn-sm btn-secondary" (click)="testConnection('llm')" [disabled]="testingLlm" title="Test LLM connection">
+              <span *ngIf="testingLlm">...</span>
+              <span *ngIf="!testingLlm">Test</span>
+            </button>
+          </div>
+          <div *ngIf="llmTestResult" style="margin-top:0.375rem;font-size:0.8125rem">
+            <span *ngIf="llmTestResult.success" style="color:var(--success)">
+              <i class="bi bi-check-circle-fill"></i> Connected ({{ llmTestResult.latencyMs }}ms)
+            </span>
+            <span *ngIf="!llmTestResult.success" style="color:var(--danger)">
+              <i class="bi bi-x-circle-fill"></i> {{ llmTestResult.error }}
+            </span>
           </div>
         </div>
-        <button class="btn btn-primary btn-sm" (click)="saveLlm()" [disabled]="savingLlm || !llmKey">
-          {{ savingLlm ? 'Saving...' : 'Save LLM Key' }}
+        <div class="form-group">
+          <label>LLM Model</label>
+          <select class="form-control" [(ngModel)]="llmModel">
+            <option value="">Default ({{ settings.llm.model }})</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="gpt-4-turbo">gpt-4-turbo</option>
+            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" (click)="saveLlm()" [disabled]="savingLlm || (!llmKey && !llmModel)">
+          {{ savingLlm ? 'Saving...' : 'Save LLM Settings' }}
         </button>
         <span *ngIf="llmMessage" style="margin-left:0.75rem;color:var(--success);font-size:0.8125rem">{{ llmMessage }}</span>
       </div>
@@ -115,7 +145,9 @@ import { environment } from '../../../environments/environment';
             </span>
             <strong style="margin-left:0.5rem">{{ entry.field }}</strong>
           </div>
-          <span class="text-muted" style="font-size:0.75rem">{{ entry.createdAt | date:'short' }}</span>
+          <span class="text-muted" style="font-size:0.75rem">
+            <span *ngIf="entry.userEmail" style="margin-right:0.5rem">{{ entry.userEmail }}</span>{{ entry.createdAt | date:'short' }}
+          </span>
         </div>
         <div class="text-muted" style="font-size:0.8125rem;margin-top:0.25rem" *ngIf="entry.oldValue || entry.newValue">
           <span *ngIf="entry.oldValue"><code>{{ entry.oldValue }}</code> &rarr; </span>
@@ -134,22 +166,30 @@ export class SettingsComponent implements OnInit {
   embeddingKey = '';
   embeddingModel = '';
   llmKey = '';
+  llmModel = '';
   settings: any = null;
   history: any[] = [];
   savingEmbed = false;
   savingLlm = false;
   embedMessage = '';
   llmMessage = '';
+  testingEmbed = false;
+  testingLlm = false;
+  embedTestResult: any = null;
+  llmTestResult: any = null;
 
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
     this.embedMessage = '';
     this.llmMessage = '';
+    this.embedTestResult = null;
+    this.llmTestResult = null;
     this.http.get(`${environment.apiUrl}/settings`).subscribe({
       next: (s: any) => {
         this.settings = s;
         this.embeddingModel = s.embedding?.model || '';
+        this.llmModel = s.llm?.model || '';
       }
     });
     this.http.get<any[]>(`${environment.apiUrl}/settings/history`).subscribe({
@@ -173,7 +213,11 @@ export class SettingsComponent implements OnInit {
   saveLlm() {
     this.savingLlm = true;
     this.llmMessage = '';
-    this.http.put(`${environment.apiUrl}/settings`, { llmApiKey: this.llmKey }).subscribe({
+    const body: any = {};
+    if (this.llmKey) body.llmApiKey = this.llmKey;
+    if (this.llmModel) body.llmModel = this.llmModel;
+
+    this.http.put(`${environment.apiUrl}/settings`, body).subscribe({
       next: () => { this.llmMessage = 'Saved'; this.savingLlm = false; this.llmKey = ''; this.ngOnInit(); },
       error: () => this.savingLlm = false
     });
@@ -188,6 +232,38 @@ export class SettingsComponent implements OnInit {
   deleteLlmKey() {
     this.http.put(`${environment.apiUrl}/settings`, { llmApiKey: '' }).subscribe({
       next: () => { this.llmMessage = 'Key removed'; this.ngOnInit(); }
+    });
+  }
+
+  testConnection(type: 'embedding' | 'llm') {
+    if (type === 'embedding') {
+      this.testingEmbed = true;
+      this.embedTestResult = null;
+    } else {
+      this.testingLlm = true;
+      this.llmTestResult = null;
+    }
+
+    this.http.post<any>(`${environment.apiUrl}/settings/test-connection`, { type }).subscribe({
+      next: (result) => {
+        if (type === 'embedding') {
+          this.embedTestResult = result;
+          this.testingEmbed = false;
+        } else {
+          this.llmTestResult = result;
+          this.testingLlm = false;
+        }
+      },
+      error: (err) => {
+        const errorResult = { success: false, error: err.message || 'Request failed' };
+        if (type === 'embedding') {
+          this.embedTestResult = errorResult;
+          this.testingEmbed = false;
+        } else {
+          this.llmTestResult = errorResult;
+          this.testingLlm = false;
+        }
+      }
     });
   }
 }

@@ -104,6 +104,15 @@ public class QuestionClassifierTests
         result.DimensionId.Should().Be(expectedDimension);
     }
 
+    [Theory]
+    [InlineData("Find similar error handling patterns in the codebase", "semantic-search")]
+    [InlineData("Find code that implements retry logic and backoff", "semantic-search")]
+    public void Classify_SemanticSearchQuestions_ReturnSemanticSearchDimension(string message, string expectedDimension)
+    {
+        var result = _classifier.Classify(message);
+        result.DimensionId.Should().Be(expectedDimension);
+    }
+
     [Fact]
     public void Classify_EmptyMessage_ReturnsGeneral()
     {
@@ -119,10 +128,10 @@ public class QuestionClassifierTests
     }
 
     [Fact]
-    public void GetSuggestions_Returns10Dimensions()
+    public void GetSuggestions_Returns11Dimensions()
     {
         var suggestions = _classifier.GetSuggestions();
-        suggestions.Should().HaveCount(10);
+        suggestions.Should().HaveCount(11);
     }
 
     [Fact]

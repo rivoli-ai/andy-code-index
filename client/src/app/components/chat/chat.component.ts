@@ -160,34 +160,34 @@ interface SuggestionDimension {
       background: var(--background-alt);
     }
     .sidebar-section { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
-    .sidebar-title { font-size: var(--font-sm); font-weight: 600; margin: 0 0 0.5rem 0; }
+    .sidebar-title { font-size: var(--font-base); font-weight: 600; margin: 0 0 0.5rem 0; }
     .sidebar-search { font-size: var(--font-xs); padding: 0.375rem 0.625rem; }
 
-    .category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; }
+    .category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; padding: 0; }
     .category-tile {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 0.375rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);
-      background: var(--surface); font-size: 0.75rem; cursor: pointer;
+      padding: 0.375rem 0.625rem; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); font-size: var(--font-xs); cursor: pointer;
       transition: all var(--transition); color: var(--text); text-align: left;
       min-height: 2rem;
     }
     .category-tile:hover { border-color: var(--primary); color: var(--primary); background: rgba(0,102,204,0.04); }
     .category-tile.active { background: var(--primary); color: white; border-color: var(--primary); }
     .category-name { font-weight: 500; line-height: 1.2; }
-    .category-count { font-size: 0.65rem; opacity: 0.7; flex-shrink: 0; margin-left: 0.25rem; }
+    .category-count { font-size: var(--font-xs); opacity: 0.7; flex-shrink: 0; margin-left: 0.25rem; }
 
-    .question-list { flex: 1; overflow-y: auto; padding: 0.5rem 0.75rem; }
+    .question-list { flex: 1; overflow-y: auto; padding: 0.75rem 1rem; }
     .question-item {
       display: block; width: 100%; text-align: left;
       padding: 0.5rem 0.625rem; margin-bottom: 0.25rem;
       border: 1px solid transparent; border-radius: var(--radius); background: none;
-      font-size: var(--font-xs); color: var(--text); cursor: pointer;
+      font-size: var(--font-sm); color: var(--text); cursor: pointer;
       transition: all var(--transition); line-height: 1.4;
     }
     .question-item:hover {
       background: var(--surface); color: var(--primary);
       border-color: var(--primary-light);
-      padding-left: 0.875rem;
+      padding-left: 0.875rem; padding-right: 0.875rem;
     }
 
     .conversations-section { margin-top: auto; border-top: 1px solid var(--border); border-bottom: none; max-height: 40%; overflow-y: auto; }
@@ -199,7 +199,7 @@ interface SuggestionDimension {
     .conversation-item:hover { background: var(--surface); border-color: var(--border); }
     .conversation-item.active { background: rgba(0,102,204,0.06); border-color: var(--primary-light); }
     .conv-title { font-size: var(--font-xs); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .conv-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: var(--text-muted); margin-top: 0.125rem; }
+    .conv-meta { display: flex; justify-content: space-between; align-items: center; font-size: var(--font-xs); color: var(--text-muted); margin-top: 0.125rem; }
     .btn-icon {
       background: none; border: 1px solid var(--border); border-radius: var(--radius);
       cursor: pointer; padding: 0.25rem 0.5rem; color: var(--text-muted);
@@ -208,7 +208,7 @@ interface SuggestionDimension {
     .btn-icon:hover { color: var(--primary); border-color: var(--primary); }
     .btn-icon-sm {
       background: none; border: none; cursor: pointer; padding: 0.125rem;
-      color: var(--text-light); transition: all var(--transition); font-size: 0.7rem;
+      color: var(--text-light); transition: all var(--transition); font-size: var(--font-xs);
     }
     .btn-icon-sm:hover { color: var(--danger); }
 

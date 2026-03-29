@@ -16,33 +16,36 @@ import { environment } from '../../../environments/environment';
     </div>
 
     <div class="card mb-2">
-      <h3 style="font-size:1rem;margin-bottom:0.5rem">What are enrichments?</h3>
-      <p class="text-muted" style="font-size:0.875rem;margin-bottom:0.75rem">
+      <h3 style="font-size:var(--font-sm);margin-bottom:0.5rem">What are enrichments?</h3>
+      <p class="text-muted" style="font-size:var(--font-xs);margin-bottom:0.75rem">
         Enrichments are structured knowledge extracted from your repositories. They power MCP agents, semantic search,
         and chat -- giving AI tools deep understanding of your codebase beyond raw source files.
       </p>
-      <details style="font-size:0.8125rem">
-        <summary style="cursor:pointer;color:var(--primary);font-weight:500;margin-bottom:0.5rem">Type descriptions</summary>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;margin-top:0.5rem">
-          <div><strong>Architecture</strong> -- System structure, component diagrams, and dependency maps</div>
-          <div><strong>DB Schema</strong> -- Database table definitions and relationships</div>
-          <div><strong>Chunk</strong> -- Parsed code segments with context (functions, classes, blocks)</div>
-          <div><strong>Snippet</strong> -- Key code snippets extracted from the repository</div>
-          <div><strong>Snippet Summary</strong> -- Natural language summaries of code snippets</div>
-          <div><strong>Example</strong> -- Usage examples found in tests and documentation</div>
-          <div><strong>Commit Desc</strong> -- LLM-generated summary of development history and purpose</div>
-          <div><strong>Commit History</strong> -- Full commit log with authors, dates, and tags</div>
-          <div><strong>API Docs</strong> -- Auto-generated documentation for public APIs and endpoints</div>
-          <div><strong>Cookbook</strong> -- How-to recipes derived from real usage patterns</div>
-          <div><strong>Wiki</strong> -- High-level explanations of modules, features, and design decisions</div>
-          <div><strong>Dependencies</strong> -- Package dependencies extracted from manifest files</div>
-        </div>
-      </details>
+      <h4 style="font-size:var(--font-sm);font-weight:600;margin:0.75rem 0 0.5rem 0;color:var(--text)">Type descriptions</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;font-size:var(--font-xs)">
+        <div><strong>Architecture</strong> -- High-level component overview, responsibilities, interactions, and design patterns</div>
+        <div><strong>DB Schema</strong> -- Database tables, columns, relationships, indexes, and constraints from entity classes and migrations</div>
+        <div><strong>Dependencies</strong> -- Package dependencies extracted from manifest files</div>
+        <div><strong>Chunk</strong> -- Parsed code segments with file path and line ranges</div>
+        <div><strong>Snippet</strong> -- Key code snippets extracted from the repository</div>
+        <div><strong>Snippet Summary</strong> -- Natural language summaries of code snippets grouped by file</div>
+        <div><strong>Example</strong> -- Usage examples found in tests and documentation</div>
+        <div><strong>Example Summary</strong> -- Natural language summaries of usage examples</div>
+        <div><strong>Commit Desc</strong> -- LLM-generated summary of development history, features, and project purpose</div>
+        <div><strong>Commit History</strong> -- Full commit log with authors, dates, and tags</div>
+        <div><strong>API Docs</strong> -- Auto-generated documentation for public classes, interfaces, functions, and enums</div>
+        <div><strong>Cookbook</strong> -- Getting-started guide with setup instructions, usage patterns, and best practices</div>
+        <div><strong>Wiki</strong> -- Comprehensive documentation covering architecture, API reference, configuration, deployment, and troubleshooting</div>
+        <div><strong>Ownership</strong> -- Code ownership, team structure, maintainer areas, and contribution workflows</div>
+        <div><strong>Security</strong> -- Authentication, authorization, secrets management, input validation, and encryption analysis</div>
+        <div><strong>Operations</strong> -- CI/CD pipelines, containerization, deployment, infrastructure, monitoring, and environment management</div>
+        <div><strong>Quality</strong> -- Testing strategy, test frameworks, coverage analysis, quality tooling, and CI quality gates</div>
+      </div>
     </div>
 
     <!-- Summary bar -->
     <div class="card mb-2" *ngIf="!loading && typeCounts.length > 0" style="padding:0.75rem 1rem">
-      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;font-size:0.8125rem">
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;font-size:var(--font-xs)">
         <span class="text-muted">{{ totalCount }} total</span>
         <span *ngFor="let tc of typeCounts" style="display:inline-flex;align-items:center;gap:0.25rem">
           <span class="badge badge-muted">{{ getSubtypeLabel(tc.subtype) }}</span>
@@ -57,10 +60,7 @@ import { environment } from '../../../environments/environment';
         <div class="form-group" style="margin-bottom:0">
           <select class="form-control" [(ngModel)]="typeFilter" (change)="onTypeChange()" style="width:180px">
             <option value="">All Types</option>
-            <option value="Architecture">Architecture</option>
-            <option value="Development">Development</option>
-            <option value="History">History</option>
-            <option value="Usage">Usage</option>
+            <option *ngFor="let t of typeOptions" [value]="t">{{ t }}</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
@@ -91,7 +91,7 @@ import { environment } from '../../../environments/environment';
               <span class="badge" style="margin-left:0.25rem" [ngClass]="qualityClass(e.quality)">{{ qualityLabel(e.quality) }}</span>
             </div>
             <strong>{{ e.title || e.filePath || 'Untitled' }}</strong>
-            <div class="text-muted" style="font-size:0.8125rem;margin-top:0.25rem" *ngIf="e.filePath || getRepoName(e.repositoryId)">
+            <div class="text-muted" style="font-size:var(--font-xs);margin-top:0.25rem" *ngIf="e.filePath || getRepoName(e.repositoryId)">
               <span *ngIf="getRepoName(e.repositoryId)">{{ getRepoName(e.repositoryId) }}</span>
               <span *ngIf="getRepoName(e.repositoryId) && e.filePath"> / </span>
               <code *ngIf="e.filePath">{{ e.filePath }}</code>
@@ -153,11 +153,15 @@ export class EnrichmentBrowserComponent implements OnInit {
     'Quality': 'Quality',
   };
 
+  typeOptions = ['Architecture', 'Development', 'History', 'Usage'];
+
   private typeToSubtypes: Record<string, { value: string; label: string }[]> = {
     'Architecture': [
       { value: 'Physical', label: 'Architecture' },
       { value: 'DatabaseSchema', label: 'DB Schema' },
       { value: 'Dependencies', label: 'Dependencies' },
+      { value: 'Ownership', label: 'Ownership' },
+      { value: 'Security', label: 'Security' },
     ],
     'Development': [
       { value: 'Chunk', label: 'Chunk' },
@@ -165,6 +169,7 @@ export class EnrichmentBrowserComponent implements OnInit {
       { value: 'SnippetSummary', label: 'Snippet Summary' },
       { value: 'Example', label: 'Example' },
       { value: 'ExampleSummary', label: 'Example Summary' },
+      { value: 'Quality', label: 'Quality' },
     ],
     'History': [
       { value: 'CommitDescription', label: 'Commit Desc' },
@@ -174,6 +179,7 @@ export class EnrichmentBrowserComponent implements OnInit {
       { value: 'Cookbook', label: 'Cookbook' },
       { value: 'APIDocs', label: 'API Docs' },
       { value: 'Wiki', label: 'Wiki' },
+      { value: 'Operations', label: 'Operations' },
     ],
   };
 
