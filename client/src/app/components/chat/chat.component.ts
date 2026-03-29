@@ -201,7 +201,7 @@ interface ConversationGroup {
     .category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; padding: 0; }
     .category-tile {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 0.375rem 0.625rem; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 0.375rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);
       background: var(--surface); font-size: var(--font-xs); cursor: pointer;
       transition: all var(--transition); color: var(--text); text-align: left;
       min-height: 2rem;
@@ -211,10 +211,10 @@ interface ConversationGroup {
     .category-name { font-weight: 500; line-height: 1.2; }
     .category-count { font-size: var(--font-xs); opacity: 0.7; flex-shrink: 0; margin-left: 0.25rem; }
 
-    .question-list { flex: 1; overflow-y: auto; padding: 0.75rem 1rem; }
+    .question-list { flex: 1; overflow-y: auto; padding: 0.5rem 0; }
     .question-item {
       display: block; width: 100%; text-align: left;
-      padding: 0.5rem 0.625rem; margin-bottom: 0.25rem;
+      padding: 0.5rem 1rem; margin-bottom: 0.25rem;
       border: 1px solid transparent; border-radius: var(--radius); background: none;
       font-size: var(--font-sm); color: var(--text); cursor: pointer;
       transition: all var(--transition); line-height: 1.4;
@@ -222,13 +222,12 @@ interface ConversationGroup {
     .question-item:hover {
       background: var(--surface); color: var(--primary);
       border-color: var(--primary-light);
-      padding-left: 0.875rem; padding-right: 0.875rem;
     }
 
     .conversations-section { margin-top: auto; border-top: 1px solid var(--border); border-bottom: none; max-height: 40%; overflow-y: auto; }
-    .conversation-list { display: flex; flex-direction: column; gap: 0.125rem; }
+    .conversation-list { display: flex; flex-direction: column; gap: 0.125rem; padding: 0.25rem 0; }
     .conversation-item {
-      padding: 0.5rem 0.625rem; border-radius: var(--radius); cursor: pointer;
+      padding: 0.5rem 1rem; border-radius: var(--radius); cursor: pointer;
       transition: all var(--transition); border: 1px solid transparent;
     }
     .conversation-item:hover { background: var(--surface); border-color: var(--border); }
@@ -244,7 +243,7 @@ interface ConversationGroup {
     .conv-meta { display: flex; justify-content: space-between; align-items: center; font-size: var(--font-xs); color: var(--text-muted); margin-top: 0.125rem; }
     .conv-group-header {
       font-size: var(--font-xs); font-weight: 600; color: var(--text-muted);
-      padding: 0.375rem 0.625rem 0.125rem; text-transform: uppercase; letter-spacing: 0.03em;
+      padding: 0.375rem 1rem 0.125rem; text-transform: uppercase; letter-spacing: 0.03em;
     }
     .btn-icon {
       background: none; border: 1px solid var(--border); border-radius: var(--radius);
