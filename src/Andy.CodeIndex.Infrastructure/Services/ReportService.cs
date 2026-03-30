@@ -171,8 +171,8 @@ public class ReportService : IReportService
             if (!InsightLayerNames.TryGetValue(insight.Subtype, out var name))
                 continue;
 
-            var content = insight.Content.Length > 3000
-                ? insight.Content[..3000] + "\n... (truncated)"
+            var content = insight.Content.Length > 1500
+                ? insight.Content[..1500] + "\n... (truncated)"
                 : insight.Content;
 
             sb.AppendLine($"=== {name} ({insight.Subtype}) ===");
@@ -214,7 +214,12 @@ public class ReportService : IReportService
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             httpRequest.Content = JsonContent.Create(body);
             var response = await client.SendAsync(httpRequest, ct);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogError("LLM API returned {Status}: {Error}", response.StatusCode, errorBody);
+                return null;
+            }
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
             var reply = result.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
 

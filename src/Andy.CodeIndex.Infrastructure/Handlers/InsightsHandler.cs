@@ -129,8 +129,8 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
         var sb = new StringBuilder();
         foreach (var enrichment in enrichments)
         {
-            var content = enrichment.Content.Length > 2000
-                ? enrichment.Content[..2000] + "..."
+            var content = enrichment.Content.Length > 1000
+                ? enrichment.Content[..1000] + "..."
                 : enrichment.Content;
             sb.AppendLine($"=== {enrichment.Subtype} ===");
             sb.AppendLine(content);
