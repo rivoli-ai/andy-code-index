@@ -426,6 +426,24 @@ interface CommitComparison {
               <div class="insights-layer-content" [innerHTML]="renderInsightHtml(layer)"></div>
             </div>
 
+            <!-- Methodology -->
+            <div class="insights-section" id="insights-methodology" style="margin-top:2rem">
+              <a (click)="showInsightsMethodology = !showInsightsMethodology" href="javascript:void(0)" style="display:inline-flex;align-items:center;gap:0.375rem;font-size:var(--font-xs);font-weight:600;color:var(--primary);text-decoration:none">
+                <i class="bi" [ngClass]="showInsightsMethodology ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
+                Methodology
+              </a>
+              <div *ngIf="showInsightsMethodology" style="margin-top:0.75rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;font-size:var(--font-xs);color:var(--text-muted);line-height:1.5">
+                <div><strong>Health Score</strong><br>Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.</div>
+                <div><strong>Commits/Month</strong><br>Total commits divided by the repository's active period in months.</div>
+                <div><strong>Active Contributors</strong><br>Unique committer emails across all indexed commits.</div>
+                <div><strong>Trend</strong><br>Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.</div>
+                <div><strong>Maturity Rating</strong><br>1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.</div>
+                <div><strong>Quality Rating</strong><br>1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.</div>
+                <div><strong>Risk Rating</strong><br>1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.</div>
+                <div><strong>Impact/Effort</strong><br>Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.</div>
+              </div>
+            </div>
+
           </div><!-- End Content Area -->
         </div><!-- End Document Wrapper -->
 
@@ -1431,6 +1449,7 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   syncIntervalSaved = false;
   activeTab = 'Overview';
   activeReportSection = 'rpt-health';
+  showInsightsMethodology = false;
   showMethodology = false;
 
   // Insights & Report
