@@ -29,7 +29,7 @@ services:
     container_name: andy-code-index-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=https://+:8443
+      - ASPNETCORE_URLS=https://+:8443;http://+:8080
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=andy_code_index;Username=andy_code_index;Password=andy_code_index_dev_password
       - AndyAuth__Authority=https://host.docker.internal:5001
       - AndyAuth__Audience=urn:andy-code-index-api
@@ -40,6 +40,7 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "5101:8443"
+      - "5102:8080"
     volumes:
       - ./certs:/usr/local/share/ca-certificates/custom:ro
       - code_index_data:/data
