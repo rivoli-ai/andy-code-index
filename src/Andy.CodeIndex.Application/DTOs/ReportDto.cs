@@ -15,6 +15,14 @@ public class VelocityDto
     public double CommitsPerMonth { get; set; }
     public int ActiveContributors { get; set; }
     public string Trend { get; set; } = "stable"; // increasing, stable, decreasing
+    public List<ContributorDto> TopContributors { get; set; } = [];
+}
+
+public class ContributorDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public int Commits { get; set; }
 }
 
 public class LayerReportDto

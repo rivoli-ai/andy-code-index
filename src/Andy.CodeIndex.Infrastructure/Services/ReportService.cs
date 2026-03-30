@@ -298,11 +298,24 @@ public class ReportService : IReportService
         else
             trend = "stable";
 
+        var topContributors = allCommits
+            .GroupBy(c => new { c.AuthorName, c.AuthorEmail })
+            .Select(g => new ContributorDto
+            {
+                Name = g.Key.AuthorName ?? g.Key.AuthorEmail ?? "unknown",
+                Email = g.Key.AuthorEmail ?? "",
+                Commits = g.Count()
+            })
+            .OrderByDescending(c => c.Commits)
+            .Take(10)
+            .ToList();
+
         return new VelocityDto
         {
             CommitsPerMonth = Math.Round(commitsPerMonth, 1),
             ActiveContributors = activeContributors,
-            Trend = trend
+            Trend = trend,
+            TopContributors = topContributors
         };
     }
 

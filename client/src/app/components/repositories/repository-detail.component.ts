@@ -311,19 +311,26 @@ interface CommitComparison {
               <div *ngIf="reportData.velocity" class="insights-velocity-row">
                 <div class="insights-velocity-item">
                   <div class="insights-velocity-value">{{ reportData.velocity.commitsPerMonth }}</div>
-                  <div class="insights-velocity-label">Commits/Month</div>
+                  <div class="insights-velocity-label">Commits/Month <span class="report-info-icon report-info-below" data-tooltip="Total commits divided by the repository's active period in months.">?</span></div>
                 </div>
                 <div class="insights-velocity-item">
                   <div class="insights-velocity-value">{{ reportData.velocity.activeContributors }}</div>
-                  <div class="insights-velocity-label">Active Contributors</div>
+                  <div class="insights-velocity-label">Contributors <span class="report-info-icon report-info-below" data-tooltip="Unique committer emails across all indexed commits.">?</span></div>
                 </div>
-                <div class="insights-velocity-item" *ngIf="reportData.velocity.averageCommitsPerDay != null">
-                  <div class="insights-velocity-value">{{ reportData.velocity.averageCommitsPerDay | number:'1.1-1' }}</div>
-                  <div class="insights-velocity-label">Commits/Day</div>
+                <div class="insights-velocity-item">
+                  <div class="insights-velocity-value" style="text-transform:capitalize">{{ reportData.velocity.trend }}</div>
+                  <div class="insights-velocity-label">Trend <span class="report-info-icon report-info-below" data-tooltip="Compares commit rate in the second half vs first half. Increasing if >20% higher, decreasing if >20% lower.">?</span></div>
                 </div>
-                <div class="insights-velocity-item" *ngIf="reportData.velocity.deployFrequency">
-                  <div class="insights-velocity-value">{{ reportData.velocity.deployFrequency }}</div>
-                  <div class="insights-velocity-label">Deploy Frequency</div>
+              </div>
+
+              <!-- Top Contributors -->
+              <div *ngIf="reportData.velocity?.topContributors?.length" style="margin-bottom:1.5rem;padding:0 0.5rem">
+                <div style="font-weight:600;font-size:var(--font-xs);margin-bottom:0.5rem;color:var(--text-muted)">Top Contributors</div>
+                <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+                  <span *ngFor="let c of reportData.velocity.topContributors" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:var(--background-alt);border-radius:100px;font-size:var(--font-xs)">
+                    <strong>{{ c.name }}</strong>
+                    <span class="text-muted">{{ c.commits }}</span>
+                  </span>
                 </div>
               </div>
 
@@ -366,14 +373,17 @@ interface CommitComparison {
                 <span class="badge insights-badge-maturity"
                       [ngClass]="lr.maturityRating >= 4 ? 'badge-success' : lr.maturityRating >= 3 ? 'badge-warning' : 'badge-danger'">
                   <i class="bi bi-bar-chart-fill"></i> Maturity {{ lr.maturityRating }}/5
+                  <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized">?</span>
                 </span>
                 <span class="badge insights-badge-quality"
                       [ngClass]="lr.qualityRating >= 4 ? 'badge-success' : lr.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'">
                   <i class="bi bi-star-fill"></i> Quality {{ lr.qualityRating }}/5
+                  <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent">?</span>
                 </span>
                 <span class="badge insights-badge-risk"
                       [ngClass]="lr.riskRating <= 2 ? 'badge-success' : lr.riskRating <= 3 ? 'badge-warning' : 'badge-danger'">
                   <i class="bi bi-shield-fill"></i> Risk {{ lr.riskRating }}/5
+                  <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical">?</span>
                 </span>
               </div>
 
@@ -559,6 +569,17 @@ interface CommitComparison {
                 <div class="report-velocity-card" *ngIf="reportData.velocity.deployFrequency">
                   <div class="report-velocity-value">{{ reportData.velocity.deployFrequency }}</div>
                   <div class="report-velocity-label">Deploy Frequency</div>
+                </div>
+              </div>
+
+              <!-- Top Contributors -->
+              <div *ngIf="reportData.velocity?.topContributors?.length" style="margin-top:1.25rem">
+                <div style="font-weight:600;font-size:var(--font-xs);margin-bottom:0.5rem;color:var(--text-muted)">Top Contributors</div>
+                <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+                  <span *ngFor="let c of reportData.velocity.topContributors" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:var(--background-alt);border-radius:100px;font-size:var(--font-xs)">
+                    <strong>{{ c.name }}</strong>
+                    <span class="text-muted">{{ c.commits }}</span>
+                  </span>
                 </div>
               </div>
             </section>
@@ -1293,6 +1314,14 @@ interface CommitComparison {
     .report-info-icon:hover::after, .report-info-icon:hover::before { opacity: 1; }
     .report-info-inline {
       margin-left: 0.25rem; font-size: 0.6875rem;
+    }
+    /* Tooltip below (for elements near the top) */
+    .report-info-below::after {
+      bottom: auto; top: 100%; margin-top: 6px;
+    }
+    .report-info-below::before {
+      bottom: auto; top: calc(100% - 4px);
+      border-top-color: transparent; border-bottom-color: #1a1a2e;
     }
 
     /* Methodology Section */
