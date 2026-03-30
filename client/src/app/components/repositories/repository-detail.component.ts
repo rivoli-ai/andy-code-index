@@ -355,6 +355,7 @@ interface CommitComparison {
                 <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
                   <span *ngFor="let c of reportData.velocity.topContributors" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:var(--background-alt);border-radius:100px;font-size:var(--font-xs)">
                     <strong>{{ c.name }}</strong>
+                    <span class="text-muted" style="font-size:0.85em;opacity:0.7">{{ c.email }}</span>
                     <span class="text-muted">{{ c.commits }}</span>
                   </span>
                 </div>
@@ -657,6 +658,7 @@ interface CommitComparison {
                 <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
                   <span *ngFor="let c of reportData.velocity.topContributors" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:var(--background-alt);border-radius:100px;font-size:var(--font-xs)">
                     <strong>{{ c.name }}</strong>
+                    <span class="text-muted" style="font-size:0.85em;opacity:0.7">{{ c.email }}</span>
                     <span class="text-muted">{{ c.commits }}</span>
                   </span>
                 </div>
