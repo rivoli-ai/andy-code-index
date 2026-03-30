@@ -322,29 +322,19 @@ IMPORTANT: Always use these tools to answer questions. Never say you don't have 
 
         for (var iteration = 0; iteration <= maxIterations; iteration++)
         {
-            object llmRequest;
-            if (tools is not null && iteration < maxIterations)
+            var llmRequest = new Dictionary<string, object>
             {
-                llmRequest = new
-                {
-                    model,
-                    messages,
-                    max_tokens = 2000,
-                    temperature = 0.3,
-                    tools
-                };
-            }
+                ["model"] = model,
+                ["messages"] = messages,
+                ["temperature"] = 0.3
+            };
+            // GPT-5+ uses max_completion_tokens; older models use max_tokens
+            if (model.StartsWith("gpt-5") || model.StartsWith("o1") || model.StartsWith("o3"))
+                llmRequest["max_completion_tokens"] = 2000;
             else
-            {
-                // Final iteration or no tools: don't send tools to force text response
-                llmRequest = new
-                {
-                    model,
-                    messages,
-                    max_tokens = 2000,
-                    temperature = 0.3
-                };
-            }
+                llmRequest["max_tokens"] = 2000;
+            if (tools is not null && iteration < maxIterations)
+                llmRequest["tools"] = tools;
 
             var response = await client.PostAsJsonAsync("chat/completions", llmRequest, ct);
             response.EnsureSuccessStatusCode();

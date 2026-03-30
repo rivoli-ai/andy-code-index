@@ -520,6 +520,9 @@ interface CommitComparison {
           <i class="bi bi-file-earmark-bar-graph" style="font-size:2.5rem;color:var(--text-light);margin-bottom:1rem;display:block"></i>
           <h3 style="font-size:var(--font-lg);margin-bottom:0.5rem">No report yet</h3>
           <p class="text-muted" style="font-size:var(--font-xs);margin-bottom:1.25rem">Generate insights first, then click "Generate Report" to produce a comprehensive analysis.</p>
+          <div *ngIf="reportError" style="margin-bottom:1rem;padding:0.75rem 1rem;background:rgba(220,53,69,0.08);border:1px solid rgba(220,53,69,0.2);border-radius:var(--radius);color:var(--danger);font-size:var(--font-xs)">
+            <i class="bi bi-exclamation-triangle"></i> {{ reportError }}
+          </div>
           <button class="btn btn-primary" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
             <i class="bi bi-file-earmark-bar-graph"></i> Generate Report
           </button>
@@ -1725,12 +1728,18 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
     });
   }
 
+  reportError = '';
+
   generateReport() {
     if (!this.repo) return;
     this.generatingReport = true;
+    this.reportError = '';
     this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo.id}/report?regenerate=true`).subscribe({
       next: (report) => { this.reportData = report; this.generatingReport = false; },
-      error: (err) => { this.generatingReport = false; console.error('Report generation failed', err); }
+      error: (err) => {
+        this.generatingReport = false;
+        this.reportError = err?.error?.error || 'Report generation failed. Check server logs for details.';
+      }
     });
   }
 

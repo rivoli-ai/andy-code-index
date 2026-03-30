@@ -105,6 +105,12 @@ public class ReportService : IReportService
         // Call LLM once to rate all layers
         var llmAnalysis = await CallLlmForAnalysisAsync(apiKey, model, repo.Name, insights, ct, baseUrl);
 
+        if (llmAnalysis is null)
+            throw new InvalidOperationException(
+                "Report generation failed: the LLM did not return a valid analysis. " +
+                "This may be due to an API error, context size limits, or an unsupported model parameter. " +
+                "Check the server logs for details and try again.");
+
         // Build layer reports from insights + LLM analysis
         foreach (var insight in insights)
         {
@@ -200,13 +206,16 @@ public class ReportService : IReportService
         var client = _httpClientFactory.CreateClient("Chat");
         var baseUrl = (overrideBaseUrl ?? _llmOptions.BaseUrl).TrimEnd('/') + "/";
 
-        var body = new
+        var body = new Dictionary<string, object>
         {
-            model,
-            messages = new[] { new { role = "user", content = prompt } },
-            max_tokens = 4000,
-            temperature = 0.3
+            ["model"] = model,
+            ["messages"] = new[] { new { role = "user", content = prompt } },
+            ["temperature"] = 0.3
         };
+        if (model.StartsWith("gpt-5") || model.StartsWith("o1") || model.StartsWith("o3"))
+            body["max_completion_tokens"] = 4000;
+        else
+            body["max_tokens"] = 4000;
 
         try
         {
