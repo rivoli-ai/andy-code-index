@@ -307,10 +307,10 @@ interface CommitComparison {
                     {{ reportData.overallHealthScore }}
                   </div>
                   <div class="insights-health-label">Health Score</div>
-                  <span class="report-info-icon report-info-below" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
                   <div class="insights-health-stars" *ngIf="reportData.overallHealthScore != null">
                     {{ getStarRating(Math.round(reportData.overallHealthScore / 20)) }}
                   </div>
+                  <span class="report-info-icon report-info-below" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
                 </div>
 
                 <div class="insights-health-details">
