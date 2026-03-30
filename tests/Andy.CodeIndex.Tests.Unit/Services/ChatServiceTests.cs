@@ -78,7 +78,7 @@ public class ChatServiceTests : IDisposable
     public async Task ChatAsync_NoApiKey_ReturnsKeyNotConfiguredMessage()
     {
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("", "gpt-4o-mini", "none"));
+            .ReturnsAsync(("", "https://api.openai.com/v1", "gpt-4o-mini", "none"));
 
         var response = await _chatService.ChatAsync(new ChatRequest { Message = "test" });
 
@@ -90,7 +90,7 @@ public class ChatServiceTests : IDisposable
     public async Task ChatAsync_GeneratesConversationId_WhenNotProvided()
     {
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("", "", "none"));
+            .ReturnsAsync(("", "https://api.openai.com/v1", "", "none"));
 
         var response = await _chatService.ChatAsync(new ChatRequest { Message = "hello" });
 
@@ -101,7 +101,7 @@ public class ChatServiceTests : IDisposable
     public async Task ChatAsync_UsesProvidedConversationId()
     {
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("", "", "none"));
+            .ReturnsAsync(("", "https://api.openai.com/v1", "", "none"));
 
         var convId = Guid.NewGuid().ToString();
         var response = await _chatService.ChatAsync(new ChatRequest
@@ -118,7 +118,7 @@ public class ChatServiceTests : IDisposable
     {
         // With a key set, the service proceeds past the early return to classification
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("sk-test", "gpt-4o-mini", "system"));
+            .ReturnsAsync(("sk-test", "https://api.openai.com/v1", "gpt-4o-mini", "system"));
 
         // The LLM HTTP call will fail (no real server), but classifier should still be called
         try { await _chatService.ChatAsync(new ChatRequest { Message = "explain the architecture" }); } catch { }
@@ -130,7 +130,7 @@ public class ChatServiceTests : IDisposable
     public async Task ChatAsync_FiltersEnrichmentsByQuality()
     {
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("", "", "none"));
+            .ReturnsAsync(("", "https://api.openai.com/v1", "", "none"));
 
         // Add enrichments with different quality scores
         _context.Enrichments.Add(new Enrichment
@@ -169,7 +169,7 @@ public class ChatServiceTests : IDisposable
     public async Task ChatAsync_WithApiKey_ScopesToRepository()
     {
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("sk-test", "gpt-4o-mini", "system"));
+            .ReturnsAsync(("sk-test", "https://api.openai.com/v1", "gpt-4o-mini", "system"));
 
         try
         {
@@ -218,7 +218,7 @@ public class ChatServiceTests : IDisposable
     public async Task ChatAsync_WithRef_PassesRefToRequest()
     {
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("", "", "none"));
+            .ReturnsAsync(("", "https://api.openai.com/v1", "", "none"));
 
         var response = await _chatService.ChatAsync(new ChatRequest
         {

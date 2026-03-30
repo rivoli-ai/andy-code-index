@@ -26,7 +26,7 @@ public class CreateSecurityDocsHandler : BaseLlmEnrichmentHandler
         var repo = await Context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
-        var (apiKey, model, source) = await ApiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
+        var (apiKey, baseUrl, model, source) = await ApiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
         if (string.IsNullOrEmpty(apiKey))
         {
             Logger.LogInformation("Skipping {Operation} for {Name}: no LLM key available", Operation, repo.Name);
@@ -71,7 +71,7 @@ public class CreateSecurityDocsHandler : BaseLlmEnrichmentHandler
         }
 
         var prompt = BuildPrompt(repo, securityChunks);
-        var reply = await CallLlmAsync(apiKey, model, prompt, ct);
+        var reply = await CallLlmAsync(apiKey, model, prompt, ct, baseUrl);
         if (string.IsNullOrEmpty(reply)) return;
 
         var existing = await Context.Enrichments

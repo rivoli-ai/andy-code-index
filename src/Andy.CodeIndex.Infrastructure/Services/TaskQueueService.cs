@@ -70,7 +70,7 @@ public class TaskQueueService : ITaskQueue
         // Skip LLM-dependent operations only if no LLM key is available
         if (IsLlmDependent(next.Value))
         {
-            var (llmKey, _, _) = await _apiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
+            var (llmKey, _, _, _) = await _apiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
             if (string.IsNullOrEmpty(llmKey))
                 next = GetNextNonLlmOperation(next.Value);
         }

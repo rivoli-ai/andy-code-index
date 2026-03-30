@@ -41,16 +41,17 @@ public class OpenAiEmbeddingProvider : IEmbeddingProvider
             return [];
 
         // Resolve API key dynamically (user "anonymous" in dev, or system config)
-        var (apiKey, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync("anonymous", ct);
+        var (apiKey, baseUrl, model, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync("anonymous", ct);
         if (string.IsNullOrEmpty(apiKey))
             throw new InvalidOperationException("No embedding API key available");
 
+        _httpClient.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         var request = new EmbeddingRequest
         {
             Input = texts,
-            Model = _options.Model
+            Model = model
         };
 
         var retryCount = 0;

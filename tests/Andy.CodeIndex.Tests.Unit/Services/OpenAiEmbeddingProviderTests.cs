@@ -26,7 +26,7 @@ public class OpenAiEmbeddingProviderTests
         // Mock resolver that returns the API key from options
         var resolverMock = new Moq.Mock<IApiKeyResolver>();
         resolverMock.Setup(r => r.ResolveEmbeddingKeyAsync(Moq.It.IsAny<string?>(), Moq.It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult<(string?, string)>((opts.ApiKey ?? "test-key", "test")));
+            .Returns(Task.FromResult<(string?, string, string, string)>((opts.ApiKey ?? "test-key", opts.BaseUrl, opts.Model, "test")));
 
         var httpClient = new HttpClient(handler);
         return new OpenAiEmbeddingProvider(

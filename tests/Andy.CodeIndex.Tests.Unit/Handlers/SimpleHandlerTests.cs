@@ -120,7 +120,7 @@ public class CreateCodeEmbeddingsHandlerTests : IDisposable
         _context = TestDbContextFactory.Create();
         _embeddingServiceMock.Setup(e => e.IsAvailable).Returns(false);
         _resolverMock.Setup(r => r.ResolveEmbeddingKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(((string?)null, "none"));
+            .ReturnsAsync(((string?)null, "https://api.openai.com/v1", "text-embedding-3-small", "none"));
 
         _handler = new CreateCodeEmbeddingsHandler(
             _context, _embeddingServiceMock.Object, _resolverMock.Object,
@@ -165,7 +165,7 @@ public class CreateCodeEmbeddingsHandlerTests : IDisposable
     {
         _embeddingServiceMock.Setup(e => e.IsAvailable).Returns(true);
         _resolverMock.Setup(r => r.ResolveEmbeddingKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("sk-test-key", "user"));
+            .ReturnsAsync(("sk-test-key", "https://api.openai.com/v1", "text-embedding-3-small", "user"));
 
         // Add a chunk enrichment
         _context.Enrichments.Add(new Enrichment

@@ -16,7 +16,7 @@ import { environment } from '../../../environments/environment';
     <div *ngIf="settings" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
       <!-- Embedding Section -->
       <div class="card">
-        <h3 style="font-size:1.125rem;margin-bottom:0.75rem">Embedding API Key</h3>
+        <h3 style="font-size:1.125rem;margin-bottom:0.75rem">Embedding Provider</h3>
         <p class="text-muted" style="font-size:0.8125rem;margin-bottom:1rem">
           Generates <strong>vector representations</strong> of your code for <strong>semantic search</strong> --
           finding code by meaning, not just keywords. Also used for re-embedding when code changes.
@@ -41,6 +41,15 @@ import { environment } from '../../../environments/environment';
           <i class="bi bi-exclamation-triangle"></i> No embedding key configured. Semantic search unavailable.
         </div>
 
+        <div class="form-group">
+          <label>Server URL</label>
+          <input class="form-control" type="text" [(ngModel)]="embeddingBaseUrl" placeholder="https://api.openai.com/v1" style="margin-bottom:0.375rem">
+          <div style="display:flex;gap:0.375rem;flex-wrap:wrap;margin-bottom:0.5rem">
+            <button class="btn btn-xs btn-outline" (click)="embeddingBaseUrl = 'https://api.openai.com/v1'">OpenAI</button>
+            <button class="btn btn-xs btn-outline" (click)="embeddingBaseUrl = 'http://localhost:11434/v1'">Ollama</button>
+            <button class="btn btn-xs btn-outline" (click)="embeddingBaseUrl = 'https://api.groq.com/openai/v1'">Groq</button>
+          </div>
+        </div>
         <div class="form-group">
           <label>API Key</label>
           <div style="display:flex;gap:0.5rem">
@@ -67,15 +76,15 @@ import { environment } from '../../../environments/environment';
             <option value="text-embedding-3-large">text-embedding-3-large (3072 dims)</option>
           </select>
         </div>
-        <button class="btn btn-primary btn-sm" (click)="saveEmbedding()" [disabled]="savingEmbed || !embeddingKey">
-          {{ savingEmbed ? 'Saving...' : 'Save Embedding Key' }}
+        <button class="btn btn-primary btn-sm" (click)="saveEmbedding()" [disabled]="savingEmbed || (!embeddingKey && !embeddingModel && !embeddingBaseUrl)">
+          {{ savingEmbed ? 'Saving...' : 'Save Embedding Settings' }}
         </button>
         <span *ngIf="embedMessage" style="margin-left:0.75rem;color:var(--success);font-size:0.8125rem">{{ embedMessage }}</span>
       </div>
 
       <!-- LLM / Chat Section -->
       <div class="card">
-        <h3 style="font-size:1.125rem;margin-bottom:0.75rem">LLM / Chat Model</h3>
+        <h3 style="font-size:1.125rem;margin-bottom:0.75rem">LLM / Chat Provider</h3>
         <p class="text-muted" style="font-size:0.8125rem;margin-bottom:1rem">
           Powers the <strong>Chat</strong> feature (ask questions about your codebase) and generates
           <strong>enrichments</strong>: architecture docs, wiki pages, cookbook guides, database schema docs,
@@ -99,6 +108,15 @@ import { environment } from '../../../environments/environment';
           <i class="bi bi-exclamation-triangle"></i> No LLM key configured. Chat and enrichment generation unavailable.
         </div>
 
+        <div class="form-group">
+          <label>Server URL</label>
+          <input class="form-control" type="text" [(ngModel)]="llmBaseUrl" placeholder="https://api.openai.com/v1" style="margin-bottom:0.375rem">
+          <div style="display:flex;gap:0.375rem;flex-wrap:wrap;margin-bottom:0.5rem">
+            <button class="btn btn-xs btn-outline" (click)="llmBaseUrl = 'https://api.openai.com/v1'">OpenAI</button>
+            <button class="btn btn-xs btn-outline" (click)="llmBaseUrl = 'http://localhost:11434/v1'">Ollama</button>
+            <button class="btn btn-xs btn-outline" (click)="llmBaseUrl = 'https://api.groq.com/openai/v1'">Groq</button>
+          </div>
+        </div>
         <div class="form-group">
           <label>LLM API Key (optional, separate from embedding)</label>
           <div style="display:flex;gap:0.5rem">
@@ -129,7 +147,7 @@ import { environment } from '../../../environments/environment';
             <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
           </select>
         </div>
-        <button class="btn btn-primary btn-sm" (click)="saveLlm()" [disabled]="savingLlm || (!llmKey && !llmModel)">
+        <button class="btn btn-primary btn-sm" (click)="saveLlm()" [disabled]="savingLlm || (!llmKey && !llmModel && !llmBaseUrl)">
           {{ savingLlm ? 'Saving...' : 'Save LLM Settings' }}
         </button>
         <span *ngIf="llmMessage" style="margin-left:0.75rem;color:var(--success);font-size:0.8125rem">{{ llmMessage }}</span>
@@ -162,13 +180,18 @@ import { environment } from '../../../environments/environment';
   styles: [`
     .history-item { padding: 0.625rem 0; border-bottom: 1px solid var(--border); }
     .history-item:last-child { border-bottom: none; }
+    .btn-xs { padding: 0.125rem 0.5rem; font-size: 0.75rem; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; border-radius: var(--radius); }
+    .btn-outline:hover { background: var(--background-alt); }
   `]
 })
 export class SettingsComponent implements OnInit {
   embeddingKey = '';
   embeddingModel = '';
+  embeddingBaseUrl = '';
   llmKey = '';
   llmModel = '';
+  llmBaseUrl = '';
   settings: any = null;
   history: any[] = [];
   savingEmbed = false;
@@ -191,7 +214,9 @@ export class SettingsComponent implements OnInit {
       next: (s: any) => {
         this.settings = s;
         this.embeddingModel = s.embedding?.model || '';
+        this.embeddingBaseUrl = s.embedding?.baseUrl || '';
         this.llmModel = s.llm?.model || '';
+        this.llmBaseUrl = s.llm?.baseUrl || '';
       }
     });
     this.http.get<any[]>(`${environment.apiUrl}/settings/history`).subscribe({
@@ -205,6 +230,7 @@ export class SettingsComponent implements OnInit {
     const body: any = {};
     if (this.embeddingKey) body.embeddingApiKey = this.embeddingKey;
     if (this.embeddingModel) body.embeddingModel = this.embeddingModel;
+    if (this.embeddingBaseUrl) body.embeddingBaseUrl = this.embeddingBaseUrl;
 
     this.http.put(`${environment.apiUrl}/settings`, body).subscribe({
       next: () => { this.embedMessage = 'Saved'; this.savingEmbed = false; this.embeddingKey = ''; this.ngOnInit(); },
@@ -218,6 +244,7 @@ export class SettingsComponent implements OnInit {
     const body: any = {};
     if (this.llmKey) body.llmApiKey = this.llmKey;
     if (this.llmModel) body.llmModel = this.llmModel;
+    if (this.llmBaseUrl) body.llmBaseUrl = this.llmBaseUrl;
 
     this.http.put(`${environment.apiUrl}/settings`, body).subscribe({
       next: () => { this.llmMessage = 'Saved'; this.savingLlm = false; this.llmKey = ''; this.ngOnInit(); },

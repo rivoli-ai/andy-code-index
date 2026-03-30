@@ -308,8 +308,10 @@ public class CodeIndexDbContext : DbContext
             builder.Property(s => s.UserId).IsRequired().HasMaxLength(256);
             builder.Property(s => s.EmbeddingApiKey).HasMaxLength(1024);
             builder.Property(s => s.EmbeddingModel).HasMaxLength(128);
+            builder.Property(s => s.EmbeddingBaseUrl).HasMaxLength(512);
             builder.Property(s => s.LlmApiKey).HasMaxLength(1024);
             builder.Property(s => s.LlmModel).HasMaxLength(128);
+            builder.Property(s => s.LlmBaseUrl).HasMaxLength(512);
 
             builder.HasIndex(s => s.UserId).IsUnique();
         });

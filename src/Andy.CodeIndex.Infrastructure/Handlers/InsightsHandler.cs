@@ -30,7 +30,7 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
         var repo = await Context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
-        var (apiKey, model, source) = await ApiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
+        var (apiKey, baseUrl, model, source) = await ApiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
         if (string.IsNullOrEmpty(apiKey))
         {
             Logger.LogInformation("Skipping {Operation} for {Name}: no LLM key available", Operation, repo.Name);
@@ -75,7 +75,7 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
         foreach (var layer in layers)
         {
             var prompt = systemInstruction + "\n\n" + layer.Prompt;
-            var reply = await CallLlmAsync(apiKey, model, prompt, ct);
+            var reply = await CallLlmAsync(apiKey, model, prompt, ct, baseUrl);
             if (string.IsNullOrEmpty(reply)) continue;
 
             // Delete existing enrichment of this subtype for the repo

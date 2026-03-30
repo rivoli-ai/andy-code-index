@@ -31,7 +31,7 @@ public class CreateSummaryEmbeddingsHandler : ITaskHandler
         var repo = await _context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
-        var (apiKey, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync("anonymous", ct);
+        var (apiKey, baseUrl, model, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync("anonymous", ct);
         if (string.IsNullOrEmpty(apiKey))
         {
             _logger.LogInformation("Skipping summary embeddings for {Name}: no embedding key", repo.Name);

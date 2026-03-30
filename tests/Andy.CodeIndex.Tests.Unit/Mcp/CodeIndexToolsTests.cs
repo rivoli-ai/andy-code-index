@@ -50,8 +50,12 @@ public class CodeIndexToolsTests
             _discoveryServiceMock.Object,
             _classifierMock.Object,
             new Mock<IReportService>().Object,
+            new Mock<IApiKeyResolver>().Object,
+            new Mock<IEncryptionService>().Object,
             dbContext,
-            Options.Create(new IndexingOptions { DataDir = "/tmp/test" }));
+            Options.Create(new IndexingOptions { DataDir = "/tmp/test" }),
+            Options.Create(new EmbeddingOptions()),
+            Options.Create(new EnrichmentLlmOptions()));
 
         _repoServiceMock.Setup(s => s.ListAsync(null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([_testRepo]);

@@ -357,7 +357,7 @@ public class LlmEnrichmentHandler_CommitIdTests : IDisposable
     public async Task HandleAsync_SkipsWhenNoApiKey()
     {
         _resolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(((string?)null, "gpt-4o-mini", "none"));
+            .ReturnsAsync(((string?)null, "https://api.openai.com/v1", "gpt-4o-mini", "none"));
 
         var handler = new CreateArchitectureDocsHandler(
             _context, _resolverMock.Object,

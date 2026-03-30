@@ -43,7 +43,7 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
         var repo = await Context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
-        var (apiKey, model, source) = await ApiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
+        var (apiKey, baseUrl, model, source) = await ApiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
         if (string.IsNullOrEmpty(apiKey))
         {
             Logger.LogInformation("Skipping {Operation} for {Name}: no LLM key available", Operation, repo.Name);
@@ -70,7 +70,7 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
         var prompt = BuildPrompt(repo, chunks);
 
         // Call LLM
-        var reply = await CallLlmAsync(apiKey, model, prompt, ct);
+        var reply = await CallLlmAsync(apiKey, model, prompt, ct, baseUrl);
         if (string.IsNullOrEmpty(reply)) return;
 
         // Delete existing enrichments of this subtype for the repo
@@ -97,10 +97,10 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
         Logger.LogInformation("Generated {Subtype} for {Name} ({Length} chars)", Subtype, repo.Name, reply.Length);
     }
 
-    protected async Task<string?> CallLlmAsync(string apiKey, string model, string prompt, CancellationToken ct)
+    protected async Task<string?> CallLlmAsync(string apiKey, string model, string prompt, CancellationToken ct, string? overrideBaseUrl = null)
     {
         var client = HttpClientFactory.CreateClient("Chat");
-        var baseUrl = LlmOptions.BaseUrl.TrimEnd('/') + "/";
+        var baseUrl = (overrideBaseUrl ?? LlmOptions.BaseUrl).TrimEnd('/') + "/";
 
         var body = new
         {

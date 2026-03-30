@@ -132,7 +132,7 @@ public class InsightsHandlerTests : IDisposable
     public async Task HandleAsync_NoLlmKey_SkipsWithoutError()
     {
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("", "", ""));
+            .ReturnsAsync(("", "https://api.openai.com/v1", "", ""));
 
         var task = new IndexingTask
         {
@@ -169,7 +169,7 @@ public class InsightsHandlerTests : IDisposable
     {
         SetupLlmMock("LLM response content for testing.");
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("test-key", "test-model", "test"));
+            .ReturnsAsync(("test-key", "https://api.openai.com/v1", "test-model", "test"));
 
         var task = new IndexingTask
         {
@@ -198,7 +198,7 @@ public class InsightsHandlerTests : IDisposable
     {
         SetupLlmMock("Generated insight content for testing purposes.");
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("test-key", "test-model", "test"));
+            .ReturnsAsync(("test-key", "https://api.openai.com/v1", "test-model", "test"));
 
         var task = new IndexingTask
         {
@@ -245,7 +245,7 @@ public class InsightsHandlerTests : IDisposable
 
         SetupLlmMock("New insight content replaces old.");
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("test-key", "test-model", "test"));
+            .ReturnsAsync(("test-key", "https://api.openai.com/v1", "test-model", "test"));
 
         var task = new IndexingTask
         {
@@ -270,7 +270,7 @@ public class InsightsHandlerTests : IDisposable
     {
         SetupLlmMock(new string('x', 2500)); // Long content = high quality
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("test-key", "test-model", "test"));
+            .ReturnsAsync(("test-key", "https://api.openai.com/v1", "test-model", "test"));
 
         var task = new IndexingTask
         {
@@ -320,7 +320,7 @@ public class InsightsHandlerTests : IDisposable
 
         SetupLlmMock("Response based on existing context.");
         _apiKeyResolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(("test-key", "test-model", "test"));
+            .ReturnsAsync(("test-key", "https://api.openai.com/v1", "test-model", "test"));
 
         var task = new IndexingTask
         {

@@ -71,6 +71,7 @@ public class SettingsController : ControllerBase
                 source = hasUserKey ? "user" : hasSystemKey ? "system" : "none",
                 maskedKey = hasUserKey ? MaskKey(settings!.EmbeddingApiKey!) : hasSystemKey ? MaskPlainKey(_embeddingOptions.ApiKey!) : null,
                 model = settings?.EmbeddingModel ?? _embeddingOptions.Model,
+                baseUrl = settings?.EmbeddingBaseUrl ?? _embeddingOptions.BaseUrl,
                 configuredAt = settings?.UpdatedAt,
             },
             llm = new
@@ -78,6 +79,7 @@ public class SettingsController : ControllerBase
                 hasKey = settings?.LlmApiKey is not null,
                 maskedKey = settings?.LlmApiKey is not null ? MaskKey(settings.LlmApiKey) : null,
                 model = settings?.LlmModel ?? _llmOptions.Model,
+                baseUrl = settings?.LlmBaseUrl ?? _llmOptions.BaseUrl,
             }
         });
     }
@@ -119,6 +121,16 @@ public class SettingsController : ControllerBase
             settings.EmbeddingModel = request.EmbeddingModel;
         }
 
+        if (request.EmbeddingBaseUrl is not null)
+        {
+            if (!IsValidBaseUrl(request.EmbeddingBaseUrl))
+                return BadRequest(new { error = "Invalid embedding base URL. Must be a valid HTTP or HTTPS URL." });
+
+            LogChange(userId, "EmbeddingBaseUrl", settings.EmbeddingBaseUrl, request.EmbeddingBaseUrl,
+                settings.EmbeddingBaseUrl is null ? "set" : "updated");
+            settings.EmbeddingBaseUrl = request.EmbeddingBaseUrl == "" ? null : request.EmbeddingBaseUrl;
+        }
+
         if (request.LlmApiKey is not null)
         {
             var oldMasked = settings.LlmApiKey is not null ? MaskKey(settings.LlmApiKey) : null;
@@ -132,6 +144,16 @@ public class SettingsController : ControllerBase
             LogChange(userId, "LlmModel", settings.LlmModel, request.LlmModel,
                 settings.LlmModel is null ? "set" : "updated");
             settings.LlmModel = request.LlmModel;
+        }
+
+        if (request.LlmBaseUrl is not null)
+        {
+            if (!IsValidBaseUrl(request.LlmBaseUrl))
+                return BadRequest(new { error = "Invalid LLM base URL. Must be a valid HTTP or HTTPS URL." });
+
+            LogChange(userId, "LlmBaseUrl", settings.LlmBaseUrl, request.LlmBaseUrl,
+                settings.LlmBaseUrl is null ? "set" : "updated");
+            settings.LlmBaseUrl = request.LlmBaseUrl == "" ? null : request.LlmBaseUrl;
         }
 
         settings.UpdatedAt = DateTime.UtcNow;
@@ -257,15 +279,12 @@ public class SettingsController : ControllerBase
         {
             if (request.Type == "embedding")
             {
-                var (apiKey, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync(userId, ct);
+                var (apiKey, baseUrl, model, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync(userId, ct);
                 if (string.IsNullOrEmpty(apiKey))
                     return Ok(new { success = false, error = "No embedding API key configured." });
 
-                var settings = await _context.UserSettings.FirstOrDefaultAsync(s => s.UserId == userId, ct);
-                var model = settings?.EmbeddingModel ?? _embeddingOptions.Model;
-
                 var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri(_embeddingOptions.BaseUrl.TrimEnd('/') + "/");
+                client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
                 client.Timeout = TimeSpan.FromSeconds(15);
 
@@ -278,21 +297,18 @@ public class SettingsController : ControllerBase
             }
             else if (request.Type == "llm")
             {
-                var (apiKey, model, source) = await _apiKeyResolver.ResolveLlmKeyAsync(userId, ct);
+                var (apiKey, baseUrl, model, source) = await _apiKeyResolver.ResolveLlmKeyAsync(userId, ct);
                 if (string.IsNullOrEmpty(apiKey))
                     return Ok(new { success = false, error = "No LLM API key configured." });
 
-                var settings = await _context.UserSettings.FirstOrDefaultAsync(s => s.UserId == userId, ct);
-                var effectiveModel = settings?.LlmModel ?? model;
-
                 var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri(_llmOptions.BaseUrl.TrimEnd('/') + "/");
+                client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
                 client.Timeout = TimeSpan.FromSeconds(15);
 
                 var chatRequest = new
                 {
-                    model = effectiveModel,
+                    model,
                     messages = new[] { new { role = "user", content = "Say OK" } },
                     max_tokens = 5
                 };
@@ -334,14 +350,24 @@ public class SettingsController : ControllerBase
         if (key.Length <= 4) return "***";
         return $"***...{key[^4..]}";
     }
+
+    /// <summary>Validate that a base URL is a valid HTTP or HTTPS URL.</summary>
+    public static bool IsValidBaseUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return true; // empty = reset to default
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
 }
 
 public class UpdateSettingsRequest
 {
     public string? EmbeddingApiKey { get; set; }
     public string? EmbeddingModel { get; set; }
+    public string? EmbeddingBaseUrl { get; set; }
     public string? LlmApiKey { get; set; }
     public string? LlmModel { get; set; }
+    public string? LlmBaseUrl { get; set; }
 }
 
 public class TestConnectionRequest

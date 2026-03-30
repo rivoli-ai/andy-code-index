@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Reflection;
+using Andy.CodeIndex.Api.Controllers;
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
@@ -25,8 +26,12 @@ public class CodeIndexTools
     private readonly IRepoDiscoveryService _discoveryService;
     private readonly IQuestionClassifier _questionClassifier;
     private readonly IReportService _reportService;
+    private readonly IApiKeyResolver _apiKeyResolver;
+    private readonly IEncryptionService _encryption;
     private readonly CodeIndexDbContext _dbContext;
     private readonly IndexingOptions _options;
+    private readonly EmbeddingOptions _embeddingOptions;
+    private readonly EnrichmentLlmOptions _llmOptions;
 
     public CodeIndexTools(
         IRepositoryService repoService,
@@ -40,8 +45,12 @@ public class CodeIndexTools
         IRepoDiscoveryService discoveryService,
         IQuestionClassifier questionClassifier,
         IReportService reportService,
+        IApiKeyResolver apiKeyResolver,
+        IEncryptionService encryption,
         CodeIndexDbContext dbContext,
-        IOptions<IndexingOptions> options)
+        IOptions<IndexingOptions> options,
+        IOptions<EmbeddingOptions> embeddingOptions,
+        IOptions<EnrichmentLlmOptions> llmOptions)
     {
         _repoService = repoService;
         _searchService = searchService;
@@ -54,8 +63,12 @@ public class CodeIndexTools
         _discoveryService = discoveryService;
         _questionClassifier = questionClassifier;
         _reportService = reportService;
+        _apiKeyResolver = apiKeyResolver;
+        _encryption = encryption;
         _dbContext = dbContext;
         _options = options.Value;
+        _embeddingOptions = embeddingOptions.Value;
+        _llmOptions = llmOptions.Value;
     }
 
     [McpServerTool(Name = "code_index_version"), Description("Get the Andy.CodeIndex server version")]
@@ -1115,6 +1128,92 @@ public class CodeIndexTools
         {
             return new { error = ex.Message };
         }
+    }
+
+    [McpServerTool(Name = "code_index_settings"), Description("Get current provider configuration including API server URLs, models, and key status for both embedding and LLM providers")]
+    public async Task<object> GetSettings()
+    {
+        var (embeddingKey, embeddingUrl, embeddingModel, embeddingSource) = await _apiKeyResolver.ResolveEmbeddingKeyAsync(null);
+        var (llmKey, llmUrl, llmModel, llmSource) = await _apiKeyResolver.ResolveLlmKeyAsync(null);
+
+        return new
+        {
+            embedding = new
+            {
+                baseUrl = embeddingUrl,
+                model = embeddingModel,
+                hasKey = !string.IsNullOrEmpty(embeddingKey),
+                source = embeddingSource
+            },
+            llm = new
+            {
+                baseUrl = llmUrl,
+                model = llmModel,
+                hasKey = !string.IsNullOrEmpty(llmKey),
+                source = llmSource
+            }
+        };
+    }
+
+    [McpServerTool(Name = "code_index_update_settings"), Description("Update provider configuration (server URL and model) for embedding or LLM providers. Does not accept API keys for security.")]
+    public async Task<object> UpdateSettings(
+        [Description("Embedding provider server URL (e.g., https://api.openai.com/v1, http://localhost:11434/v1)")] string? embedding_base_url = null,
+        [Description("Embedding model name (e.g., text-embedding-3-small)")] string? embedding_model = null,
+        [Description("LLM provider server URL")] string? llm_base_url = null,
+        [Description("LLM model name (e.g., gpt-4o-mini)")] string? llm_model = null)
+    {
+        // Validate URLs
+        if (embedding_base_url is not null && !SettingsController.IsValidBaseUrl(embedding_base_url))
+            return new { error = "Invalid embedding base URL. Must be a valid HTTP or HTTPS URL." };
+        if (llm_base_url is not null && !SettingsController.IsValidBaseUrl(llm_base_url))
+            return new { error = "Invalid LLM base URL. Must be a valid HTTP or HTTPS URL." };
+
+        // Use "anonymous" as the user for MCP tool calls
+        const string userId = "anonymous";
+        var settings = await _dbContext.UserSettings.FirstOrDefaultAsync(s => s.UserId == userId);
+
+        if (settings is null)
+        {
+            settings = new Domain.Entities.UserSettings
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _dbContext.UserSettings.Add(settings);
+        }
+
+        var changes = new List<string>();
+
+        if (embedding_base_url is not null)
+        {
+            settings.EmbeddingBaseUrl = embedding_base_url == "" ? null : embedding_base_url;
+            changes.Add($"EmbeddingBaseUrl: {embedding_base_url}");
+        }
+        if (embedding_model is not null)
+        {
+            settings.EmbeddingModel = embedding_model == "" ? null : embedding_model;
+            changes.Add($"EmbeddingModel: {embedding_model}");
+        }
+        if (llm_base_url is not null)
+        {
+            settings.LlmBaseUrl = llm_base_url == "" ? null : llm_base_url;
+            changes.Add($"LlmBaseUrl: {llm_base_url}");
+        }
+        if (llm_model is not null)
+        {
+            settings.LlmModel = llm_model == "" ? null : llm_model;
+            changes.Add($"LlmModel: {llm_model}");
+        }
+
+        if (changes.Count == 0)
+            return new { message = "No changes specified." };
+
+        settings.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync();
+
+        return new { message = "Settings updated.", changes };
     }
 
     // --- Helpers ---

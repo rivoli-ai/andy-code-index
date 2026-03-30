@@ -91,7 +91,7 @@ public class ReportService : IReportService
             throw new InvalidOperationException("No insights found. Generate insights first using the insights endpoint.");
 
         // Build the LLM prompt with all insight contents
-        var (apiKey, model, source) = await _apiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
+        var (apiKey, baseUrl, model, source) = await _apiKeyResolver.ResolveLlmKeyAsync("anonymous", ct);
         if (string.IsNullOrEmpty(apiKey))
             throw new InvalidOperationException("No LLM API key configured. Cannot generate report.");
 
@@ -102,7 +102,7 @@ public class ReportService : IReportService
         };
 
         // Call LLM once to rate all layers
-        var llmAnalysis = await CallLlmForAnalysisAsync(apiKey, model, repo.Name, insights, ct);
+        var llmAnalysis = await CallLlmForAnalysisAsync(apiKey, model, repo.Name, insights, ct, baseUrl);
 
         // Build layer reports from insights + LLM analysis
         foreach (var insight in insights)
@@ -159,7 +159,7 @@ public class ReportService : IReportService
     }
 
     internal async Task<LlmAnalysisResponse?> CallLlmForAnalysisAsync(
-        string apiKey, string model, string repoName, List<Enrichment> insights, CancellationToken ct)
+        string apiKey, string model, string repoName, List<Enrichment> insights, CancellationToken ct, string? overrideBaseUrl = null)
     {
         var sb = new StringBuilder();
         foreach (var insight in insights)
@@ -194,7 +194,7 @@ public class ReportService : IReportService
             "Insight contents:\n" + sb.ToString();
 
         var client = _httpClientFactory.CreateClient("Chat");
-        var baseUrl = _llmOptions.BaseUrl.TrimEnd('/') + "/";
+        var baseUrl = (overrideBaseUrl ?? _llmOptions.BaseUrl).TrimEnd('/') + "/";
 
         var body = new
         {

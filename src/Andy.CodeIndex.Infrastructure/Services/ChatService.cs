@@ -77,7 +77,7 @@ public class ChatService : IChatService
         }
 
         // 1. Resolve LLM API key
-        var (apiKey, model, source) = await _apiKeyResolver.ResolveLlmKeyAsync(userId, ct);
+        var (apiKey, baseUrl, model, source) = await _apiKeyResolver.ResolveLlmKeyAsync(userId, ct);
 
         if (string.IsNullOrEmpty(apiKey))
         {
@@ -259,7 +259,7 @@ IMPORTANT: Always use these tools to answer questions. Never say you don't have 
 
         // 5. Call LLM (with function calling loop)
         var client = _httpClientFactory.CreateClient("Chat");
-        client.BaseAddress = new Uri(_llmOptions.BaseUrl.TrimEnd('/') + "/");
+        client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         client.Timeout = TimeSpan.FromSeconds(_llmOptions.TimeoutSeconds);
 

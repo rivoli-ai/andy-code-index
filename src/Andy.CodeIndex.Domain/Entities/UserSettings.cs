@@ -6,8 +6,10 @@ public class UserSettings
     public required string UserId { get; set; }
     public string? EmbeddingApiKey { get; set; }
     public string? EmbeddingModel { get; set; }
+    public string? EmbeddingBaseUrl { get; set; }
     public string? LlmApiKey { get; set; }
     public string? LlmModel { get; set; }
+    public string? LlmBaseUrl { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

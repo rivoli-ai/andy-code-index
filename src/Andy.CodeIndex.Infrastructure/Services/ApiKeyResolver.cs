@@ -29,7 +29,7 @@ public class ApiKeyResolver : IApiKeyResolver
         _logger = logger;
     }
 
-    public async Task<(string? apiKey, string source)> ResolveEmbeddingKeyAsync(string? userId = null, CancellationToken ct = default)
+    public async Task<(string? apiKey, string baseUrl, string model, string source)> ResolveEmbeddingKeyAsync(string? userId = null, CancellationToken ct = default)
     {
         if (!string.IsNullOrEmpty(userId))
         {
@@ -42,7 +42,9 @@ public class ApiKeyResolver : IApiKeyResolver
                 if (!string.IsNullOrEmpty(decrypted))
                 {
                     _logger.LogDebug("Using user-specific embedding key for {UserId}", userId);
-                    return (decrypted, "user");
+                    var baseUrl = userSettings.EmbeddingBaseUrl ?? _embeddingOptions.BaseUrl;
+                    var model = userSettings.EmbeddingModel ?? _embeddingOptions.Model;
+                    return (decrypted, baseUrl, model, "user");
                 }
             }
         }
@@ -50,7 +52,7 @@ public class ApiKeyResolver : IApiKeyResolver
         if (_embeddingOptions.IsConfigured)
         {
             _logger.LogDebug("Using system-level embedding key");
-            return (_embeddingOptions.ApiKey!, "system");
+            return (_embeddingOptions.ApiKey!, _embeddingOptions.BaseUrl, _embeddingOptions.Model, "system");
         }
 
         // Tier 3: Fall back to any user's embedding key (for background tasks that don't have a user context)
@@ -62,14 +64,16 @@ public class ApiKeyResolver : IApiKeyResolver
             if (!string.IsNullOrEmpty(decrypted))
             {
                 _logger.LogDebug("Using fallback embedding key from user {UserId}", anyUserSettings.UserId);
-                return (decrypted, "user-fallback");
+                var baseUrl = anyUserSettings.EmbeddingBaseUrl ?? _embeddingOptions.BaseUrl;
+                var model = anyUserSettings.EmbeddingModel ?? _embeddingOptions.Model;
+                return (decrypted, baseUrl, model, "user-fallback");
             }
         }
 
-        return (null, "none");
+        return (null, _embeddingOptions.BaseUrl, _embeddingOptions.Model, "none");
     }
 
-    public async Task<(string? apiKey, string model, string source)> ResolveLlmKeyAsync(string? userId = null, CancellationToken ct = default)
+    public async Task<(string? apiKey, string baseUrl, string model, string source)> ResolveLlmKeyAsync(string? userId = null, CancellationToken ct = default)
     {
         // Tier 1: User-specific LLM key
         if (!string.IsNullOrEmpty(userId))
@@ -83,7 +87,9 @@ public class ApiKeyResolver : IApiKeyResolver
                 if (!string.IsNullOrEmpty(decrypted))
                 {
                     _logger.LogDebug("Using user-specific LLM key for {UserId}", userId);
-                    return (decrypted, _llmOptions.Model, "user");
+                    var baseUrl = userSettings.LlmBaseUrl ?? _llmOptions.BaseUrl;
+                    var model = userSettings.LlmModel ?? _llmOptions.Model;
+                    return (decrypted, baseUrl, model, "user");
                 }
             }
 
@@ -94,7 +100,9 @@ public class ApiKeyResolver : IApiKeyResolver
                 if (!string.IsNullOrEmpty(decrypted))
                 {
                     _logger.LogDebug("Using user embedding key as LLM fallback for {UserId}", userId);
-                    return (decrypted, _llmOptions.Model, "user");
+                    var baseUrl = userSettings.LlmBaseUrl ?? _llmOptions.BaseUrl;
+                    var model = userSettings.LlmModel ?? _llmOptions.Model;
+                    return (decrypted, baseUrl, model, "user");
                 }
             }
         }
@@ -103,14 +111,14 @@ public class ApiKeyResolver : IApiKeyResolver
         if (_llmOptions.IsConfigured)
         {
             _logger.LogDebug("Using system-level LLM key");
-            return (_llmOptions.ApiKey!, _llmOptions.Model, "system");
+            return (_llmOptions.ApiKey!, _llmOptions.BaseUrl, _llmOptions.Model, "system");
         }
 
         // Tier 3: Fall back to embedding key (same OpenAI account often works)
         if (_embeddingOptions.IsConfigured)
         {
             _logger.LogDebug("Using embedding key as LLM fallback");
-            return (_embeddingOptions.ApiKey!, _llmOptions.Model, "system");
+            return (_embeddingOptions.ApiKey!, _llmOptions.BaseUrl, _llmOptions.Model, "system");
         }
 
         // Tier 4: Fall back to any user's key (for background tasks without user context)
@@ -125,11 +133,13 @@ public class ApiKeyResolver : IApiKeyResolver
                 if (!string.IsNullOrEmpty(decrypted))
                 {
                     _logger.LogDebug("Using fallback LLM key from user {UserId}", anyUser.UserId);
-                    return (decrypted, _llmOptions.Model, "user-fallback");
+                    var baseUrl = anyUser.LlmBaseUrl ?? _llmOptions.BaseUrl;
+                    var model = anyUser.LlmModel ?? _llmOptions.Model;
+                    return (decrypted, baseUrl, model, "user-fallback");
                 }
             }
         }
 
-        return (null, _llmOptions.Model, "none");
+        return (null, _llmOptions.BaseUrl, _llmOptions.Model, "none");
     }
 }

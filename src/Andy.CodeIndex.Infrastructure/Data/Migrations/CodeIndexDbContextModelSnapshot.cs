@@ -626,6 +626,10 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
 
+                    b.Property<string>("EmbeddingBaseUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<string>("EmbeddingModel")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -633,6 +637,10 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     b.Property<string>("LlmApiKey")
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("LlmBaseUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("LlmModel")
                         .HasMaxLength(128)

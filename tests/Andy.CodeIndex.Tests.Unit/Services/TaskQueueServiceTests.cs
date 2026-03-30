@@ -17,7 +17,7 @@ public class TaskQueueServiceTests
     {
         // Default: no LLM key available (skip LLM operations)
         _resolverMock.Setup(r => r.ResolveLlmKeyAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult<(string?, string, string)>((null, "gpt-4o-mini", "none")));
+            .Returns(Task.FromResult<(string?, string, string, string)>((null, "https://api.openai.com/v1", "gpt-4o-mini", "none")));
         _service = new TaskQueueService(_taskRepoMock.Object, _resolverMock.Object);
 
         _taskRepoMock.Setup(r => r.AddAsync(It.IsAny<IndexingTask>(), It.IsAny<CancellationToken>()))

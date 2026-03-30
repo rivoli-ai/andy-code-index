@@ -39,7 +39,7 @@ public class CreateCodeEmbeddingsHandler : ITaskHandler
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
         // Check if any embedding key is available (user "anonymous" in dev, or system config)
-        var (apiKey, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync("anonymous", ct);
+        var (apiKey, baseUrl, model, source) = await _apiKeyResolver.ResolveEmbeddingKeyAsync("anonymous", ct);
         if (string.IsNullOrEmpty(apiKey))
         {
             _logger.LogInformation("Skipping code embeddings for {Name}: no embedding API key available (set one in Settings or Embedding:ApiKey)", repo.Name);
