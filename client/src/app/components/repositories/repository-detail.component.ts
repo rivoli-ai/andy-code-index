@@ -500,7 +500,7 @@ interface CommitComparison {
                   </div>
                   <div class="report-health-of">/100</div>
                   <div class="report-health-label">Health Score</div>
-                  <span class="report-info-icon" title="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.">
+                  <span class="report-info-icon" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.">
                     <i class="bi bi-info-circle"></i>
                   </span>
                 </div>
@@ -529,7 +529,7 @@ interface CommitComparison {
                   <div class="report-velocity-value">{{ reportData.velocity.commitsPerMonth }}</div>
                   <div class="report-velocity-label">
                     Commits/Month
-                    <span class="report-info-icon" title="Total commits divided by the repository's active period in months.">
+                    <span class="report-info-icon" data-tooltip="Total commits divided by the repository's active period in months.">
                       <i class="bi bi-info-circle"></i>
                     </span>
                   </div>
@@ -538,7 +538,7 @@ interface CommitComparison {
                   <div class="report-velocity-value">{{ reportData.velocity.activeContributors }}</div>
                   <div class="report-velocity-label">
                     Active Contributors
-                    <span class="report-info-icon" title="Unique committer emails across all indexed commits.">
+                    <span class="report-info-icon" data-tooltip="Unique committer emails across all indexed commits.">
                       <i class="bi bi-info-circle"></i>
                     </span>
                   </div>
@@ -547,7 +547,7 @@ interface CommitComparison {
                   <div class="report-velocity-value report-velocity-trend" style="text-transform:capitalize">{{ reportData.velocity.trend }}</div>
                   <div class="report-velocity-label">
                     Trend
-                    <span class="report-info-icon" title="Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.">
+                    <span class="report-info-icon" data-tooltip="Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.">
                       <i class="bi bi-info-circle"></i>
                     </span>
                   </div>
@@ -609,7 +609,7 @@ interface CommitComparison {
                             [ngClass]="imp.impact === 'high' || imp.impact === 'critical' ? 'badge-danger' : imp.impact === 'medium' ? 'badge-warning' : 'badge-muted'"
                             style="font-size:0.6875rem;text-transform:capitalize">
                         {{ imp.impact }} impact
-                        <span class="report-info-icon" title="Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.">
+                        <span class="report-info-icon" data-tooltip="Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.">
                           <i class="bi bi-info-circle"></i>
                         </span>
                       </span>
@@ -642,21 +642,21 @@ interface CommitComparison {
                 <span class="badge report-badge-maturity"
                       [ngClass]="layer.maturityRating >= 4 ? 'badge-success' : layer.maturityRating >= 3 ? 'badge-warning' : 'badge-danger'">
                   <i class="bi bi-bar-chart-fill"></i> Maturity {{ layer.maturityRating }}/5
-                  <span class="report-info-icon report-info-inline" title="1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.">
+                  <span class="report-info-icon report-info-inline" data-tooltip="1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.">
                     <i class="bi bi-info-circle"></i>
                   </span>
                 </span>
                 <span class="badge report-badge-quality"
                       [ngClass]="layer.qualityRating >= 4 ? 'badge-success' : layer.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'">
                   <i class="bi bi-star-fill"></i> Quality {{ layer.qualityRating }}/5
-                  <span class="report-info-icon report-info-inline" title="1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.">
+                  <span class="report-info-icon report-info-inline" data-tooltip="1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.">
                     <i class="bi bi-info-circle"></i>
                   </span>
                 </span>
                 <span class="badge report-badge-risk"
                       [ngClass]="layer.riskRating <= 2 ? 'badge-success' : layer.riskRating <= 3 ? 'badge-warning' : 'badge-danger'">
                   <i class="bi bi-shield-fill"></i> Risk {{ layer.riskRating }}/5
-                  <span class="report-info-icon report-info-inline" title="1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.">
+                  <span class="report-info-icon report-info-inline" data-tooltip="1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.">
                     <i class="bi bi-info-circle"></i>
                   </span>
                 </span>
@@ -1271,15 +1271,26 @@ interface CommitComparison {
       content: '\\2192'; position: absolute; left: 0; color: var(--primary); font-weight: 700;
     }
 
-    /* Info Icon (tooltip) */
+    /* Info Icon with CSS tooltip */
     .report-info-icon {
       display: inline-flex; align-items: center; cursor: help; position: relative;
       color: var(--text-light); font-size: 0.75rem; vertical-align: middle;
     }
     .report-info-icon:hover { color: var(--primary); }
-    .report-info-icon[title] {
-      /* native title tooltip is used; keep icon small */
+    .report-info-icon::after {
+      content: attr(data-tooltip);
+      position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+      background: #1a1a2e; color: white; padding: 0.5rem 0.75rem; border-radius: 6px;
+      font-size: 0.75rem; font-weight: 400; line-height: 1.4; white-space: normal;
+      width: max-content; max-width: 280px; z-index: 100; pointer-events: none;
+      opacity: 0; transition: opacity 0.15s; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
+    .report-info-icon::before {
+      content: ''; position: absolute; bottom: calc(100% - 4px); left: 50%; transform: translateX(-50%);
+      border: 5px solid transparent; border-top-color: #1a1a2e;
+      z-index: 101; opacity: 0; transition: opacity 0.15s; pointer-events: none;
+    }
+    .report-info-icon:hover::after, .report-info-icon:hover::before { opacity: 1; }
     .report-info-inline {
       margin-left: 0.25rem; font-size: 0.6875rem;
     }
