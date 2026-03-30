@@ -432,20 +432,49 @@ interface CommitComparison {
             </div>
 
             <!-- Methodology -->
-            <div class="insights-section" id="insights-methodology" style="margin-top:2rem">
-              <a (click)="showInsightsMethodology = !showInsightsMethodology" href="javascript:void(0)" style="display:inline-flex;align-items:center;gap:0.375rem;font-size:var(--font-xs);font-weight:600;color:var(--primary);text-decoration:none">
-                <i class="bi" [ngClass]="showInsightsMethodology ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
-                Methodology
-              </a>
-              <div *ngIf="showInsightsMethodology" style="margin-top:0.75rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;font-size:var(--font-xs);color:var(--text-muted);line-height:1.5">
-                <div><strong>Health Score</strong><br>Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.</div>
-                <div><strong>Commits/Month</strong><br>Total commits divided by the repository's active period in months.</div>
-                <div><strong>Active Contributors</strong><br>Unique committer emails across all indexed commits.</div>
-                <div><strong>Trend</strong><br>Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.</div>
-                <div><strong>Maturity Rating</strong><br>1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.</div>
-                <div><strong>Quality Rating</strong><br>1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.</div>
-                <div><strong>Risk Rating</strong><br>1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.</div>
-                <div><strong>Impact/Effort</strong><br>Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.</div>
+            <div class="insights-section report-methodology-section" id="insights-methodology" style="margin-top:2rem">
+              <h2 class="report-section-title">
+                <i class="bi bi-info-circle"></i> Methodology
+              </h2>
+              <div class="report-methodology-toggle" (click)="showInsightsMethodology = !showInsightsMethodology">
+                <i class="bi" [ngClass]="showInsightsMethodology ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                {{ showInsightsMethodology ? 'Hide methodology details' : 'Show methodology details' }}
+              </div>
+              <div class="report-methodology-content" [class.report-methodology-expanded]="showInsightsMethodology">
+                <div class="report-methodology-grid">
+                  <div class="report-methodology-item">
+                    <div class="report-methodology-term">Health Score</div>
+                    <div class="report-methodology-def">Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.</div>
+                  </div>
+                  <div class="report-methodology-item">
+                    <div class="report-methodology-term">Commits/Month</div>
+                    <div class="report-methodology-def">Total commits divided by the repository's active period in months.</div>
+                  </div>
+                  <div class="report-methodology-item">
+                    <div class="report-methodology-term">Active Contributors</div>
+                    <div class="report-methodology-def">Unique committer emails across all indexed commits.</div>
+                  </div>
+                  <div class="report-methodology-item">
+                    <div class="report-methodology-term">Trend</div>
+                    <div class="report-methodology-def">Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.</div>
+                  </div>
+                  <div class="report-methodology-item">
+                    <div class="report-methodology-term">Maturity Rating</div>
+                    <div class="report-methodology-def">1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.</div>
+                  </div>
+                  <div class="report-methodology-item">
+                    <div class="report-methodology-term">Quality Rating</div>
+                    <div class="report-methodology-def">1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.</div>
+                  </div>
+                  <div class="report-methodology-item">
+                    <div class="report-methodology-term">Risk Rating</div>
+                    <div class="report-methodology-def">1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.</div>
+                  </div>
+                  <div class="report-methodology-item">
+                    <div class="report-methodology-term">Impact / Effort</div>
+                    <div class="report-methodology-def">Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.</div>
+                  </div>
+                </div>
               </div>
             </div>
 
