@@ -306,7 +306,8 @@ interface CommitComparison {
                        [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
                     {{ reportData.overallHealthScore }}
                   </div>
-                  <div class="insights-health-label">Health Score <span class="report-info-icon report-info-below" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100."><i class="bi bi-info-circle"></i></span></div>
+                  <div class="insights-health-label">Health Score</div>
+                  <span class="report-info-icon report-info-below" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
                   <div class="insights-health-stars" *ngIf="reportData.overallHealthScore != null">
                     {{ getStarRating(Math.round(reportData.overallHealthScore / 20)) }}
                   </div>
@@ -328,15 +329,18 @@ interface CommitComparison {
               <div *ngIf="reportData.velocity" class="insights-velocity-row">
                 <div class="insights-velocity-item">
                   <div class="insights-velocity-value">{{ reportData.velocity.commitsPerMonth }}</div>
-                  <div class="insights-velocity-label">Commits/Month <span class="report-info-icon report-info-below" data-tooltip="Total commits divided by the repository's active period in months."><i class="bi bi-info-circle"></i></span></div>
+                  <div class="insights-velocity-label">Commits/Month</div>
+                  <span class="report-info-icon report-info-below" data-tooltip="Total commits divided by the repository's active period in months." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
                 </div>
                 <div class="insights-velocity-item">
                   <div class="insights-velocity-value">{{ reportData.velocity.activeContributors }}</div>
-                  <div class="insights-velocity-label">Contributors <span class="report-info-icon report-info-below" data-tooltip="Unique committer emails across all indexed commits."><i class="bi bi-info-circle"></i></span></div>
+                  <div class="insights-velocity-label">Contributors</div>
+                  <span class="report-info-icon report-info-below" data-tooltip="Unique committer emails across all indexed commits." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
                 </div>
                 <div class="insights-velocity-item">
                   <div class="insights-velocity-value" style="text-transform:capitalize">{{ reportData.velocity.trend }}</div>
-                  <div class="insights-velocity-label">Trend <span class="report-info-icon report-info-below" data-tooltip="Compares commit rate in the second half vs first half. Increasing if >20% higher, decreasing if >20% lower."><i class="bi bi-info-circle"></i></span></div>
+                  <div class="insights-velocity-label">Trend</div>
+                  <span class="report-info-icon report-info-below" data-tooltip="Compares commit rate in the second half vs first half. Increasing if >20% higher, decreasing if >20% lower." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
                 </div>
               </div>
 
