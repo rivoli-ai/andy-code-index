@@ -281,7 +281,19 @@ interface CommitComparison {
           <div class="insights-content-area" id="insightsContentArea" (scroll)="onInsightsScroll($event)">
 
             <!-- Health Score Header -->
-            <div *ngIf="reportData" class="insights-section" id="report-summary">
+            <div class="insights-section" id="report-summary">
+
+              <!-- No report yet -->
+              <div *ngIf="!reportData" style="text-align:center;padding:1.5rem;background:var(--background-alt);border-radius:var(--radius-lg);margin-bottom:1.5rem">
+                <div style="font-size:var(--font-sm);color:var(--text-muted);margin-bottom:0.75rem">
+                  <i class="bi bi-bar-chart"></i> Health score and ratings available after generating a report.
+                </div>
+                <button class="btn btn-secondary btn-sm" (click)="activeTab = 'Report'" style="font-size:var(--font-xs)">
+                  Go to Report tab to generate
+                </button>
+              </div>
+
+              <div *ngIf="reportData">
               <div class="insights-health-header">
                 <div class="insights-health-score"
                      [style.borderColor]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
@@ -350,7 +362,8 @@ interface CommitComparison {
                         style="font-size:0.6875rem;text-transform:capitalize">{{ imp.impact }}</span>
                 </div>
               </div>
-            </div>
+            </div><!-- end *ngIf="reportData" -->
+            </div><!-- end insights-section report-summary -->
 
             <!-- Each Insight Layer Section -->
             <div *ngFor="let layer of insightLayers; let idx = index"
@@ -888,12 +901,16 @@ interface CommitComparison {
 
     /* Velocity Metrics */
     .insights-velocity-row {
-      display: flex; gap: 1px; margin-bottom: 1.5rem;
-      background: var(--border); border-radius: var(--radius); overflow: hidden;
+      display: flex; gap: 0; margin-bottom: 1.5rem;
+      border: 1px solid var(--border); border-radius: var(--radius);
     }
     .insights-velocity-item {
       flex: 1; text-align: center; padding: 1rem; background: var(--background-alt);
+      position: relative; overflow: visible;
     }
+    .insights-velocity-item:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+    .insights-velocity-item:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+    .insights-velocity-item + .insights-velocity-item { border-left: 1px solid var(--border); }
     .insights-velocity-value {
       font-size: 1.5rem; font-weight: 700; color: var(--primary); line-height: 1.2;
     }
@@ -1164,12 +1181,16 @@ interface CommitComparison {
 
     /* Velocity Grid */
     .report-velocity-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
-      background: var(--border); border-radius: var(--radius); overflow: hidden;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+      border: 1px solid var(--border); border-radius: var(--radius);
     }
     .report-velocity-card {
       text-align: center; padding: 1.25rem 1rem; background: var(--background-alt);
+      position: relative; overflow: visible;
     }
+    .report-velocity-card:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+    .report-velocity-card:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+    .report-velocity-card + .report-velocity-card { border-left: 1px solid var(--border); }
     .report-velocity-value {
       font-size: 1.75rem; font-weight: 700; color: var(--primary); line-height: 1.2;
     }
