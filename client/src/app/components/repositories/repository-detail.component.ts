@@ -275,6 +275,11 @@ interface CommitComparison {
                 {{ getStarRating(rating) }}
               </span>
             </a>
+            <a class="insights-toc-item"
+               [class.active]="activeTocSection === 'insights-methodology'"
+               (click)="scrollToSection('insights-methodology', $event)">
+              <i class="bi bi-info-circle"></i> Methodology
+            </a>
           </nav>
 
           <!-- Content Area -->
@@ -301,7 +306,7 @@ interface CommitComparison {
                        [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
                     {{ reportData.overallHealthScore }}
                   </div>
-                  <div class="insights-health-label">Health Score</div>
+                  <div class="insights-health-label">Health Score <span class="report-info-icon report-info-below" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.">?</span></div>
                   <div class="insights-health-stars" *ngIf="reportData.overallHealthScore != null">
                     {{ getStarRating(Math.round(reportData.overallHealthScore / 20)) }}
                   </div>
