@@ -160,6 +160,7 @@ builder.Services.AddScoped<ITaskHandler, CreateSecurityDocsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateOperationsDocsHandler>();
 builder.Services.AddScoped<ITaskHandler, CreateQualityDocsHandler>();
 builder.Services.AddScoped<ITaskHandler, ExtractDocumentTextHandler>();
+builder.Services.AddScoped<ITaskHandler, TechStackHandler>();
 builder.Services.AddScoped<ITaskHandler, InsightsHandler>();
 builder.Services.AddScoped<IDependencyParserService, Andy.CodeIndex.Infrastructure.Parsers.DependencyParserService>();
 

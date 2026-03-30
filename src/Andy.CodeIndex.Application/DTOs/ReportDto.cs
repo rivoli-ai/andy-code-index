@@ -6,8 +6,31 @@ public class ReportDto
     public DateTime GeneratedAt { get; set; }
     public int OverallHealthScore { get; set; }
     public VelocityDto Velocity { get; set; } = new();
+    public TechStackDto? TechStack { get; set; }
     public List<LayerReportDto> Layers { get; set; } = [];
     public List<ImprovementDto> Top5Improvements { get; set; } = [];
+}
+
+public class TechStackDto
+{
+    public List<TechComponent> Backend { get; set; } = [];
+    public List<TechComponent> Frontend { get; set; } = [];
+    public List<TechComponent> Database { get; set; } = [];
+    public List<TechComponent> Infrastructure { get; set; } = [];
+    public List<LanguageBreakdown> Languages { get; set; } = [];
+}
+
+public class TechComponent
+{
+    public string Name { get; set; } = "";
+    public string? Version { get; set; }
+}
+
+public class LanguageBreakdown
+{
+    public string Name { get; set; } = "";
+    public int FileCount { get; set; }
+    public double Percentage { get; set; }
 }
 
 public class VelocityDto

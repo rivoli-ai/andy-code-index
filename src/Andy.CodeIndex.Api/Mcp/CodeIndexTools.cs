@@ -331,7 +331,7 @@ public class CodeIndexTools
     [McpServerTool(Name = "code_index_insights"), Description("Get repository insight layers (architecture, design, security, testing, deployment, etc.)")]
     public async Task<object> GetInsights(
         [Description("Repository URL or name")] string repo_url,
-        [Description("Specific layer to retrieve (featuremap, architectureanalysis, designanalysis, implementationanalysis, dependencyanalysis, testanalysis, securityanalysis, deploymentanalysis, operationsanalysis, localsetupguide). Omit for all layers.")] string? layer = null)
+        [Description("Specific layer to retrieve (featuremap, architectureanalysis, designanalysis, implementationanalysis, dependencyanalysis, testanalysis, securityanalysis, deploymentanalysis, operationsanalysis, localsetupguide, techstack). Omit for all layers.")] string? layer = null)
     {
         var repo = await ResolveRepo(repo_url);
         if (repo is null)
@@ -349,6 +349,7 @@ public class CodeIndexTools
             ["deploymentanalysis"] = EnrichmentSubtype.DeploymentAnalysis,
             ["operationsanalysis"] = EnrichmentSubtype.OperationsAnalysis,
             ["localsetupguide"] = EnrichmentSubtype.LocalSetupGuide,
+            ["techstack"] = EnrichmentSubtype.TechStack,
         };
 
         if (!string.IsNullOrEmpty(layer))
@@ -371,6 +372,13 @@ public class CodeIndexTools
         }
 
         return new { repository = repo.Name, layers = results };
+    }
+
+    [McpServerTool(Name = "code_index_tech_stack"), Description("Get technology stack detection and summary for a repository")]
+    public async Task<object> GetTechStack(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        return await GetEnrichmentBySubtype(repo_url, EnrichmentSubtype.TechStack, "Tech stack");
     }
 
     [McpServerTool(Name = "code_index_feature_map"), Description("Get the structured feature inventory for a repository")]

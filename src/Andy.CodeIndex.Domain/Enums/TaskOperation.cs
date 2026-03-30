@@ -25,5 +25,6 @@ public enum TaskOperation
     CreateOperationsDocs,
     CreateQualityDocs,
     ExtractDocumentText,
+    CreateTechStack,
     CreateInsights
 }

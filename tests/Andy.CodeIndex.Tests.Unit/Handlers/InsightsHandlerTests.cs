@@ -73,10 +73,10 @@ public class InsightsHandlerTests : IDisposable
     }
 
     [Fact]
-    public void GetInsightLayers_Returns10Layers()
+    public void GetInsightLayers_Returns11Layers()
     {
         var layers = InsightsHandler.GetInsightLayers(_testRepo, "", "");
-        layers.Should().HaveCount(10);
+        layers.Should().HaveCount(11);
     }
 
     [Fact]
@@ -103,6 +103,7 @@ public class InsightsHandlerTests : IDisposable
         subtypes.Should().Contain(EnrichmentSubtype.DeploymentAnalysis);
         subtypes.Should().Contain(EnrichmentSubtype.OperationsAnalysis);
         subtypes.Should().Contain(EnrichmentSubtype.LocalSetupGuide);
+        subtypes.Should().Contain(EnrichmentSubtype.TechStack);
     }
 
     [Fact]
@@ -185,7 +186,7 @@ public class InsightsHandlerTests : IDisposable
             .Where(e => e.RepositoryId == _testRepo.Id && e.Type == EnrichmentType.Insights)
             .ToListAsync();
 
-        enrichments.Should().HaveCount(10);
+        enrichments.Should().HaveCount(11);
         foreach (var enrichment in enrichments)
         {
             enrichment.CommitId.Should().Be(_testCommit.Id,
@@ -225,6 +226,7 @@ public class InsightsHandlerTests : IDisposable
         subtypes.Should().Contain(EnrichmentSubtype.DeploymentAnalysis);
         subtypes.Should().Contain(EnrichmentSubtype.OperationsAnalysis);
         subtypes.Should().Contain(EnrichmentSubtype.LocalSetupGuide);
+        subtypes.Should().Contain(EnrichmentSubtype.TechStack);
     }
 
     [Fact]
@@ -335,7 +337,7 @@ public class InsightsHandlerTests : IDisposable
 
         _context.Enrichments
             .Count(e => e.RepositoryId == _testRepo.Id && e.Type == EnrichmentType.Insights)
-            .Should().Be(10);
+            .Should().Be(11);
     }
 
     private void SetupLlmMock(string responseContent)

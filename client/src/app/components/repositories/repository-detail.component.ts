@@ -230,7 +230,7 @@ interface CommitComparison {
           </div>
           <div class="insights-toolbar-right">
             <button class="btn btn-secondary btn-sm" (click)="generateInsights()" [disabled]="generatingInsights">
-              <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating (' + insightLayers.length + '/10)...' : (insightLayers.length > 0 ? 'Regenerate' : 'Generate Insights') }}
+              <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating (' + insightLayers.length + '/11)...' : (insightLayers.length > 0 ? 'Regenerate' : 'Generate Insights') }}
             </button>
             <button class="btn btn-secondary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
               <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
@@ -284,6 +284,11 @@ interface CommitComparison {
 
           <!-- Content Area -->
           <div class="insights-content-area" id="insightsContentArea" (scroll)="onInsightsScroll($event)">
+
+            <!-- Tech Stack Summary Bar -->
+            <div *ngIf="techStackSummary?.length" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
+              <span *ngFor="let tech of techStackSummary" class="badge badge-primary" style="font-size:var(--font-xs)">{{ tech }}</span>
+            </div>
 
             <!-- Health Score Header -->
             <div class="insights-section" id="report-summary">
@@ -567,6 +572,11 @@ interface CommitComparison {
 
           <!-- Content Area (single scrollable document) -->
           <div class="report-content-area" id="reportContentArea" (scroll)="onReportScroll($event)">
+
+            <!-- Tech Stack Summary Bar -->
+            <div *ngIf="techStackSummary?.length" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
+              <span *ngFor="let tech of techStackSummary" class="badge badge-primary" style="font-size:var(--font-xs)">{{ tech }}</span>
+            </div>
 
             <!-- Section 1: Health Score -->
             <section class="report-section" id="rpt-health">
@@ -1497,6 +1507,7 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   generatingReport = false;
   reportData: any = null;
   activeTocSection = '';
+  techStackSummary: string[] = [];
   Math = Math;
 
   // Mermaid rendering tracking
@@ -1512,11 +1523,11 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
     'FeatureMap': 'Features', 'ArchitectureAnalysis': 'Architecture', 'DesignAnalysis': 'Design',
     'ImplementationAnalysis': 'Implementation', 'DependencyAnalysis': 'Dependencies',
     'TestAnalysis': 'Testing', 'SecurityAnalysis': 'Security', 'DeploymentAnalysis': 'Deployment',
-    'OperationsAnalysis': 'Operations', 'LocalSetupGuide': 'Local Setup',
+    'OperationsAnalysis': 'Operations', 'LocalSetupGuide': 'Local Setup', 'TechStack': 'Tech Stack',
     'featuremap': 'Features', 'architectureanalysis': 'Architecture', 'designanalysis': 'Design',
     'implementationanalysis': 'Implementation', 'dependencyanalysis': 'Dependencies',
     'testanalysis': 'Testing', 'securityanalysis': 'Security', 'deploymentanalysis': 'Deployment',
-    'operationsanalysis': 'Operations', 'localsetupguide': 'Local Setup'
+    'operationsanalysis': 'Operations', 'localsetupguide': 'Local Setup', 'techstack': 'Tech Stack'
   };
 
   constructor(
@@ -1555,6 +1566,7 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
             .filter(([_, v]) => v !== null)
             .map(([k, v]: any) => ({ subtype: k, ...v }));
           if (this.insightLayers.length > 0) this.selectedInsightLayer = this.insightLayers[0].subtype;
+          this.parseTechStackSummary();
         }
       },
       error: () => {}
@@ -1658,6 +1670,7 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
           if (this.insightLayers.length > 0 && !this.selectedInsightLayer) {
             this.selectedInsightLayer = this.insightLayers[0].subtype;
           }
+          this.parseTechStackSummary();
         }
       },
       error: () => {}
@@ -1692,8 +1705,8 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
                 }
                 // Clear the HTML cache so new content renders
                 this.insightHtmlCache.clear();
-                // Stop when all 10 layers are present
-                if (layers.length >= 10) {
+                // Stop when all 11 layers are present
+                if (layers.length >= 11) {
                   clearInterval(pollInterval);
                   this.generatingInsights = false;
                   // Also refresh the report
@@ -1717,6 +1730,35 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
       next: (report) => { this.reportData = report; this.generatingReport = false; },
       error: (err) => { this.generatingReport = false; console.error('Report generation failed', err); }
     });
+  }
+
+  parseTechStackSummary() {
+    const techLayer = this.insightLayers.find(l => l.subtype === 'techstack' || l.subtype === 'TechStack');
+    if (!techLayer?.content) {
+      this.techStackSummary = [];
+      return;
+    }
+    const content = techLayer.content as string;
+    // Extract technology names from markdown headings and bullet points
+    const techs: string[] = [];
+    const patterns = [
+      /\.NET\s*\d+/gi, /ASP\.NET/gi, /Angular\s*\d*/gi, /React\s*\d*/gi,
+      /Vue\.?js?\s*\d*/gi, /Node\.js\s*\d*/gi, /Go\s+\d+/gi, /Rust/gi,
+      /Python\s*\d*/gi, /Java\s+\d*/gi, /TypeScript/gi, /JavaScript/gi,
+      /PostgreSQL/gi, /SQL\s*Server/gi, /MySQL/gi, /MongoDB/gi, /Redis/gi,
+      /Docker/gi, /Kubernetes/gi, /K8s/gi, /GitHub\s*Actions/gi,
+      /Azure\s*DevOps/gi, /Terraform/gi, /Jenkins/gi, /GitLab\s*CI/gi
+    ];
+    for (const pat of patterns) {
+      const match = content.match(pat);
+      if (match) {
+        const name = match[0].trim();
+        if (!techs.some(t => t.toLowerCase() === name.toLowerCase())) {
+          techs.push(name);
+        }
+      }
+    }
+    this.techStackSummary = techs.slice(0, 12); // Limit to 12 badges
   }
 
   ngAfterViewChecked() {

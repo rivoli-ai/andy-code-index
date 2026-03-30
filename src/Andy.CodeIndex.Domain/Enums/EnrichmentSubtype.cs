@@ -47,5 +47,6 @@ public enum EnrichmentSubtype
     DeploymentAnalysis,
     OperationsAnalysis,
     LocalSetupGuide,
-    InsightReport
+    InsightReport,
+    TechStack
 }

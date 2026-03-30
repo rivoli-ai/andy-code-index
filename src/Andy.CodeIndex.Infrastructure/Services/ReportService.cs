@@ -35,6 +35,7 @@ public class ReportService : IReportService
         [EnrichmentSubtype.DeploymentAnalysis] = "Deployment Analysis",
         [EnrichmentSubtype.OperationsAnalysis] = "Operations Analysis",
         [EnrichmentSubtype.LocalSetupGuide] = "Local Setup Guide",
+        [EnrichmentSubtype.TechStack] = "Technology Stack",
     };
 
     public ReportService(
@@ -145,6 +146,9 @@ public class ReportService : IReportService
 
         // Calculate velocity from commits table
         report.Velocity = await CalculateVelocityAsync(repositoryId, ct);
+
+        // Populate TechStack from file extensions and TechStack enrichment
+        report.TechStack = await BuildTechStackAsync(repositoryId, ct);
 
         // Cache the report as an InsightReport enrichment
         await CacheReportAsync(repo, report, ct);
@@ -317,6 +321,123 @@ public class ReportService : IReportService
             Trend = trend,
             TopContributors = topContributors
         };
+    }
+
+    internal async Task<TechStackDto> BuildTechStackAsync(Guid repositoryId, CancellationToken ct)
+    {
+        var dto = new TechStackDto();
+
+        // Language breakdown from RepositoryFiles
+        var latestCommit = await _context.Commits
+            .Where(c => c.RepositoryId == repositoryId)
+            .OrderByDescending(c => c.CommittedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (latestCommit is not null)
+        {
+            var files = await _context.RepositoryFiles
+                .Where(f => f.CommitId == latestCommit.Id)
+                .ToListAsync(ct);
+
+            var total = files.Count;
+            if (total > 0)
+            {
+                dto.Languages = files
+                    .Where(f => !string.IsNullOrEmpty(f.Language))
+                    .GroupBy(f => f.Language!)
+                    .Select(g => new LanguageBreakdown
+                    {
+                        Name = g.Key,
+                        FileCount = g.Count(),
+                        Percentage = Math.Round(100.0 * g.Count() / total, 1)
+                    })
+                    .OrderByDescending(l => l.FileCount)
+                    .ToList();
+            }
+        }
+
+        // Parse TechStack enrichment content for backend/frontend/database/infrastructure
+        var techStackEnrichment = await _context.Enrichments
+            .Where(e => e.RepositoryId == repositoryId && e.Subtype == EnrichmentSubtype.TechStack)
+            .FirstOrDefaultAsync(ct);
+
+        if (techStackEnrichment is not null)
+        {
+            var content = techStackEnrichment.Content;
+            dto.Backend = ExtractTechComponents(content, "## Backend");
+            dto.Frontend = ExtractTechComponents(content, "## Frontend");
+            dto.Database = ExtractTechComponents(content, "## Database");
+            dto.Infrastructure = ExtractTechComponents(content, "## Infrastructure");
+        }
+
+        return dto;
+    }
+
+    internal static List<TechComponent> ExtractTechComponents(string content, string sectionHeader)
+    {
+        var components = new List<TechComponent>();
+
+        var sectionIdx = content.IndexOf(sectionHeader, StringComparison.OrdinalIgnoreCase);
+        if (sectionIdx < 0) return components;
+
+        var sectionStart = sectionIdx + sectionHeader.Length;
+        var nextSection = content.IndexOf("\n## ", sectionStart, StringComparison.OrdinalIgnoreCase);
+        var sectionText = nextSection > 0
+            ? content[sectionStart..nextSection]
+            : content[sectionStart..];
+
+        // Look for known technology keywords with optional versions
+        var techPatterns = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            [".NET"] = [".NET", "ASP.NET", "dotnet"],
+            ["Angular"] = ["Angular"],
+            ["React"] = ["React"],
+            ["Vue"] = ["Vue.js", "Vue"],
+            ["Node.js"] = ["Node.js", "Node"],
+            ["Go"] = ["Go ", "Golang"],
+            ["Rust"] = ["Rust"],
+            ["Python"] = ["Python", "Django", "Flask", "FastAPI"],
+            ["Java"] = ["Java ", "Spring"],
+            ["PostgreSQL"] = ["PostgreSQL", "Postgres"],
+            ["SQL Server"] = ["SQL Server", "MSSQL"],
+            ["MySQL"] = ["MySQL"],
+            ["MongoDB"] = ["MongoDB", "Mongo"],
+            ["Redis"] = ["Redis"],
+            ["Docker"] = ["Docker"],
+            ["Kubernetes"] = ["Kubernetes", "K8s"],
+            ["GitHub Actions"] = ["GitHub Actions"],
+            ["Azure DevOps"] = ["Azure DevOps", "Azure Pipelines"],
+            ["Jenkins"] = ["Jenkins"],
+            ["GitLab CI"] = ["GitLab CI"],
+            ["Terraform"] = ["Terraform"],
+        };
+
+        foreach (var (name, keywords) in techPatterns)
+        {
+            foreach (var keyword in keywords)
+            {
+                if (sectionText.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Try to extract a version number after the keyword
+                    var version = ExtractVersion(sectionText, keyword);
+                    components.Add(new TechComponent { Name = name, Version = version });
+                    break; // One match per tech is enough
+                }
+            }
+        }
+
+        return components;
+    }
+
+    internal static string? ExtractVersion(string text, string keyword)
+    {
+        var idx = text.IndexOf(keyword, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0) return null;
+
+        // Look for a version pattern after the keyword: e.g., "Angular 17.2", ".NET 8", "v3.1.0"
+        var after = text[(idx + keyword.Length)..];
+        var match = System.Text.RegularExpressions.Regex.Match(after, @"^\s*v?(\d+(?:\.\d+){0,3})");
+        return match.Success ? match.Groups[1].Value : null;
     }
 
     internal static int CalculateHealthScore(List<LayerReportDto> layers)

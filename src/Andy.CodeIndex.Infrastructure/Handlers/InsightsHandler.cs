@@ -104,7 +104,7 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                 layer.Subtype, repo.Name, reply.Length);
         }
 
-        Logger.LogInformation("Completed {Count}/10 insight layers for {Name}", generatedCount, repo.Name);
+        Logger.LogInformation("Completed {Count}/11 insight layers for {Name}", generatedCount, repo.Name);
     }
 
     private async Task<string> BuildExistingContext(Guid repoId, CancellationToken ct)
@@ -118,7 +118,8 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
             EnrichmentSubtype.Security,
             EnrichmentSubtype.Operations,
             EnrichmentSubtype.Ownership,
-            EnrichmentSubtype.CommitHistory
+            EnrichmentSubtype.CommitHistory,
+            EnrichmentSubtype.TechStack
         };
 
         var enrichments = await Context.Enrichments
@@ -301,6 +302,24 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Generate a getting-started guide for "{repoName}".
                     Include: prerequisites, step-by-step setup, running tests, common issues, environment variables needed.
                     Format as markdown.
+
+                    Existing knowledge:
+                    {existingContext}
+
+                    Code samples:
+                    {codeContext}
+                    """
+            },
+            new InsightLayer
+            {
+                Subtype = EnrichmentSubtype.TechStack,
+                Title = "Technology Stack",
+                Prompt = $"""
+                    Summarize the technology stack of "{repoName}" in a concise markdown format.
+                    Include: Backend frameworks + versions, Frontend frameworks + versions,
+                    Database technologies, Infrastructure (Docker, K8s, CI/CD), Languages breakdown,
+                    and Key Dependencies with versions.
+                    Output ONLY markdown. No preamble. Be specific with version numbers.
 
                     Existing knowledge:
                     {existingContext}

@@ -52,6 +52,7 @@ import { environment } from '../../../environments/environment';
         <div><strong>Operations Analysis</strong> -- Logging audit, monitoring, health checks, alerting, and graceful shutdown</div>
         <div><strong>Local Setup Guide</strong> -- Step-by-step guide to run the project locally with prerequisites and common issues</div>
         <div><strong>Insight Report</strong> -- Comprehensive analysis report with per-layer ratings, health score, and top improvements</div>
+        <div><strong>Tech Stack</strong> -- Technology stack detection: backend/frontend frameworks, databases, infrastructure, and language breakdown</div>
       </div>
     </div>
 
@@ -176,6 +177,7 @@ export class EnrichmentBrowserComponent implements OnInit {
     'OperationsAnalysis': 'Operations Analysis',
     'LocalSetupGuide': 'Local Setup Guide',
     'InsightReport': 'Insight Report',
+    'TechStack': 'Tech Stack',
   };
 
   typeOptions = ['Architecture', 'Development', 'History', 'Usage', 'Insights'];
@@ -219,6 +221,7 @@ export class EnrichmentBrowserComponent implements OnInit {
       { value: 'OperationsAnalysis', label: 'Operations Analysis' },
       { value: 'LocalSetupGuide', label: 'Local Setup Guide' },
       { value: 'InsightReport', label: 'Insight Report' },
+      { value: 'TechStack', label: 'Tech Stack' },
     ],
   };
 

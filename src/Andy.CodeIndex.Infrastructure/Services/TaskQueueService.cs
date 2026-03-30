@@ -116,6 +116,7 @@ public class TaskQueueService : ITaskQueue
             TaskOperation.CreateSecurityDocs,
             TaskOperation.CreateOperationsDocs,
             TaskOperation.CreateQualityDocs,
+            TaskOperation.CreateTechStack,
             TaskOperation.CreateInsights
         ],
         TaskChainType.Resync =>
@@ -163,6 +164,7 @@ public class TaskQueueService : ITaskQueue
             TaskOperation.CreateSecurityDocs,
             TaskOperation.CreateOperationsDocs,
             TaskOperation.CreateQualityDocs,
+            TaskOperation.CreateTechStack,
             TaskOperation.CreateInsights,
         ];
 
@@ -183,6 +185,7 @@ public class TaskQueueService : ITaskQueue
         TaskOperation.CreateSecurityDocs or
         TaskOperation.CreateOperationsDocs or
         TaskOperation.CreateQualityDocs or
+        TaskOperation.CreateTechStack or
         TaskOperation.CreateInsights or
         TaskOperation.CreateSummaryEnrichments or
         TaskOperation.CreateSummaryEmbeddings;
