@@ -20,7 +20,55 @@ services:
     networks:
       - andy-code-index-network
 
-  # Optional: Ollama for local embeddings and LLM enrichments
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      additional_contexts:
+        certs: ./certs
+    container_name: andy-code-index-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:8443
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=andy_code_index;Username=andy_code_index;Password=andy_code_index_dev_password
+      - AndyAuth__Authority=https://host.docker.internal:5001
+      - AndyAuth__Audience=urn:andy-code-index-api
+      - Rbac__ApiBaseUrl=https://host.docker.internal:7003
+      - Rbac__ApplicationCode=code-index
+      - Indexing__DataDir=/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "5101:8443"
+    volumes:
+      - ./certs:/usr/local/share/ca-certificates/custom:ro
+      - code_index_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:8443/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - andy-code-index-network
+
+  web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: andy-code-index-web
+    depends_on:
+      - api
+    ports:
+      - "4201:80"
+    restart: unless-stopped
+    networks:
+      - andy-code-index-network
+
   ollama:
     image: ollama/ollama:latest
     container_name: andy-code-index-ollama
@@ -36,9 +84,8 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
+  code_index_data:
   ollama_data:
-    driver: local
 
 networks:
   andy-code-index-network:

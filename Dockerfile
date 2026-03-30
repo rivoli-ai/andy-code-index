@@ -1,45 +1,62 @@
-# Build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
+WORKDIR /build
 
-# Copy build config and csproj files for restore (layer caching)
-COPY ["Directory.Build.props", "./"]
-COPY ["src/Andy.CodeIndex.Api/Andy.CodeIndex.Api.csproj", "src/Andy.CodeIndex.Api/"]
-COPY ["src/Andy.CodeIndex.Application/Andy.CodeIndex.Application.csproj", "src/Andy.CodeIndex.Application/"]
-COPY ["src/Andy.CodeIndex.Domain/Andy.CodeIndex.Domain.csproj", "src/Andy.CodeIndex.Domain/"]
-COPY ["src/Andy.CodeIndex.Infrastructure/Andy.CodeIndex.Infrastructure.csproj", "src/Andy.CodeIndex.Infrastructure/"]
-COPY ["src/Andy.CodeIndex.Shared/Andy.CodeIndex.Shared.csproj", "src/Andy.CodeIndex.Shared/"]
-RUN dotnet restore "src/Andy.CodeIndex.Api/Andy.CodeIndex.Api.csproj"
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl && rm -rf /var/lib/apt/lists/*
+COPY --from=certs . /usr/local/share/ca-certificates/corporate/
+RUN find /usr/local/share/ca-certificates/corporate/ -name '.git*' -delete 2>/dev/null || true && \
+    find /usr/local/share/ca-certificates/corporate/ -name 'README.md' -delete 2>/dev/null || true && \
+    update-ca-certificates
 
-# Copy everything else and build
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_DIR=/etc/ssl/certs \
+    DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0 \
+    NUGET_CERT_REVOCATION_MODE=off \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_NUGET_SIGNATURE_VERIFICATION=false
+
+COPY Directory.Build.props ./
+COPY src/Andy.CodeIndex.Api/Andy.CodeIndex.Api.csproj src/Andy.CodeIndex.Api/
+COPY src/Andy.CodeIndex.Application/Andy.CodeIndex.Application.csproj src/Andy.CodeIndex.Application/
+COPY src/Andy.CodeIndex.Domain/Andy.CodeIndex.Domain.csproj src/Andy.CodeIndex.Domain/
+COPY src/Andy.CodeIndex.Infrastructure/Andy.CodeIndex.Infrastructure.csproj src/Andy.CodeIndex.Infrastructure/
+COPY src/Andy.CodeIndex.Shared/Andy.CodeIndex.Shared.csproj src/Andy.CodeIndex.Shared/
+RUN dotnet restore src/Andy.CodeIndex.Api/Andy.CodeIndex.Api.csproj
+
 COPY . .
-WORKDIR "/src/src/Andy.CodeIndex.Api"
-RUN dotnet build "Andy.CodeIndex.Api.csproj" -c Release -o /app/build
+RUN dotnet publish src/Andy.CodeIndex.Api/Andy.CodeIndex.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-# Publish stage
-FROM build AS publish
-RUN dotnet publish "Andy.CodeIndex.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
-
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
-# Create non-root user
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl openssl git && rm -rf /var/lib/apt/lists/*
+
+# Non-root user
 RUN groupadd -r codeindex && useradd -r -g codeindex -d /app -s /sbin/nologin codeindex
+RUN mkdir -p /data /https && chown codeindex:codeindex /data
 
-# Create data directory for repository clones
-RUN mkdir -p /data && chown codeindex:codeindex /data
-
-EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
-ENV Indexing__DataDir=/data
-
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 RUN chown -R codeindex:codeindex /app
 
+# Self-signed dev cert
+RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+      -keyout /tmp/dev.key -out /tmp/dev.crt \
+      -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" && \
+    openssl pkcs12 -export -out /https/aspnetapp.pfx \
+      -inkey /tmp/dev.key -in /tmp/dev.crt -passout pass:devcert && \
+    rm -f /tmp/dev.key /tmp/dev.crt && \
+    chown codeindex:codeindex /https/aspnetapp.pfx
+
+RUN printf '#!/bin/sh\nset -e\nif ls /usr/local/share/ca-certificates/custom/*.crt 1>/dev/null 2>&1 || ls /usr/local/share/ca-certificates/custom/*.pem 1>/dev/null 2>&1; then\n    update-ca-certificates 2>/dev/null || true\nfi\nexec "$@"\n' > /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
+
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_DIR=/etc/ssl/certs \
+    ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx \
+    ASPNETCORE_Kestrel__Certificates__Default__Password=devcert \
+    Indexing__DataDir=/data
+
+EXPOSE 8080
 USER codeindex
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
-ENTRYPOINT ["dotnet", "Andy.CodeIndex.Api.dll"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["dotnet", "Andy.CodeIndex.Api.dll"]
