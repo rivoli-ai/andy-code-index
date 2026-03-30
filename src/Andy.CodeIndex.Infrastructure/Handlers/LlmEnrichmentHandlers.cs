@@ -102,17 +102,14 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
         var client = HttpClientFactory.CreateClient("Chat");
         var baseUrl = (overrideBaseUrl ?? LlmOptions.BaseUrl).TrimEnd('/') + "/";
 
+        var isReasoningModel = model.StartsWith("gpt-5") || model.StartsWith("o1") || model.StartsWith("o3");
         var body = new Dictionary<string, object>
         {
             ["model"] = model,
-            ["messages"] = new[] { new { role = "user", content = prompt } },
-            ["temperature"] = 0.3
+            ["messages"] = new[] { new { role = "user", content = prompt } }
         };
-        // GPT-5+ uses max_completion_tokens; older models use max_tokens
-        if (model.StartsWith("gpt-5") || model.StartsWith("o1") || model.StartsWith("o3"))
-            body["max_completion_tokens"] = 3000;
-        else
-            body["max_tokens"] = 3000;
+        if (!isReasoningModel) body["temperature"] = 0.3;
+        body[isReasoningModel ? "max_completion_tokens" : "max_tokens"] = 3000;
 
         try
         {

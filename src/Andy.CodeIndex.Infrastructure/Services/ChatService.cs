@@ -322,17 +322,14 @@ IMPORTANT: Always use these tools to answer questions. Never say you don't have 
 
         for (var iteration = 0; iteration <= maxIterations; iteration++)
         {
+            var isReasoningModel = model.StartsWith("gpt-5") || model.StartsWith("o1") || model.StartsWith("o3");
             var llmRequest = new Dictionary<string, object>
             {
                 ["model"] = model,
-                ["messages"] = messages,
-                ["temperature"] = 0.3
+                ["messages"] = messages
             };
-            // GPT-5+ uses max_completion_tokens; older models use max_tokens
-            if (model.StartsWith("gpt-5") || model.StartsWith("o1") || model.StartsWith("o3"))
-                llmRequest["max_completion_tokens"] = 2000;
-            else
-                llmRequest["max_tokens"] = 2000;
+            if (!isReasoningModel) llmRequest["temperature"] = 0.3;
+            llmRequest[isReasoningModel ? "max_completion_tokens" : "max_tokens"] = 2000;
             if (tools is not null && iteration < maxIterations)
                 llmRequest["tools"] = tools;
 

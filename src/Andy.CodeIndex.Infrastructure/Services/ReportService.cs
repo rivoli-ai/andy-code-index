@@ -206,16 +206,14 @@ public class ReportService : IReportService
         var client = _httpClientFactory.CreateClient("Chat");
         var baseUrl = (overrideBaseUrl ?? _llmOptions.BaseUrl).TrimEnd('/') + "/";
 
+        var isReasoningModel = model.StartsWith("gpt-5") || model.StartsWith("o1") || model.StartsWith("o3");
         var body = new Dictionary<string, object>
         {
             ["model"] = model,
-            ["messages"] = new[] { new { role = "user", content = prompt } },
-            ["temperature"] = 0.3
+            ["messages"] = new[] { new { role = "user", content = prompt } }
         };
-        if (model.StartsWith("gpt-5") || model.StartsWith("o1") || model.StartsWith("o3"))
-            body["max_completion_tokens"] = 4000;
-        else
-            body["max_tokens"] = 4000;
+        if (!isReasoningModel) body["temperature"] = 0.3;
+        body[isReasoningModel ? "max_completion_tokens" : "max_tokens"] = 4000;
 
         try
         {
