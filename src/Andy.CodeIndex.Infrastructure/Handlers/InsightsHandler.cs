@@ -129,8 +129,8 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
         var sb = new StringBuilder();
         foreach (var enrichment in enrichments)
         {
-            var content = enrichment.Content.Length > 1000
-                ? enrichment.Content[..1000] + "..."
+            var content = enrichment.Content.Length > 3000
+                ? enrichment.Content[..3000] + "..."
                 : enrichment.Content;
             sb.AppendLine($"=== {enrichment.Subtype} ===");
             sb.AppendLine(content);
@@ -150,10 +150,14 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                 Subtype = EnrichmentSubtype.FeatureMap,
                 Title = "Feature Map",
                 Prompt = $"""
-                    Analyze the repository "{repoName}" and create a structured feature inventory.
+                    Analyze the repository "{repoName}" and create a comprehensive feature inventory.
+                    List ALL features and capabilities you can identify — aim for at least 10-20 features.
+                    Look at controllers, services, API endpoints, UI components, CLI commands, background jobs, integrations.
                     For each feature, assign a stable ID in format feat:[category]:[name] (e.g., feat:auth:login, feat:search:semantic).
+
                     Present as a markdown table with columns: ID, Feature Name, Description, Entry Files, Status (active/deprecated), Complexity (low/medium/high).
-                    Group features by category with section headings.
+                    Group features by category (e.g., ## Authentication, ## Search, ## Data Management) with section headings.
+                    Be thorough — a real application typically has many features across different areas.
 
                     Existing knowledge:
                     {existingContext}
@@ -167,9 +171,19 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                 Subtype = EnrichmentSubtype.ArchitectureAnalysis,
                 Title = "Architecture Analysis",
                 Prompt = $"""
-                    Create a technical architecture analysis of "{repoName}" with a Mermaid component diagram.
-                    Include: layers, components, communication patterns, data flow.
-                    Include a ```mermaid block with a C4-style or component diagram.
+                    Create a detailed technical architecture analysis of "{repoName}".
+                    Include:
+                    1. Architecture overview (layers, components, their responsibilities)
+                    2. Communication patterns (HTTP, gRPC, message queues, etc.)
+                    3. Data flow (how data moves through the system)
+                    4. External integrations
+
+                    You MUST include at least one Mermaid diagram. Use this format:
+                    ```mermaid
+                    graph TD
+                        A[Component A] --> B[Component B]
+                    ```
+                    Prefer graph TD, flowchart, or C4 component diagrams. Make them detailed with real component names from the codebase.
                     Format as markdown.
 
                     Existing knowledge:
@@ -184,10 +198,21 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                 Subtype = EnrichmentSubtype.DesignAnalysis,
                 Title = "Design Analysis",
                 Prompt = $"""
-                    Analyze the technical design of "{repoName}".
-                    Include: domain model (Mermaid class diagram), API surface, design patterns used, error handling approach.
-                    Include ```mermaid blocks for diagrams.
-                    Format as markdown.
+                    Analyze the technical design of "{repoName}" in detail.
+                    Include:
+                    1. Domain model — entities and their relationships
+                    2. API surface — endpoints, methods, authentication
+                    3. Design patterns used (MVC, Repository, CQRS, etc.)
+                    4. Error handling approach
+                    5. State management
+
+                    You MUST include a Mermaid class diagram or ER diagram showing the domain model:
+                    ```mermaid
+                    classDiagram
+                        class Entity1
+                        Entity1 --> Entity2
+                    ```
+                    Use real entity names from the codebase. Format as markdown.
 
                     Existing knowledge:
                     {existingContext}

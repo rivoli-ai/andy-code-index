@@ -177,8 +177,8 @@ public class ReportService : IReportService
             if (!InsightLayerNames.TryGetValue(insight.Subtype, out var name))
                 continue;
 
-            var content = insight.Content.Length > 1500
-                ? insight.Content[..1500] + "\n... (truncated)"
+            var content = insight.Content.Length > 2500
+                ? insight.Content[..2500] + "\n... (truncated)"
                 : insight.Content;
 
             sb.AppendLine($"=== {name} ({insight.Subtype}) ===");
