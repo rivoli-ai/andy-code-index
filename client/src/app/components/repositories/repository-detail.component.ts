@@ -2044,6 +2044,10 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
       script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
       script.onload = () => {
         this.mermaidModule = (window as any).mermaid;
+        // Prevent auto-scanning the DOM for mermaid blocks
+        if (this.mermaidModule?.initialize) {
+          this.mermaidModule.initialize({ startOnLoad: false });
+        }
         resolve();
       };
       script.onerror = () => reject(new Error('Failed to load mermaid from CDN'));
