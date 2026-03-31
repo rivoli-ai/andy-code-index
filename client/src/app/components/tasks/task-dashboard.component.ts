@@ -57,11 +57,14 @@ import { environment } from '../../../environments/environment';
             </button>
           </div>
         </div>
-        <div *ngIf="task.status === 'Running' && task.progress > 0" style="margin-top:0.75rem">
-          <div class="progress"><div class="progress-bar" [style.width.%]="task.progress"></div></div>
+        <div *ngIf="task.status === 'Running' && (task.progress > 0 || task.progressMessage)" style="margin-top:0.75rem">
+          <div class="progress"><div class="progress-bar" [style.width.%]="task.progress || 2"></div></div>
           <div style="display:flex;justify-content:space-between;margin-top:0.25rem">
             <span class="text-muted" style="font-size:0.75rem">{{ task.progressMessage || '' }}</span>
             <span class="text-muted" style="font-size:0.75rem">{{ task.progress }}%</span>
+          </div>
+          <div *ngIf="task.chainStepIndex != null && task.chainTotalSteps" class="text-muted" style="font-size:0.75rem;margin-top:0.25rem">
+            Step {{ task.chainStepIndex! + 1 }} of {{ task.chainTotalSteps }}
           </div>
         </div>
         <div *ngIf="task.errorMessage" style="margin-top:0.5rem;color:var(--danger);font-size:0.8125rem">

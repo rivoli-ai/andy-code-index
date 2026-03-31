@@ -35,6 +35,14 @@ public class ExtractDependenciesHandler : ITaskHandler
 
     public async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
+        var trackedTask = await _context.IndexingTasks.FindAsync([task.Id], ct);
+        if (trackedTask is not null)
+        {
+            trackedTask.ProgressMessage = "Extracting dependencies...";
+            trackedTask.Progress = 0;
+            await _context.SaveChangesAsync(ct);
+        }
+
         var repo = await _context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 

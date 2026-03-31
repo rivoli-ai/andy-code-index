@@ -32,6 +32,14 @@ public class CreateOperationsDocsHandler : BaseLlmEnrichmentHandler
 
     public override async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
+        var trackedTask = await Context.IndexingTasks.FindAsync([task.Id], ct);
+        if (trackedTask is not null)
+        {
+            trackedTask.ProgressMessage = "Analyzing operations...";
+            trackedTask.Progress = 0;
+            await Context.SaveChangesAsync(ct);
+        }
+
         var repo = await Context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 

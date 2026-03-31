@@ -39,6 +39,9 @@ public class CreateApiDocsHandler : ITaskHandler
 
     public async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
+        task.ProgressMessage = "Generating API documentation...";
+        task.Progress = 0;
+
         var repo = await _repoRepo.GetByIdAsync(task.RepositoryId, ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 

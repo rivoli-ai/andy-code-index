@@ -40,6 +40,14 @@ public class ExtractSnippetsHandler : ITaskHandler
 
     public async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
+        var trackedTask = await _context.IndexingTasks.FindAsync([task.Id], ct);
+        if (trackedTask is not null)
+        {
+            trackedTask.ProgressMessage = "Extracting snippets...";
+            trackedTask.Progress = 0;
+            await _context.SaveChangesAsync(ct);
+        }
+
         var repo = await _context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
@@ -107,7 +115,11 @@ public class ExtractSnippetsHandler : ITaskHandler
         int filesSkipped = 0;
         var skippedFilePaths = new HashSet<string>();
 
-        foreach (var file in acceptedFiles.Where(f => f.Language is not null))
+        var filesToProcess = acceptedFiles.Where(f => f.Language is not null).ToList();
+        var totalFiles = filesToProcess.Count;
+        var processedFiles = 0;
+
+        foreach (var file in filesToProcess)
         {
             // Skip-if-unchanged: if blob SHA matches previous commit, skip this file
             if (file.Hash != null &&
@@ -127,6 +139,15 @@ public class ExtractSnippetsHandler : ITaskHandler
             foreach (var chunk in chunks)
             {
                 newChunks.Add((file.Path, file.Language!, chunk, ComputeHash(chunk.Content)));
+            }
+
+            processedFiles++;
+            if (trackedTask is not null && processedFiles % 50 == 0)
+            {
+                var pct = (int)((processedFiles / (float)totalFiles) * 100);
+                trackedTask.Progress = pct;
+                trackedTask.ProgressMessage = $"Extracting snippets ({processedFiles}/{totalFiles} files)...";
+                await _context.SaveChangesAsync(ct);
             }
         }
 

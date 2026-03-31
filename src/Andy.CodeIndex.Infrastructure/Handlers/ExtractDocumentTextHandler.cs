@@ -46,6 +46,14 @@ public class ExtractDocumentTextHandler : ITaskHandler
 
     public async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
+        var trackedTask = await _context.IndexingTasks.FindAsync([task.Id], ct);
+        if (trackedTask is not null)
+        {
+            trackedTask.ProgressMessage = "Extracting document text...";
+            trackedTask.Progress = 0;
+            await _context.SaveChangesAsync(ct);
+        }
+
         if (!_documentParsingOptions.Enabled)
         {
             _logger.LogInformation("Document parsing is disabled globally, skipping");

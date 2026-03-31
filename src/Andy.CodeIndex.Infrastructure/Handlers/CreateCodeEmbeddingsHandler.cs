@@ -35,6 +35,14 @@ public class CreateCodeEmbeddingsHandler : ITaskHandler
 
     public async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
+        var trackedTask = await _context.IndexingTasks.FindAsync([task.Id], ct);
+        if (trackedTask is not null)
+        {
+            trackedTask.ProgressMessage = "Generating embeddings...";
+            trackedTask.Progress = 0;
+            await _context.SaveChangesAsync(ct);
+        }
+
         var repo = await _context.Repositories.FindAsync([task.RepositoryId], ct)
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
@@ -61,6 +69,13 @@ public class CreateCodeEmbeddingsHandler : ITaskHandler
         }
 
         _logger.LogInformation("Generating code embeddings for {Count} chunks in {Name}", chunks.Count, repo.Name);
+
+        if (trackedTask is not null)
+        {
+            trackedTask.ProgressMessage = $"Generating embeddings ({chunks.Count} chunks)...";
+            trackedTask.Progress = 10;
+            await _context.SaveChangesAsync(ct);
+        }
 
         var texts = chunks.Select(c => c.Content).ToArray();
         var embeddings = await _embeddingService.GenerateEmbeddingsAsync(texts, ct);

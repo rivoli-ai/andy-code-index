@@ -6,7 +6,8 @@ namespace Andy.CodeIndex.Application.Interfaces;
 public interface ITaskQueue
 {
     Task<IndexingTask> EnqueueAsync(Guid repositoryId, TaskOperation operation,
-        Guid? commitId = null, int priority = 0, Guid? chainId = null, CancellationToken ct = default);
+        Guid? commitId = null, int priority = 0, Guid? chainId = null,
+        int? chainStepIndex = null, int? chainTotalSteps = null, CancellationToken ct = default);
     Task<IndexingTask?> DequeueAsync(CancellationToken ct = default);
     Task UpdateStatusAsync(Guid taskId, IndexingTaskStatus status, string? errorMessage = null, CancellationToken ct = default);
     Task UpdateProgressAsync(Guid taskId, int progress, string? progressMessage = null, CancellationToken ct = default);

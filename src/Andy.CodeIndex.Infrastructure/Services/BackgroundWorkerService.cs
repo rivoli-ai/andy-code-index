@@ -87,6 +87,14 @@ public class BackgroundWorkerService : BackgroundService
 
             await handler.HandleAsync(task, ct);
 
+            // Persist any progress message set by the handler on the detached task entity
+            if (task.ProgressMessage is not null || task.Progress > 0)
+            {
+                using var progressScope = _scopeFactory.CreateScope();
+                var progressQueue = progressScope.ServiceProvider.GetRequiredService<ITaskQueue>();
+                await progressQueue.UpdateProgressAsync(task.Id, task.Progress, task.ProgressMessage, ct);
+            }
+
             sw.Stop();
             Telemetry.CodeIndexTelemetry.TasksCompleted.Add(1,
                 new KeyValuePair<string, object?>("operation", task.Operation.ToString()));

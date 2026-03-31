@@ -16,7 +16,8 @@ public class TaskQueueService : ITaskQueue
     }
 
     public async Task<IndexingTask> EnqueueAsync(Guid repositoryId, TaskOperation operation,
-        Guid? commitId = null, int priority = 0, Guid? chainId = null, CancellationToken ct = default)
+        Guid? commitId = null, int priority = 0, Guid? chainId = null,
+        int? chainStepIndex = null, int? chainTotalSteps = null, CancellationToken ct = default)
     {
         // Cancel any existing Pending tasks with the same Operation + RepositoryId (deduplication)
         var duplicates = await _taskRepo.FindAsync(
@@ -39,6 +40,8 @@ public class TaskQueueService : ITaskQueue
             Status = IndexingTaskStatus.Pending,
             Priority = priority,
             ChainId = chainId,
+            ChainStepIndex = chainStepIndex,
+            ChainTotalSteps = chainTotalSteps,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -64,7 +67,8 @@ public class TaskQueueService : ITaskQueue
         // Enqueue first operation, rest will be chained
         if (operations.Length > 0)
         {
-            await EnqueueAsync(repositoryId, operations[0], commitId, priority: 10, chainId, ct);
+            await EnqueueAsync(repositoryId, operations[0], commitId, priority: 10, chainId,
+                chainStepIndex: 0, chainTotalSteps: operations.Length, ct: ct);
         }
 
         return chainId;
@@ -90,13 +94,17 @@ public class TaskQueueService : ITaskQueue
         if (next is null)
             return;
 
+        var nextStepIndex = (completedTask.ChainStepIndex ?? -1) + 1;
+
         await EnqueueAsync(
             completedTask.RepositoryId,
             next.Value,
             completedTask.CommitId,
             priority: 5,
             completedTask.ChainId,
-            ct);
+            chainStepIndex: nextStepIndex,
+            chainTotalSteps: completedTask.ChainTotalSteps,
+            ct: ct);
     }
 
     public async Task CancelChainAsync(Guid chainId, CancellationToken ct = default)

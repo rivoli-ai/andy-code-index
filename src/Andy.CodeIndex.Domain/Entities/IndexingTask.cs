@@ -13,6 +13,8 @@ public class IndexingTask
     public string? ProgressMessage { get; set; }
     public string? ErrorMessage { get; set; }
     public Guid? ChainId { get; set; }
+    public int? ChainStepIndex { get; set; }
+    public int? ChainTotalSteps { get; set; }
     public int Priority { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? StartedAt { get; set; }

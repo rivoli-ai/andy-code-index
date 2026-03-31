@@ -8,6 +8,8 @@ export interface IndexingTask {
   progressMessage?: string;
   errorMessage?: string;
   chainId?: string;
+  chainStepIndex?: number;
+  chainTotalSteps?: number;
   priority: number;
   createdAt: string;
   startedAt?: string;

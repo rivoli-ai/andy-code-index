@@ -21,6 +21,14 @@ public class CreateBM25IndexHandler : ITaskHandler
 
     public async Task HandleAsync(IndexingTask task, CancellationToken ct = default)
     {
+        var trackedTask = await _context.IndexingTasks.FindAsync([task.Id], ct);
+        if (trackedTask is not null)
+        {
+            trackedTask.ProgressMessage = "Building BM25 search index...";
+            trackedTask.Progress = 0;
+            await _context.SaveChangesAsync(ct);
+        }
+
         // BM25 index is maintained automatically via the tsvector computed column on Enrichments.
         // This handler just verifies enrichments exist and logs the count.
         var repo = await _context.Repositories.FindAsync([task.RepositoryId], ct)

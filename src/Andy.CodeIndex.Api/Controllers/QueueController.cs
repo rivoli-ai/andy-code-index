@@ -32,7 +32,9 @@ public class QueueController : ControllerBase
             operation = t.Operation.ToString(),
             status = t.Status.ToString(),
             t.Progress, t.ProgressMessage,
-            t.ErrorMessage, t.ChainId, t.Priority,
+            t.ErrorMessage, t.ChainId,
+            t.ChainStepIndex, t.ChainTotalSteps,
+            t.Priority,
             t.CreatedAt, t.StartedAt, t.CompletedAt
         }).OrderByDescending(t => t.CreatedAt));
     }
@@ -68,13 +70,16 @@ public class QueueController : ControllerBase
             var completed = chainTasks.Count(t => t.Status == IndexingTaskStatus.Completed);
             var running = chainTasks.FirstOrDefault(t => t.Status == IndexingTaskStatus.Running);
 
+            var totalSteps = chainTasks.FirstOrDefault()?.ChainTotalSteps ?? (chainTasks.Any() ? chainTasks.Count : 0);
+
             return new
             {
                 repositoryId = repoId,
                 chainId = activeChainId,
-                totalSteps = chainTasks.Any() ? 15 : 0, // Full chain has 15 operations
+                totalSteps,
                 completedSteps = completed,
                 currentStep = running?.Operation.ToString(),
+                currentStepIndex = running?.ChainStepIndex,
                 currentProgress = running?.Progress ?? 0,
                 currentProgressMessage = running?.ProgressMessage,
             };
@@ -97,7 +102,9 @@ public class QueueController : ControllerBase
             operation = task.Operation.ToString(),
             status = task.Status.ToString(),
             task.Progress, task.ProgressMessage,
-            task.ErrorMessage, task.ChainId, task.Priority,
+            task.ErrorMessage, task.ChainId,
+            task.ChainStepIndex, task.ChainTotalSteps,
+            task.Priority,
             task.CreatedAt, task.StartedAt, task.CompletedAt
         });
     }
