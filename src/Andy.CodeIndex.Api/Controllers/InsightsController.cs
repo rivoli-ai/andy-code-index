@@ -57,7 +57,7 @@ public class InsightsController : ControllerBase
                 ct: ct);
 
             results[layerName] = enrichments.Count > 0
-                ? new { enrichments[0].Id, enrichments[0].Title, enrichments[0].Content, enrichments[0].Quality, enrichments[0].CreatedAt }
+                ? new { enrichments[0].Id, enrichments[0].Title, enrichments[0].Content, enrichments[0].Quality, enrichments[0].CreatedAt, enrichments[0].CommitId }
                 : null;
         }
 

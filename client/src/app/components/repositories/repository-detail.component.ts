@@ -227,6 +227,9 @@ interface CommitComparison {
           <div class="insights-toolbar-left">
             <i class="bi bi-journal-richtext" style="font-size:1.125rem;color:var(--primary)"></i>
             <span style="font-weight:600;font-size:var(--font-sm)">Repository Insights Report</span>
+            <span *ngIf="insightLayers.length > 0 && insightLayers[0].createdAt" class="text-muted" style="font-size:var(--font-xs);margin-left:0.75rem">
+              Generated {{ getRelativeTime(insightLayers[0].createdAt || insightLayers[0].CreatedAt) }}
+            </span>
           </div>
           <div class="insights-toolbar-right">
             <button class="btn btn-secondary btn-sm" (click)="generateInsights()" [disabled]="generatingInsights">

@@ -113,6 +113,17 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                 layer.Subtype, repo.Name, reply.Length);
         }
 
+        // Invalidate cached report since insights have changed
+        var staleReports = await Context.Enrichments
+            .Where(e => e.RepositoryId == repo.Id && e.Subtype == EnrichmentSubtype.InsightReport)
+            .ToListAsync(ct);
+        if (staleReports.Count > 0)
+        {
+            Context.Enrichments.RemoveRange(staleReports);
+            await Context.SaveChangesAsync(ct);
+            Logger.LogInformation("Invalidated {Count} cached report(s) for {Name}", staleReports.Count, repo.Name);
+        }
+
         Logger.LogInformation("Completed {Count}/11 insight layers for {Name}", generatedCount, repo.Name);
     }
 
