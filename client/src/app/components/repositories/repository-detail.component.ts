@@ -1784,10 +1784,12 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
           }, 300000);
         }, 3000); // Initial delay to let handler start
       },
-      error: () => {
+      error: (err) => {
         this.generatingInsights = false;
         this.insightsTaskId = null;
         this.insightsProgressMessage = '';
+        const errorMsg = err?.error?.error || 'Failed to generate insights.';
+        alert(errorMsg);
       }
     });
   }

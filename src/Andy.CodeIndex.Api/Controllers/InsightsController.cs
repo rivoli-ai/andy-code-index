@@ -1,8 +1,10 @@
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Enums;
+using Andy.CodeIndex.Infrastructure.Data;
 using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Andy.CodeIndex.Api.Controllers;
 
@@ -31,11 +33,14 @@ public class InsightsController : ControllerBase
         ["techstack"] = EnrichmentSubtype.TechStack,
     };
 
-    public InsightsController(IEnrichmentGeneratorService enrichmentService, ITaskQueue taskQueue, IReportService reportService)
+    private readonly CodeIndexDbContext _dbContext;
+
+    public InsightsController(IEnrichmentGeneratorService enrichmentService, ITaskQueue taskQueue, IReportService reportService, CodeIndexDbContext dbContext)
     {
         _enrichmentService = enrichmentService;
         _taskQueue = taskQueue;
         _reportService = reportService;
+        _dbContext = dbContext;
     }
 
     /// <summary>Get all insight layers for a repository.</summary>
@@ -94,6 +99,12 @@ public class InsightsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     public async Task<IActionResult> Generate(Guid repositoryId, CancellationToken ct = default)
     {
+        // Check that the repo has been indexed (has code chunks)
+        var chunkCount = await _dbContext.Enrichments
+            .CountAsync(e => e.RepositoryId == repositoryId && e.Subtype == EnrichmentSubtype.Chunk, ct);
+        if (chunkCount == 0)
+            return BadRequest(new { error = "Cannot generate insights: this repository has no indexed code. Click Sync first to index the codebase." });
+
         var task = await _taskQueue.EnqueueAsync(repositoryId, TaskOperation.CreateInsights, priority: 5, ct: ct);
         return Accepted(new { taskId = task.Id, operation = "CreateInsights", message = "Insight generation queued." });
     }

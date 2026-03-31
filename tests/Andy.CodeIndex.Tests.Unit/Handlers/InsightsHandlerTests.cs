@@ -61,6 +61,14 @@ public class InsightsHandlerTests : IDisposable
             CreatedAt = DateTime.UtcNow
         };
         _context.Commits.Add(_testCommit);
+
+        // Seed a chunk so the handler doesn't skip due to missing base enrichments
+        _context.Enrichments.Add(new Enrichment
+        {
+            Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+            Type = EnrichmentType.Development, Subtype = EnrichmentSubtype.Chunk,
+            Title = "Test chunk", Content = "test code", CreatedAt = DateTime.UtcNow
+        });
         _context.SaveChanges();
     }
 

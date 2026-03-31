@@ -47,6 +47,18 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
             commitId = commitRecord?.Id;
         }
 
+        // Check that base enrichments exist before generating insights
+        var baseEnrichmentCount = await Context.Enrichments
+            .CountAsync(e => e.RepositoryId == repo.Id && e.Subtype == EnrichmentSubtype.Chunk, ct);
+        if (baseEnrichmentCount == 0)
+        {
+            Logger.LogWarning("Skipping insights for {Name}: no base enrichments (chunks) found. Run a full sync first.", repo.Name);
+            task.ErrorMessage = "Cannot generate insights: repository has no indexed code. Run Sync first to index the codebase.";
+            task.Status = Domain.Enums.IndexingTaskStatus.Failed;
+            await Context.SaveChangesAsync(ct);
+            return;
+        }
+
         // Gather existing enrichments as context (build on what exists, not from scratch)
         var existingContext = await BuildExistingContext(repo.Id, ct);
 
