@@ -59,6 +59,17 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
             return;
         }
 
+        // Delete ALL existing insight enrichments upfront so stale data isn't shown during regeneration
+        var oldInsights = await Context.Enrichments
+            .Where(e => e.RepositoryId == repo.Id && e.Type == EnrichmentType.Insights)
+            .ToListAsync(ct);
+        if (oldInsights.Count > 0)
+        {
+            Context.Enrichments.RemoveRange(oldInsights);
+            await Context.SaveChangesAsync(ct);
+            Logger.LogInformation("Deleted {Count} old insight enrichments for {Name}", oldInsights.Count, repo.Name);
+        }
+
         // Gather existing enrichments as context (build on what exists, not from scratch)
         var existingContext = await BuildExistingContext(repo.Id, ct);
 
