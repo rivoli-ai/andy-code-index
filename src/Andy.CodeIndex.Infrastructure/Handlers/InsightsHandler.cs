@@ -78,13 +78,16 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
         var generatedCount = 0;
 
         const string systemInstruction = """
-            IMPORTANT RULES:
+            You are an expert code analyst. You have FULL ACCESS to this repository's code and documentation — it is provided below in the "Existing knowledge" and "Code samples" sections. You MUST use this provided data to produce your analysis.
+
+            CRITICAL RULES:
+            - You ALREADY HAVE all the code and data you need. Do NOT ask for more information or repository access.
+            - Do NOT say "Repository access required" or "Please provide" — everything is provided below.
             - Output ONLY the requested content in well-formatted markdown.
-            - Do NOT include any preamble, explanation, or meta-commentary about what you are doing.
-            - Do NOT say "I'll analyze..." or "Based on the provided context..." or similar.
-            - Do NOT output raw JSON unless the format specifically requests it — prefer markdown tables.
-            - Start directly with the content (headings, lists, diagrams).
-            - Use the provided context to give specific, accurate analysis — not generic templates.
+            - Do NOT include any preamble, explanation, or meta-commentary.
+            - Start directly with headings, tables, lists, and diagrams.
+            - Be specific — reference actual file names, class names, and patterns from the provided code.
+            - If the provided context is insufficient for a specific detail, make your best inference and note the uncertainty.
             """;
 
         foreach (var layer in layers)
@@ -175,7 +178,7 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
         return sb.ToString();
     }
 
-    internal static List<InsightLayer> GetInsightLayers(Repository repo, string existingContext, string codeContext)
+    internal static List<InsightLayer> GetInsightLayers(Repository repo, string existingContext = "", string codeContext = "")
     {
         var repoName = repo.Name;
         return
@@ -185,20 +188,22 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                 Subtype = EnrichmentSubtype.FeatureMap,
                 Title = "Feature Map",
                 Prompt = $"""
-                    Analyze the repository "{repoName}" and create a comprehensive feature inventory.
-                    List ALL features and capabilities you can identify — aim for at least 10-20 features.
-                    Look at controllers, services, API endpoints, UI components, CLI commands, background jobs, integrations.
-                    For each feature, assign a stable ID in format feat:[category]:[name] (e.g., feat:auth:login, feat:search:semantic).
+                    Here is the complete codebase data for the repository "{repoName}":
 
-                    Present as a markdown table with columns: ID, Feature Name, Description, Entry Files, Status (active/deprecated), Complexity (low/medium/high).
-                    Group features by category (e.g., ## Authentication, ## Search, ## Data Management) with section headings.
-                    Be thorough — a real application typically has many features across different areas.
-
-                    Existing knowledge:
+                    === REPOSITORY DOCUMENTATION AND ENRICHMENTS ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE SAMPLES ===
                     {codeContext}
+
+                    === YOUR TASK ===
+                    Using the data above, create a comprehensive feature inventory for "{repoName}".
+                    List ALL features and capabilities — aim for at least 10-20 features.
+                    Look at controllers, services, API endpoints, UI components, CLI commands, background jobs, integrations.
+                    For each feature, assign a stable ID in format feat:[category]:[name].
+
+                    Present as a markdown table with columns: ID, Feature Name, Description, Entry Files, Status (active/deprecated), Complexity (low/medium/high).
+                    Group features by category with section headings.
                     """
             },
             new InsightLayer
@@ -221,11 +226,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Prefer graph TD, flowchart, or C4 component diagrams. Make them detailed with real component names from the codebase.
                     Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -249,11 +256,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     ```
                     Use real entity names from the codebase. Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -265,11 +274,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Identify: key code patterns, code smells, cross-language consistency, top 5 improvement suggestions with effort/impact.
                     Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -281,11 +292,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Include: dependency count, categories (runtime/dev/test), potentially outdated packages, license types, security advisories if detectable.
                     Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -297,11 +310,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Include: test pyramid shape (unit/integration/e2e counts), test frameworks, coverage estimate, testing patterns, gaps, top 3 testing improvements.
                     Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -314,11 +329,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Rate each area risk 1-5.
                     Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -331,11 +348,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Include a ```mermaid block with a flowchart.
                     Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -347,11 +366,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Check: logging patterns (correct levels, no PII), monitoring, health checks, alerting, error handling, graceful shutdown.
                     Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -363,11 +384,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     Include: prerequisites, step-by-step setup, running tests, common issues, environment variables needed.
                     Format as markdown.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             },
             new InsightLayer
@@ -381,11 +404,13 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                     and Key Dependencies with versions.
                     Output ONLY markdown. No preamble. Be specific with version numbers.
 
-                    Existing knowledge:
+                    === REPOSITORY DATA ===
                     {existingContext}
 
-                    Code samples:
+                    === SOURCE CODE ===
                     {codeContext}
+
+                    === YOUR TASK (use the data above) ===
                     """
             }
         ];
