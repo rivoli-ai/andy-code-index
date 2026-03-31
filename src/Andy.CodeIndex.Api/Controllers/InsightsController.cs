@@ -1,3 +1,4 @@
+using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Enums;
 using Andy.CodeIndex.Infrastructure.Data;
@@ -52,6 +53,10 @@ public class InsightsController : ControllerBase
         var subtypes = LayerMap.Values.ToArray();
         var results = new Dictionary<string, object?>();
 
+        // Resolve commit SHAs for metadata
+        var commitIds = new HashSet<Guid>();
+        var layerEnrichments = new Dictionary<string, EnrichmentDto?>();
+
         foreach (var (layerName, subtype) in LayerMap)
         {
             var enrichments = await _enrichmentService.QueryAsync(
@@ -61,9 +66,30 @@ public class InsightsController : ControllerBase
                 limit: 1,
                 ct: ct);
 
-            results[layerName] = enrichments.Count > 0
-                ? new { enrichments[0].Id, enrichments[0].Title, enrichments[0].Content, enrichments[0].Quality, enrichments[0].CreatedAt, enrichments[0].CommitId }
-                : null;
+            if (enrichments.Count > 0)
+            {
+                layerEnrichments[layerName] = enrichments[0];
+                if (enrichments[0].CommitId is { } cid)
+                    commitIds.Add(cid);
+            }
+            else
+            {
+                layerEnrichments[layerName] = null;
+            }
+        }
+
+        // Bulk resolve commit SHAs
+        var commitShas = commitIds.Count > 0
+            ? await _dbContext.Commits.Where(c => commitIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Sha, ct)
+            : new Dictionary<Guid, string>();
+
+        foreach (var (layerName, e) in layerEnrichments)
+        {
+            if (e is not null)
+            {
+                var commitSha = e.CommitId.HasValue && commitShas.TryGetValue(e.CommitId.Value, out var sha) ? sha : null;
+                results[layerName] = new { e.Id, e.Title, e.Content, e.Quality, e.CreatedAt, e.CommitId, commitSha };
+            }
         }
 
         return Ok(new { repositoryId, layers = results });

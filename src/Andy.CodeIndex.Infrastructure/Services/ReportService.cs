@@ -151,6 +151,7 @@ public class ReportService : IReportService
             : CalculateHealthScore(report.Layers);
 
         // Calculate velocity from commits table
+        report.CommitSha = repo.LastIndexedCommitSha;
         report.Velocity = await CalculateVelocityAsync(repositoryId, ct);
 
         // Populate TechStack from file extensions and TechStack enrichment

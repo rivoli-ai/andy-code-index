@@ -4,6 +4,7 @@ public class ReportDto
 {
     public string RepositoryName { get; set; } = string.Empty;
     public DateTime GeneratedAt { get; set; }
+    public string? CommitSha { get; set; }
     public int OverallHealthScore { get; set; }
     public VelocityDto Velocity { get; set; } = new();
     public TechStackDto? TechStack { get; set; }
