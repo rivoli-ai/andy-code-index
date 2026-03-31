@@ -139,12 +139,12 @@ import { environment } from '../../../environments/environment';
           <label>LLM Model</label>
           <select class="form-control" [(ngModel)]="llmModel">
             <option value="">Default ({{ settings.llm.model }})</option>
-            <option value="gpt-5">gpt-5</option>
-            <option value="gpt-5-mini">gpt-5-mini</option>
             <option value="gpt-4o">gpt-4o</option>
-            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="gpt-4o-mini">gpt-4o-mini (recommended)</option>
             <option value="gpt-4-turbo">gpt-4-turbo</option>
             <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+            <option value="gpt-5">gpt-5 (experimental — slow, may ignore context)</option>
+            <option value="gpt-5-mini">gpt-5-mini (experimental)</option>
           </select>
         </div>
         <button class="btn btn-primary btn-sm" (click)="saveLlm()" [disabled]="savingLlm || (!llmKey && !llmModel && !llmBaseUrl)">
