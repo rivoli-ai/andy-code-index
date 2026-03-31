@@ -119,14 +119,19 @@ public abstract class BaseLlmEnrichmentHandler : ITaskHandler
         if (!isReasoningModel) body["temperature"] = 0.3;
         body[isReasoningModel ? "max_completion_tokens" : "max_tokens"] = 3000;
 
+        // Set timeout for LLM calls (reasoning models need more time)
+        var timeoutSeconds = isReasoningModel ? Math.Max(LlmOptions.TimeoutSeconds, 300) : LlmOptions.TimeoutSeconds;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
         try
         {
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, baseUrl + "chat/completions");
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             httpRequest.Content = JsonContent.Create(body);
-            var response = await client.SendAsync(httpRequest, ct);
+            var response = await client.SendAsync(httpRequest, timeoutCts.Token);
             response.EnsureSuccessStatusCode();
-            var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: timeoutCts.Token);
             return result.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
         }
         catch (Exception ex)
