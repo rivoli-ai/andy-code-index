@@ -58,7 +58,10 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
             .ToListAsync(ct);
         var codeContext = SummarizeChunks(chunks);
 
-        // Generate all 10 insight layers sequentially
+        Logger.LogInformation("Context for {Name}: existingContext={ExLen} chars, codeContext={CodeLen} chars, chunks={ChunkCount}",
+            repo.Name, existingContext.Length, codeContext.Length, chunks.Count);
+
+        // Generate all 11 insight layers sequentially
         var layers = GetInsightLayers(repo, existingContext, codeContext);
         var generatedCount = 0;
 

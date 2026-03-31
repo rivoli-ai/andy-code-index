@@ -1,8 +1,10 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { ApiService } from '../../services/api.service';
 import { IndexingTask } from '../../models/task.model';
 import { SyncStatusComponent } from './sync-status.component';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-task-dashboard',
@@ -42,16 +44,25 @@ import { SyncStatusComponent } from './sync-status.component';
               on {{ getRepoName(task.repositoryId) }}
             </span>
           </div>
-          <div style="text-align:right">
+          <div style="display:flex;align-items:center;gap:0.75rem">
             <span class="text-muted" style="font-size:0.8125rem">{{ task.createdAt | date:'short' }}</span>
-            <div *ngIf="task.startedAt && task.completedAt" class="text-muted" style="font-size:0.75rem">
+            <span *ngIf="task.startedAt && task.completedAt" class="text-muted" style="font-size:0.75rem">
               {{ getDuration(task.startedAt, task.completedAt) }}
-            </div>
+            </span>
+            <button *ngIf="task.status === 'Pending'" class="btn btn-sm" style="font-size:0.75rem;padding:0.25rem 0.5rem;color:var(--danger);border:1px solid var(--danger);background:none" (click)="cancelTask(task.id)">
+              Cancel
+            </button>
+            <button *ngIf="task.status === 'Running'" class="btn btn-sm" style="font-size:0.75rem;padding:0.25rem 0.5rem;color:var(--danger);border:1px solid var(--danger);background:none" (click)="forceCancelTask(task.id)">
+              Force Cancel
+            </button>
           </div>
         </div>
         <div *ngIf="task.status === 'Running' && task.progress > 0" style="margin-top:0.75rem">
           <div class="progress"><div class="progress-bar" [style.width.%]="task.progress"></div></div>
-          <span class="text-muted" style="font-size:0.75rem">{{ task.progress }}%</span>
+          <div style="display:flex;justify-content:space-between;margin-top:0.25rem">
+            <span class="text-muted" style="font-size:0.75rem">{{ task.progressMessage || '' }}</span>
+            <span class="text-muted" style="font-size:0.75rem">{{ task.progress }}%</span>
+          </div>
         </div>
         <div *ngIf="task.errorMessage" style="margin-top:0.5rem;color:var(--danger);font-size:0.8125rem">
           {{ task.errorMessage }}
@@ -97,7 +108,9 @@ export class TaskDashboardComponent implements OnInit, OnDestroy {
     'CreateQualityDocs': 'Generate Quality Docs',
   };
 
-  constructor(private api: ApiService) {}
+  private baseUrl = environment.apiUrl;
+
+  constructor(private api: ApiService, private http: HttpClient) {}
 
   ngOnInit() {
     this.loadTasks();
@@ -157,5 +170,20 @@ export class TaskDashboardComponent implements OnInit, OnDestroy {
       case 'Cancelled': return 'badge-warning';
       default: return 'badge-muted';
     }
+  }
+
+  cancelTask(taskId: string) {
+    this.http.delete(`${this.baseUrl}/queue/${taskId}`).subscribe({
+      next: () => this.loadTasks(),
+      error: (err: any) => alert(err?.error?.error || 'Failed to cancel task')
+    });
+  }
+
+  forceCancelTask(taskId: string) {
+    if (!confirm('Force cancel this running task? It may leave the repository in an incomplete state.')) return;
+    this.http.post(`${this.baseUrl}/queue/${taskId}/cancel`, {}).subscribe({
+      next: () => this.loadTasks(),
+      error: (err: any) => alert(err?.error?.error || 'Failed to cancel task')
+    });
   }
 }

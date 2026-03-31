@@ -5,6 +5,7 @@ export interface IndexingTask {
   operation: string;
   status: string;
   progress: number;
+  progressMessage?: string;
   errorMessage?: string;
   chainId?: string;
   priority: number;
