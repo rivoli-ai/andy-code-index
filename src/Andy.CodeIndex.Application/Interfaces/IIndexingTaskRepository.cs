@@ -10,6 +10,6 @@ public interface IIndexingTaskRepository : IRepository<IndexingTask>
     Task<List<IndexingTask>> GetByChainIdAsync(Guid chainId, CancellationToken ct = default);
     Task<List<IndexingTask>> GetByRepositoryAsync(Guid repositoryId, CancellationToken ct = default);
     Task UpdateStatusAsync(Guid id, IndexingTaskStatus status, string? errorMessage = null, CancellationToken ct = default);
-    Task UpdateProgressAsync(Guid id, int progress, CancellationToken ct = default);
+    Task UpdateProgressAsync(Guid id, int progress, string? progressMessage = null, CancellationToken ct = default);
     Task CancelChainAsync(Guid chainId, CancellationToken ct = default);
 }

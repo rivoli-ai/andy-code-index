@@ -232,6 +232,9 @@ interface CommitComparison {
             <button class="btn btn-secondary btn-sm" (click)="generateInsights()" [disabled]="generatingInsights">
               <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating (' + insightLayers.length + '/11)...' : (insightLayers.length > 0 ? 'Regenerate' : 'Generate Insights') }}
             </button>
+            <span *ngIf="generatingInsights && insightsProgressMessage" class="insights-progress-label" style="font-size:var(--font-xs);color:var(--text-light);margin-left:0.5rem;white-space:nowrap">
+              {{ insightsProgressMessage }}
+            </span>
             <button class="btn btn-secondary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
               <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
             </button>
@@ -241,6 +244,16 @@ interface CommitComparison {
             <button *ngIf="insightLayers.length > 0" class="btn btn-secondary btn-sm" (click)="printReport()">
               <i class="bi bi-printer"></i> Print
             </button>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div *ngIf="generatingInsights" class="insights-progress-bar-container" style="padding:0 1rem 0.5rem 1rem">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
+            <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div [style.width.%]="insightsProgress" style="height:100%;background:var(--primary);border-radius:3px;transition:width 0.5s ease"></div>
+            </div>
+            <span style="font-size:var(--font-xs);color:var(--text-light);min-width:2.5rem;text-align:right">{{ insightsProgress }}%</span>
           </div>
         </div>
 
@@ -1118,8 +1131,22 @@ interface CommitComparison {
       letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.75rem;
       display: flex; align-items: center; gap: 0.375rem; justify-content: center;
     }
-    .insights-mermaid-wrapper svg {
+    .insights-mermaid-wrapper svg,
+    .mermaid-container svg,
+    .insights-layer-content svg {
+      overflow: visible !important;
       max-width: 100%; height: auto;
+    }
+    .mermaid-container svg .node rect,
+    .mermaid-container svg .node polygon {
+      rx: 5;
+      ry: 5;
+    }
+    /* Safari text fix */
+    .mermaid-container svg text,
+    .insights-mermaid-wrapper svg text,
+    .insights-layer-content svg text {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
 
     /* Mermaid error fallback */
@@ -1513,6 +1540,9 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   reportData: any = null;
   activeTocSection = '';
   techStackSummary: string[] = [];
+  insightsTaskId: string | null = null;
+  insightsProgress = 0;
+  insightsProgressMessage = '';
   Math = Math;
 
   // Mermaid rendering tracking
@@ -1689,6 +1719,8 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   generateInsights() {
     if (!this.repo) return;
     this.generatingInsights = true;
+    this.insightsProgress = 0;
+    this.insightsProgressMessage = 'Queuing insight generation...';
     // Clear current insights so the UI shows progress from 0
     const previousCount = this.insightLayers.length;
     this.insightLayers = [];
@@ -1696,11 +1728,30 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
     this.insightHtmlCache.clear();
     this.reportData = null;
 
-    this.http.post(`${environment.apiUrl}/repositories/${this.repo.id}/insights/generate`, {}).subscribe({
-      next: () => {
-        // Wait a few seconds for the handler to start deleting old insights, then poll
+    this.http.post<any>(`${environment.apiUrl}/repositories/${this.repo.id}/insights/generate`, {}).subscribe({
+      next: (response) => {
+        this.insightsTaskId = response.taskId;
+        // Wait a few seconds for the handler to start, then poll both task progress and insights
         setTimeout(() => {
           const pollInterval = setInterval(() => {
+            // Poll task progress for progress bar
+            if (this.insightsTaskId) {
+              this.http.get<any>(`${environment.apiUrl}/queue/${this.insightsTaskId}`).subscribe({
+                next: (taskData) => {
+                  this.insightsProgress = taskData.progress || 0;
+                  this.insightsProgressMessage = taskData.progressMessage || '';
+                  if (taskData.status === 'Completed' || taskData.status === 'Failed' || taskData.status === 'Cancelled') {
+                    clearInterval(pollInterval);
+                    this.generatingInsights = false;
+                    this.insightsTaskId = null;
+                    this.insightsProgressMessage = '';
+                    this.loadInsights();
+                  }
+                },
+                error: () => {}
+              });
+            }
+            // Poll insights layers
             this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo!.id}/insights`).subscribe({
               next: (data) => {
                 const layers = data.layers ? Object.entries(data.layers).filter(([_, v]) => v !== null).map(([k, v]: any) => ({ subtype: k, ...v })) : [];
@@ -1714,17 +1765,27 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
                 if (layers.length >= 11) {
                   clearInterval(pollInterval);
                   this.generatingInsights = false;
-                  // Also refresh the report
+                  this.insightsTaskId = null;
+                  this.insightsProgressMessage = '';
                   this.loadInsights();
                 }
               }
             });
           }, 5000);
           // Safety timeout: stop polling after 5 minutes
-          setTimeout(() => { clearInterval(pollInterval); this.generatingInsights = false; }, 300000);
+          setTimeout(() => {
+            clearInterval(pollInterval);
+            this.generatingInsights = false;
+            this.insightsTaskId = null;
+            this.insightsProgressMessage = '';
+          }, 300000);
         }, 3000); // Initial delay to let handler start
       },
-      error: () => { this.generatingInsights = false; }
+      error: () => {
+        this.generatingInsights = false;
+        this.insightsTaskId = null;
+        this.insightsProgressMessage = '';
+      }
     });
   }
 
@@ -1744,32 +1805,59 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   }
 
   parseTechStackSummary() {
-    const techLayer = this.insightLayers.find(l => l.subtype === 'techstack' || l.subtype === 'TechStack');
-    if (!techLayer?.content) {
+    const techLayer = this.insightLayers.find(l =>
+      l.subtype?.toLowerCase() === 'techstack'
+    );
+    if (!techLayer) {
       this.techStackSummary = [];
       return;
     }
-    const content = techLayer.content as string;
-    // Extract technology names from markdown headings and bullet points
+    const content = (techLayer.content || techLayer.Content || '') as string;
+    if (!content) {
+      this.techStackSummary = [];
+      return;
+    }
+    // Extract technology names from markdown content using multiple strategies
     const techs: string[] = [];
+    const addTech = (name: string) => {
+      const trimmed = name.trim();
+      if (trimmed && !techs.some(t => t.toLowerCase() === trimmed.toLowerCase())) {
+        techs.push(trimmed);
+      }
+    };
+    // Strategy 1: Match well-known technology names
     const patterns = [
-      /\.NET\s*\d+/gi, /ASP\.NET/gi, /Angular\s*\d*/gi, /React\s*\d*/gi,
-      /Vue\.?js?\s*\d*/gi, /Node\.js\s*\d*/gi, /Go\s+\d+/gi, /Rust/gi,
-      /Python\s*\d*/gi, /Java\s+\d*/gi, /TypeScript/gi, /JavaScript/gi,
+      /\.NET\s*\d+/gi, /ASP\.NET\s*(Core)?/gi, /Angular\s*\d*/gi, /React\s*\d*/gi,
+      /Vue\.?js?\s*\d*/gi, /Node\.js\s*\d*/gi, /Go\s+\d+\.\d+/gi, /Rust/gi,
+      /Python\s*\d*/gi, /Java\s+\d+/gi, /TypeScript/gi, /JavaScript/gi,
       /PostgreSQL/gi, /SQL\s*Server/gi, /MySQL/gi, /MongoDB/gi, /Redis/gi,
       /Docker/gi, /Kubernetes/gi, /K8s/gi, /GitHub\s*Actions/gi,
-      /Azure\s*DevOps/gi, /Terraform/gi, /Jenkins/gi, /GitLab\s*CI/gi
+      /Azure\s*DevOps/gi, /Terraform/gi, /Jenkins/gi, /GitLab\s*CI/gi,
+      /Nginx/gi, /RabbitMQ/gi, /Kafka/gi, /Elasticsearch/gi,
+      /Entity\s*Framework/gi, /SignalR/gi, /Blazor/gi, /Next\.js/gi,
+      /Nuxt\.?js?/gi, /Express\.?js?/gi, /Flask/gi, /Django/gi,
+      /Spring\s*Boot/gi, /AWS/gi, /Azure/gi, /GCP/gi
     ];
     for (const pat of patterns) {
       const match = content.match(pat);
       if (match) {
-        const name = match[0].trim();
-        if (!techs.some(t => t.toLowerCase() === name.toLowerCase())) {
-          techs.push(name);
+        addTech(match[0]);
+      }
+    }
+    // Strategy 2: Extract from bold text in bullet points (e.g., "- **C#**: ...")
+    const boldInBullets = content.match(/[-*]\s+\*\*([^*]+)\*\*/g);
+    if (boldInBullets) {
+      for (const m of boldInBullets) {
+        const nameMatch = m.match(/\*\*([^*]+)\*\*/);
+        if (nameMatch) {
+          const name = nameMatch[1].replace(/[:\s]+$/, '').trim();
+          if (name.length > 1 && name.length < 40) {
+            addTech(name);
+          }
         }
       }
     }
-    this.techStackSummary = techs.slice(0, 12); // Limit to 12 badges
+    this.techStackSummary = techs.slice(0, 15); // Limit to 15 badges
   }
 
   ngAfterViewChecked() {
@@ -1860,7 +1948,7 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
         if (this.mermaidModule) {
           this.mermaidModule.initialize({
             startOnLoad: false,
-            theme: 'default',
+            theme: 'base',
             themeVariables: {
               primaryColor: '#0066CC',
               primaryTextColor: '#212529',
@@ -1878,8 +1966,9 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
               edgeLabelBackground: '#F8F9FA',
               nodeTextColor: '#212529',
             },
-            flowchart: { curve: 'basis', padding: 15 },
+            flowchart: { curve: 'basis', padding: 20, useMaxWidth: false },
             securityLevel: 'loose',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           });
           this.mermaidLoaded = true;
         }
@@ -1899,6 +1988,12 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
           const { svg } = await this.mermaidModule.render(block.id + '-svg', block.code);
           element.innerHTML = svg;
           this.renderedMermaidIds.add(block.id);
+          // Fix SVG overflow for Safari text truncation
+          const svgEl = element.querySelector('svg');
+          if (svgEl) {
+            svgEl.style.overflow = 'visible';
+            svgEl.style.maxWidth = '100%';
+          }
         } catch (e: any) {
           console.warn('Mermaid rendering failed for', block.id, e);
           element.innerHTML = `<div class="mermaid-error">

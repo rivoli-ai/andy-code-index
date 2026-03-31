@@ -10,6 +10,7 @@ public class IndexingTask
     public TaskOperation Operation { get; set; }
     public IndexingTaskStatus Status { get; set; } = IndexingTaskStatus.Pending;
     public int Progress { get; set; }
+    public string? ProgressMessage { get; set; }
     public string? ErrorMessage { get; set; }
     public Guid? ChainId { get; set; }
     public int Priority { get; set; }

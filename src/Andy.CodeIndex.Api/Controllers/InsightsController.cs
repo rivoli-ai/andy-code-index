@@ -28,6 +28,7 @@ public class InsightsController : ControllerBase
         ["deploymentanalysis"] = EnrichmentSubtype.DeploymentAnalysis,
         ["operationsanalysis"] = EnrichmentSubtype.OperationsAnalysis,
         ["localsetupguide"] = EnrichmentSubtype.LocalSetupGuide,
+        ["techstack"] = EnrichmentSubtype.TechStack,
     };
 
     public InsightsController(IEnrichmentGeneratorService enrichmentService, ITaskQueue taskQueue, IReportService reportService)

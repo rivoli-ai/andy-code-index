@@ -74,6 +74,11 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
 
         foreach (var layer in layers)
         {
+            // Update progress before generating
+            task.Progress = (int)((generatedCount / (float)layers.Count) * 100);
+            task.ProgressMessage = $"Generating {layer.Title} ({generatedCount}/{layers.Count})";
+            await Context.SaveChangesAsync(ct);
+
             var prompt = systemInstruction + "\n\n" + layer.Prompt;
             var reply = await CallLlmAsync(apiKey, model, prompt, ct, baseUrl);
             if (string.IsNullOrEmpty(reply)) continue;
@@ -97,8 +102,12 @@ public class InsightsHandler : BaseLlmEnrichmentHandler
                 CreatedAt = DateTime.UtcNow
             });
 
-            await Context.SaveChangesAsync(ct);
             generatedCount++;
+
+            // Update progress after generating
+            task.Progress = (int)((generatedCount / (float)layers.Count) * 100);
+            task.ProgressMessage = $"Generated {layer.Title} ({generatedCount}/{layers.Count})";
+            await Context.SaveChangesAsync(ct);
 
             Logger.LogInformation("Generated insight layer {Layer} for {Name} ({Length} chars)",
                 layer.Subtype, repo.Name, reply.Length);

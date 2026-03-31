@@ -266,6 +266,7 @@ public class CodeIndexDbContext : DbContext
 
             builder.Property(t => t.Operation).HasConversion<string>().IsRequired().HasMaxLength(64);
             builder.Property(t => t.Status).HasConversion<string>().IsRequired().HasMaxLength(32);
+            builder.Property(t => t.ProgressMessage).HasMaxLength(512);
             builder.Property(t => t.ErrorMessage).HasMaxLength(4096);
 
             if (isNpgsql)

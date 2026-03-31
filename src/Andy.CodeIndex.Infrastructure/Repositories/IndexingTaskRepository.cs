@@ -72,12 +72,13 @@ public class IndexingTaskRepository : RepositoryBase<IndexingTask>, IIndexingTas
         await Context.SaveChangesAsync(ct);
     }
 
-    public async Task UpdateProgressAsync(Guid id, int progress, CancellationToken ct = default)
+    public async Task UpdateProgressAsync(Guid id, int progress, string? progressMessage = null, CancellationToken ct = default)
     {
         var task = await DbSet.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Task {id} not found");
 
         task.Progress = progress;
+        task.ProgressMessage = progressMessage;
         await Context.SaveChangesAsync(ct);
     }
 

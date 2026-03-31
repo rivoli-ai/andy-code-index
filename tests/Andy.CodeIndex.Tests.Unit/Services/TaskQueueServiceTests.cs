@@ -22,6 +22,8 @@ public class TaskQueueServiceTests
 
         _taskRepoMock.Setup(r => r.AddAsync(It.IsAny<IndexingTask>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IndexingTask t, CancellationToken _) => t);
+        _taskRepoMock.Setup(r => r.FindAsync(It.IsAny<System.Linq.Expressions.Expression<Func<IndexingTask, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<IndexingTask>());
     }
 
     [Fact]

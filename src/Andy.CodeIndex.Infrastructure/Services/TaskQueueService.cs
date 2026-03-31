@@ -18,6 +18,18 @@ public class TaskQueueService : ITaskQueue
     public async Task<IndexingTask> EnqueueAsync(Guid repositoryId, TaskOperation operation,
         Guid? commitId = null, int priority = 0, Guid? chainId = null, CancellationToken ct = default)
     {
+        // Cancel any existing Pending tasks with the same Operation + RepositoryId (deduplication)
+        var duplicates = await _taskRepo.FindAsync(
+            t => t.RepositoryId == repositoryId && t.Operation == operation && t.Status == IndexingTaskStatus.Pending, ct);
+        foreach (var dup in duplicates)
+        {
+            dup.Status = IndexingTaskStatus.Cancelled;
+            dup.CompletedAt = DateTime.UtcNow;
+            dup.ErrorMessage = "Superseded by newer task";
+        }
+        if (duplicates.Count > 0)
+            await _taskRepo.SaveChangesAsync(ct);
+
         var task = new IndexingTask
         {
             Id = Guid.NewGuid(),
@@ -41,8 +53,8 @@ public class TaskQueueService : ITaskQueue
     public async Task UpdateStatusAsync(Guid taskId, IndexingTaskStatus status, string? errorMessage = null, CancellationToken ct = default)
         => await _taskRepo.UpdateStatusAsync(taskId, status, errorMessage, ct);
 
-    public async Task UpdateProgressAsync(Guid taskId, int progress, CancellationToken ct = default)
-        => await _taskRepo.UpdateProgressAsync(taskId, progress, ct);
+    public async Task UpdateProgressAsync(Guid taskId, int progress, string? progressMessage = null, CancellationToken ct = default)
+        => await _taskRepo.UpdateProgressAsync(taskId, progress, progressMessage, ct);
 
     public async Task<Guid> StartChainAsync(Guid repositoryId, TaskChainType chainType, Guid? commitId = null, CancellationToken ct = default)
     {

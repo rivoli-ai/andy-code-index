@@ -31,7 +31,8 @@ public class QueueController : ControllerBase
             t.Id, t.RepositoryId, t.CommitId,
             operation = t.Operation.ToString(),
             status = t.Status.ToString(),
-            t.Progress, t.ErrorMessage, t.ChainId, t.Priority,
+            t.Progress, t.ProgressMessage,
+            t.ErrorMessage, t.ChainId, t.Priority,
             t.CreatedAt, t.StartedAt, t.CompletedAt
         }).OrderByDescending(t => t.CreatedAt));
     }
@@ -75,6 +76,7 @@ public class QueueController : ControllerBase
                 completedSteps = completed,
                 currentStep = running?.Operation.ToString(),
                 currentProgress = running?.Progress ?? 0,
+                currentProgressMessage = running?.ProgressMessage,
             };
         });
 
@@ -88,6 +90,49 @@ public class QueueController : ControllerBase
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct = default)
     {
         var task = await _taskRepo.GetByIdAsync(id, ct);
-        return task is null ? NotFound() : Ok(task);
+        if (task is null) return NotFound();
+        return Ok(new
+        {
+            task.Id, task.RepositoryId, task.CommitId,
+            operation = task.Operation.ToString(),
+            status = task.Status.ToString(),
+            task.Progress, task.ProgressMessage,
+            task.ErrorMessage, task.ChainId, task.Priority,
+            task.CreatedAt, task.StartedAt, task.CompletedAt
+        });
+    }
+
+    /// <summary>Cancel a pending task.</summary>
+    [RequirePermission("task:read")]
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CancelPending(Guid id, CancellationToken ct = default)
+    {
+        var task = await _taskRepo.GetByIdAsync(id, ct);
+        if (task is null) return NotFound();
+        if (task.Status != IndexingTaskStatus.Pending)
+            return Conflict(new { error = $"Task is {task.Status}, not Pending. Use POST /api/v1/queue/{{taskId}}/cancel to force-cancel." });
+
+        await _taskRepo.UpdateStatusAsync(id, IndexingTaskStatus.Cancelled, "Cancelled by user", ct);
+        return Ok(new { message = "Task cancelled." });
+    }
+
+    /// <summary>Force-cancel a task (works on Pending and Running).</summary>
+    [RequirePermission("task:read")]
+    [HttpPost("{id:guid}/cancel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ForceCancel(Guid id, CancellationToken ct = default)
+    {
+        var task = await _taskRepo.GetByIdAsync(id, ct);
+        if (task is null) return NotFound();
+        if (task.Status is IndexingTaskStatus.Completed or IndexingTaskStatus.Failed or IndexingTaskStatus.Cancelled)
+            return Conflict(new { error = $"Task is already {task.Status} and cannot be cancelled." });
+
+        await _taskRepo.UpdateStatusAsync(id, IndexingTaskStatus.Cancelled, "Force-cancelled by user", ct);
+        return Ok(new { message = "Task force-cancelled." });
     }
 }
