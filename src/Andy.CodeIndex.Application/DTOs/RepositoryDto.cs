@@ -29,6 +29,9 @@ public class RepositoryStatsDto
     public int EmbeddingCount { get; set; }
     public int PendingTaskCount { get; set; }
     public bool HasEmbeddings { get; set; }
+    public bool NeedsAttention { get; set; }
+    public string? AttentionReason { get; set; }
+    public bool HasInsights { get; set; }
 }
 
 public class BranchDto

@@ -34,6 +34,10 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/repositories/${id}`);
   }
 
+  wipeEnrichments(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/repositories/${id}/enrichments`);
+  }
+
   syncRepository(id: string): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/repositories/${id}/sync`, {});
   }

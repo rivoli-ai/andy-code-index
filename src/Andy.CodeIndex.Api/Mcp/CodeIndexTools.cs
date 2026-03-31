@@ -1224,6 +1224,25 @@ public class CodeIndexTools
         return new { message = "Settings updated.", changes };
     }
 
+    [McpServerTool(Name = "code_index_wipe_enrichments"), Description("Delete all enrichments for a repository. Requires re-sync to regenerate.")]
+    public async Task<object> WipeEnrichments(
+        [Description("Repository URL or name")] string repo_url)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        try
+        {
+            await _repoService.WipeEnrichmentsAsync(repo.Id);
+            return new { success = true, message = $"All enrichments wiped for {repo.Name}. Run sync to regenerate." };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new { error = ex.Message };
+        }
+    }
+
     // --- Helpers ---
 
     private async Task<RepositoryDto?> ResolveRepo(string urlOrName)

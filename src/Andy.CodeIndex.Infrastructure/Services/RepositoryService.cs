@@ -106,14 +106,33 @@ public class RepositoryService : IRepositoryService
                 .Select(e => e.Id)
                 .Contains(ce.EnrichmentId), ct);
 
+        var enrichmentCount = await _enrichmentRepo.CountAsync(e => e.RepositoryId == id, ct);
+        var hasInsights = await _context.Enrichments
+            .AnyAsync(e => e.RepositoryId == id && e.Type == EnrichmentType.Insights, ct);
+
+        // Compute attention indicators
+        var needsAttention = false;
+        string? attentionReason = null;
+        if (enrichmentCount == 0)
+        { needsAttention = true; attentionReason = "Not yet indexed"; }
+        else if (repo.Status is "error" or "cloned")
+        { needsAttention = true; attentionReason = $"Status: {repo.Status}"; }
+        else if (repo.LastSyncedAt.HasValue && (DateTime.UtcNow - repo.LastSyncedAt.Value).TotalDays > 7 && repo.SyncIntervalMinutes != 0)
+        { needsAttention = true; attentionReason = "Last sync over 7 days ago"; }
+        else if (enrichmentCount > 0 && !hasInsights)
+        { needsAttention = true; attentionReason = "No insights generated"; }
+
         dto.Stats = new RepositoryStatsDto
         {
             CommitCount = await _commitRepo.CountAsync(c => c.RepositoryId == id, ct),
-            EnrichmentCount = await _enrichmentRepo.CountAsync(e => e.RepositoryId == id, ct),
+            EnrichmentCount = enrichmentCount,
             EmbeddingCount = embeddingCount,
             HasEmbeddings = embeddingCount > 0,
             PendingTaskCount = await _taskRepo.CountAsync(
-                t => t.RepositoryId == id && t.Status == IndexingTaskStatus.Pending, ct)
+                t => t.RepositoryId == id && t.Status == IndexingTaskStatus.Pending, ct),
+            NeedsAttention = needsAttention,
+            AttentionReason = attentionReason,
+            HasInsights = hasInsights
         };
 
         return dto;
@@ -206,6 +225,44 @@ public class RepositoryService : IRepositoryService
             CreatedAt = DateTime.UtcNow
         }, ct);
         await _taskRepo.SaveChangesAsync(ct);
+    }
+
+    public async Task WipeEnrichmentsAsync(Guid id, CancellationToken ct = default)
+    {
+        var repo = await _repositoryRepo.GetByIdAsync(id, ct)
+            ?? throw new KeyNotFoundException($"Repository {id} not found.");
+
+        // Block wipe if active tasks exist
+        var existingTasks = await _taskRepo.GetByRepositoryAsync(repo.Id, ct);
+        var hasActiveTasks = existingTasks.Any(t =>
+            t.Status is IndexingTaskStatus.Pending or IndexingTaskStatus.Running);
+        if (hasActiveTasks)
+            throw new InvalidOperationException("Cannot wipe: active tasks exist for this repository. Cancel them first.");
+
+        // Delete all enrichments and related data
+        var enrichmentIds = await _context.Enrichments
+            .Where(e => e.RepositoryId == id)
+            .Select(e => e.Id)
+            .ToListAsync(ct);
+
+        if (enrichmentIds.Count > 0)
+        {
+            // Delete content embeddings first (FK)
+            await _context.ContentEmbeddings
+                .Where(ce => enrichmentIds.Contains(ce.EnrichmentId))
+                .ExecuteDeleteAsync(ct);
+
+            // Delete enrichments
+            await _context.Enrichments
+                .Where(e => e.RepositoryId == id)
+                .ExecuteDeleteAsync(ct);
+        }
+
+        // Reset repo status
+        repo.Status = "cloned";
+        await _repositoryRepo.SaveChangesAsync(ct);
+
+        // Enrichments wiped successfully
     }
 
     internal static GitProvider ParseProvider(string url)

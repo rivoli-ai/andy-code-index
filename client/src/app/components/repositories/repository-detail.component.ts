@@ -52,6 +52,9 @@ interface CommitComparison {
           <button class="btn btn-secondary" (click)="sync()" [disabled]="syncing">
             <i class="bi bi-arrow-repeat"></i> Sync
           </button>
+          <button class="btn btn-secondary" style="color:var(--danger);border-color:var(--danger)" (click)="wipeEnrichments()">
+            <i class="bi bi-eraser"></i> Wipe Enrichments
+          </button>
           <button class="btn btn-danger" (click)="confirmDelete()">
             <i class="bi bi-trash"></i> Delete
           </button>
@@ -1621,6 +1624,20 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
     this.api.syncRepository(this.repo.id).subscribe({
       next: () => this.syncing = false,
       error: () => this.syncing = false
+    });
+  }
+
+  wipeEnrichments() {
+    if (!this.repo || !confirm(`Delete ALL enrichments for ${this.repo.name}? You will need to Sync again to regenerate them.`)) return;
+    this.http.delete(`${environment.apiUrl}/repositories/${this.repo.id}/enrichments`).subscribe({
+      next: () => {
+        this.insightLayers = [];
+        this.reportData = null;
+        this.techStackSummary = [];
+        // Reload repo to get updated status
+        this.api.getRepository(this.repo!.id).subscribe({ next: repo => this.repo = repo });
+      },
+      error: (err) => alert(err?.error?.error || 'Failed to wipe enrichments')
     });
   }
 

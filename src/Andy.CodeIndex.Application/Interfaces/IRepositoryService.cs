@@ -12,4 +12,5 @@ public interface IRepositoryService
     Task<RepositoryDto> UpdateAsync(Guid id, UpdateRepositoryRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
     Task SyncAsync(Guid id, CancellationToken ct = default);
+    Task WipeEnrichmentsAsync(Guid id, CancellationToken ct = default);
 }

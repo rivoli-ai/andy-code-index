@@ -120,6 +120,29 @@ public class RepositoriesController : ControllerBase
         }
     }
 
+    /// <summary>Delete all enrichments for a repository.</summary>
+    [HttpDelete("{id:guid}/enrichments")]
+    [RequirePermission("repository:delete")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> WipeEnrichments(Guid id, CancellationToken ct = default)
+    {
+        try
+        {
+            await _service.WipeEnrichmentsAsync(id, ct);
+            return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
     /// <summary>Trigger a manual sync for a repository.</summary>
     [HttpPost("{id:guid}/sync")]
     [RequirePermission("repository:execute")]

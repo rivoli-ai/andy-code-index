@@ -82,7 +82,12 @@ import { Repository } from '../../models/repository.model';
         </thead>
         <tbody>
           <tr *ngFor="let repo of filteredRepositories">
-            <td><a [routerLink]="['/repositories', repo.id]">{{ repo.name }}</a></td>
+            <td>
+              <a [routerLink]="['/repositories', repo.id]">{{ repo.name }}</a>
+              <i *ngIf="repo.stats?.needsAttention" class="bi bi-exclamation-triangle-fill"
+                 style="color:#e6a700;margin-left:0.5rem;font-size:0.75rem;cursor:help"
+                 [title]="repo.stats?.attentionReason || 'Needs attention'"></i>
+            </td>
             <td><span class="badge badge-muted">{{ repo.provider }}</span></td>
             <td>
               <span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span>

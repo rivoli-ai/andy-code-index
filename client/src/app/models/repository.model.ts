@@ -22,6 +22,9 @@ export interface RepositoryStats {
   embeddingCount: number;
   hasEmbeddings: boolean;
   pendingTaskCount: number;
+  needsAttention?: boolean;
+  attentionReason?: string;
+  hasInsights?: boolean;
 }
 
 export interface Branch {
