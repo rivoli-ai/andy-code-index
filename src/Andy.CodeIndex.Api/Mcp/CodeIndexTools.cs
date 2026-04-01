@@ -1080,9 +1080,10 @@ public class CodeIndexTools
         };
     }
 
-    [McpServerTool(Name = "code_index_report"), Description("Get the full insight analysis report for a repository with ratings, feedback, health score, and improvements")]
+    [McpServerTool(Name = "code_index_report"), Description("Get the full insight analysis report for a repository with ratings, feedback, health score, and improvements. Supports json (default) and html formats.")]
     public async Task<object> GetReport(
-        [Description("Repository URL or name")] string repo_url)
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Output format: 'json' (default) or 'html'")] string format = "json")
     {
         var repo = await ResolveRepo(repo_url);
         if (repo is null)
@@ -1090,6 +1091,12 @@ public class CodeIndexTools
 
         try
         {
+            if (format.Equals("html", StringComparison.OrdinalIgnoreCase))
+            {
+                var html = await _reportService.ExportHtmlAsync(repo.Id);
+                return new { format = "html", content = html };
+            }
+
             var report = await _reportService.GenerateReportAsync(repo.Id);
             return new
             {

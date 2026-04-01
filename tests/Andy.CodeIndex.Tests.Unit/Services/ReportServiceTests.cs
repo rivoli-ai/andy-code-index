@@ -400,6 +400,251 @@ public class ReportServiceTests
         velocity.Trend.Should().Be("none");
     }
 
+    [Fact]
+    public void BuildHtml_ContainsHealthScore()
+    {
+        var report = CreateSampleReport();
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("78");
+        html.Should().Contain("Overall Health Score");
+        html.Should().Contain("score-number");
+        html.Should().Contain("#22c55e"); // green for score > 70
+    }
+
+    [Fact]
+    public void BuildHtml_ContainsVelocityMetrics()
+    {
+        var report = CreateSampleReport();
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("15.3");
+        html.Should().Contain("Commits/Month");
+        html.Should().Contain("Active Contributors");
+        html.Should().Contain("increasing");
+    }
+
+    [Fact]
+    public void BuildHtml_ContainsTopImprovements()
+    {
+        var report = CreateSampleReport();
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("Top Improvements");
+        html.Should().Contain("Add monitoring");
+        html.Should().Contain("Increase test coverage");
+        html.Should().Contain("badge-high");
+    }
+
+    [Fact]
+    public void BuildHtml_ContainsAllLayerSections()
+    {
+        var report = CreateSampleReport();
+        report.Layers.Add(new LayerReportDto
+        {
+            Name = "Security Analysis",
+            Subtype = "SecurityAnalysis",
+            MaturityRating = 3,
+            QualityRating = 3,
+            RiskRating = 3,
+            Content = "Security content"
+        });
+
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("Architecture Analysis");
+        html.Should().Contain("Security Analysis");
+    }
+
+    [Fact]
+    public void BuildHtml_ContainsStrengthsWeaknessesRecommendations()
+    {
+        var report = CreateSampleReport();
+        var html = ReportService.BuildHtml(report);
+
+        // Strengths
+        html.Should().Contain("strengths-block");
+        html.Should().Contain("Clean separation of concerns");
+        html.Should().Contain("Good API design");
+
+        // Weaknesses
+        html.Should().Contain("weaknesses-block");
+        html.Should().Contain("Missing monitoring");
+
+        // Recommendations
+        html.Should().Contain("recommendations-block");
+        html.Should().Contain("Add health checks");
+        html.Should().Contain("Implement circuit breakers");
+    }
+
+    [Fact]
+    public void BuildHtml_ContainsTechStack()
+    {
+        var report = CreateSampleReport();
+        report.TechStack = new TechStackDto
+        {
+            Backend = [new TechComponent { Name = ".NET", Version = "8" }],
+            Frontend = [new TechComponent { Name = "Angular" }],
+            Database = [new TechComponent { Name = "PostgreSQL" }],
+            Infrastructure = [],
+            Languages = [new LanguageBreakdown { Name = "C#", FileCount = 50, Percentage = 60.5 }]
+        };
+
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("Technology Stack");
+        html.Should().Contain("tech-stack-section");
+        html.Should().Contain(".NET 8");
+        html.Should().Contain("Angular");
+        html.Should().Contain("PostgreSQL");
+        html.Should().Contain("C#");
+        html.Should().Contain("60.5%");
+    }
+
+    [Fact]
+    public void BuildHtml_ContainsMethodology()
+    {
+        var report = CreateSampleReport();
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("Methodology");
+        html.Should().Contain("methodology-section");
+        html.Should().Contain("Health Score");
+        html.Should().Contain("Weighted average");
+        html.Should().Contain("Maturity Rating");
+        html.Should().Contain("Quality Rating");
+        html.Should().Contain("Risk Rating");
+        html.Should().Contain("Impact / Effort");
+    }
+
+    [Fact]
+    public void BuildHtml_RendersMermaidBlocks()
+    {
+        var report = CreateSampleReport();
+        report.Layers[0].Content = "Some text\n\n```mermaid\ngraph TD\nA-->B\n```\n\nMore text";
+
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("class=\"mermaid\"");
+        html.Should().Contain("mermaid.min.js");
+        html.Should().Contain("mermaid.initialize");
+        // Should NOT contain language-mermaid after transformation
+        html.Should().NotContain("language-mermaid");
+    }
+
+    [Fact]
+    public void BuildHtml_RendersMarkdownTables()
+    {
+        var report = CreateSampleReport();
+        report.Layers[0].Content = "| Column A | Column B |\n|----------|----------|\n| Value 1  | Value 2  |\n| Value 3  | Value 4  |";
+
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("<table");
+        html.Should().Contain("<th>");
+        html.Should().Contain("<td>");
+        html.Should().Contain("Column A");
+        html.Should().Contain("Value 1");
+    }
+
+    [Fact]
+    public void BuildHtml_ContainsTopContributors()
+    {
+        var report = CreateSampleReport();
+        report.Velocity.TopContributors =
+        [
+            new ContributorDto { Name = "Alice", Email = "alice@test.com", Commits = 42 },
+            new ContributorDto { Name = "Bob", Email = "bob@test.com", Commits = 18 }
+        ];
+
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("Top Contributors");
+        html.Should().Contain("Alice");
+        html.Should().Contain("42 commits");
+        html.Should().Contain("Bob");
+    }
+
+    [Fact]
+    public void BuildHtml_PrintCssIncludesPageBreaks()
+    {
+        var report = CreateSampleReport();
+        var html = ReportService.BuildHtml(report);
+
+        html.Should().Contain("@media print");
+        html.Should().Contain("page-break-inside: avoid");
+        html.Should().Contain("page-break-before: always");
+    }
+
+    [Fact]
+    public void MarkdownToHtml_EmptyInput_ReturnsEmpty()
+    {
+        var result = ReportService.MarkdownToHtml(null);
+        result.Should().BeEmpty();
+
+        result = ReportService.MarkdownToHtml("");
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkdownToHtml_RendersTablesCorrectly()
+    {
+        var md = "| A | B |\n|---|---|\n| 1 | 2 |";
+        var html = ReportService.MarkdownToHtml(md);
+
+        html.Should().Contain("<table");
+        html.Should().Contain("<th>A</th>");
+        html.Should().Contain("<td>1</td>");
+    }
+
+    [Fact]
+    public void MarkdownToHtml_TransformsMermaidBlocks()
+    {
+        var md = "```mermaid\ngraph TD\nA-->B\n```";
+        var html = ReportService.MarkdownToHtml(md);
+
+        html.Should().Contain("class=\"mermaid\"");
+        html.Should().NotContain("language-mermaid");
+    }
+
+    private static ReportDto CreateSampleReport()
+    {
+        return new ReportDto
+        {
+            RepositoryName = "test-repo",
+            GeneratedAt = new DateTime(2025, 6, 15, 10, 30, 0, DateTimeKind.Utc),
+            OverallHealthScore = 78,
+            Velocity = new VelocityDto
+            {
+                CommitsPerMonth = 15.3,
+                ActiveContributors = 4,
+                Trend = "increasing",
+                TopContributors = []
+            },
+            Layers =
+            [
+                new LayerReportDto
+                {
+                    Name = "Architecture Analysis",
+                    Subtype = "ArchitectureAnalysis",
+                    MaturityRating = 4,
+                    QualityRating = 3,
+                    RiskRating = 2,
+                    Strengths = ["Clean separation of concerns", "Good API design"],
+                    Weaknesses = ["Missing monitoring"],
+                    Recommendations = ["Add health checks", "Implement circuit breakers"],
+                    Content = "Architecture analysis content here.",
+                    HasMermaidDiagrams = false
+                }
+            ],
+            Top5Improvements =
+            [
+                new ImprovementDto { Title = "Add monitoring", Description = "Implement centralized logging", Layer = "Operations", Impact = "high", Effort = "medium" },
+                new ImprovementDto { Title = "Increase test coverage", Description = "Add integration tests", Layer = "Testing", Impact = "high", Effort = "high" }
+            ]
+        };
+    }
+
     private ReportService CreateService()
     {
         return new ReportService(

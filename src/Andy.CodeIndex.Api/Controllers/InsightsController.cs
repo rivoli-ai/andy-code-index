@@ -178,4 +178,29 @@ public class InsightsController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    /// <summary>Get the insight analysis report as a print-ready HTML page that triggers the browser print dialog for PDF export.</summary>
+    [HttpGet("~/api/v1/repositories/{repositoryId:guid}/report/pdf")]
+    [RequirePermission("repository:read")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetReportPdf(Guid repositoryId, CancellationToken ct = default)
+    {
+        try
+        {
+            var html = await _reportService.ExportHtmlAsync(repositoryId, ct);
+            // MVP: return HTML with print-optimized CSS and auto-print trigger
+            var printHtml = html.Replace("</body>",
+                "<script>window.onload = function() { window.print(); }</script></body>");
+            return Content(printHtml, "text/html");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }

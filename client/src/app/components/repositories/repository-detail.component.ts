@@ -247,6 +247,9 @@ interface CommitComparison {
             <button *ngIf="reportData" (click)="exportHtml()" class="btn btn-secondary btn-sm">
               <i class="bi bi-download"></i> Export HTML
             </button>
+            <button *ngIf="reportData" (click)="exportPdf()" class="btn btn-secondary btn-sm">
+              <i class="bi bi-file-earmark-pdf"></i> Export PDF
+            </button>
             <button *ngIf="insightLayers.length > 0" class="btn btn-secondary btn-sm" (click)="printReport()">
               <i class="bi bi-printer"></i> Print
             </button>
@@ -526,6 +529,9 @@ interface CommitComparison {
             </button>
             <button *ngIf="reportData" (click)="exportHtml()" class="btn btn-secondary btn-sm">
               <i class="bi bi-download"></i> Export HTML
+            </button>
+            <button *ngIf="reportData" (click)="exportPdf()" class="btn btn-secondary btn-sm">
+              <i class="bi bi-file-earmark-pdf"></i> Export PDF
             </button>
             <button *ngIf="reportData" class="btn btn-secondary btn-sm" (click)="printReport()">
               <i class="bi bi-printer"></i> Print
@@ -2168,6 +2174,17 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
         URL.revokeObjectURL(url);
       },
       error: (err) => { console.error('Export failed', err); }
+    });
+  }
+
+  exportPdf() {
+    if (!this.repo) return;
+    this.http.get(`${environment.apiUrl}/repositories/${this.repo.id}/report/pdf`, { responseType: 'text' }).subscribe({
+      next: (html) => {
+        const win = window.open('', '_blank');
+        if (win) { win.document.write(html); win.document.close(); }
+      },
+      error: (err) => { console.error('PDF export failed', err); }
     });
   }
 
