@@ -436,23 +436,26 @@ interface CommitComparison {
 
               <!-- Strengths / Weaknesses / Recommendations -->
               <div *ngIf="getLayerReport(layer.subtype) as lr" class="insights-layer-meta">
-                <div *ngIf="lr.strengths?.length" class="insights-meta-block">
+                <div class="insights-meta-block">
                   <div class="insights-meta-title insights-meta-strengths"><i class="bi bi-check-circle-fill"></i> Strengths</div>
-                  <ul class="insights-meta-list">
+                  <ul *ngIf="lr.strengths?.length" class="insights-meta-list">
                     <li *ngFor="let s of lr.strengths" class="insights-strength-item">{{ s }}</li>
                   </ul>
+                  <div *ngIf="!lr.strengths?.length" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see ratings</div>
                 </div>
-                <div *ngIf="lr.weaknesses?.length" class="insights-meta-block">
+                <div class="insights-meta-block">
                   <div class="insights-meta-title insights-meta-weaknesses"><i class="bi bi-exclamation-triangle-fill"></i> Weaknesses</div>
-                  <ul class="insights-meta-list">
+                  <ul *ngIf="lr.weaknesses?.length" class="insights-meta-list">
                     <li *ngFor="let w of lr.weaknesses" class="insights-weakness-item">{{ w }}</li>
                   </ul>
+                  <div *ngIf="!lr.weaknesses?.length" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see ratings</div>
                 </div>
-                <div *ngIf="lr.recommendations?.length" class="insights-meta-block">
+                <div class="insights-meta-block">
                   <div class="insights-meta-title insights-meta-recommendations"><i class="bi bi-arrow-right-circle-fill"></i> Recommendations</div>
-                  <ul class="insights-meta-list">
+                  <ul *ngIf="lr.recommendations?.length" class="insights-meta-list">
                     <li *ngFor="let r of lr.recommendations" class="insights-recommendation-item">{{ r }}</li>
                   </ul>
+                  <div *ngIf="!lr.recommendations?.length" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see recommendations</div>
                 </div>
               </div>
 

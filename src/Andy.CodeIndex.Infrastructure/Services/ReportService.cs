@@ -184,8 +184,8 @@ public class ReportService : IReportService
             if (!InsightLayerNames.TryGetValue(insight.Subtype, out var name))
                 continue;
 
-            var content = insight.Content.Length > 2500
-                ? insight.Content[..2500] + "\n... (truncated)"
+            var content = insight.Content.Length > 1500
+                ? insight.Content[..1500] + "\n... (truncated)"
                 : insight.Content;
 
             sb.AppendLine($"=== {name} ({insight.Subtype}) ===");
@@ -193,8 +193,11 @@ public class ReportService : IReportService
             sb.AppendLine();
         }
 
+        var layerSubtypes = string.Join(", ", insights.Select(i => i.Subtype.ToString()));
         var prompt = "You are analyzing insight layers for the repository \"" + repoName + "\".\n" +
-            "Rate each layer and provide constructive feedback.\n\n" +
+            "Rate EVERY layer and provide constructive feedback.\n\n" +
+            "CRITICAL: You MUST include ALL " + insights.Count + " layers in your response: " + layerSubtypes + "\n" +
+            "Do NOT skip any layers. Each layer MUST have ratings, strengths, weaknesses, and recommendations.\n\n" +
             "IMPORTANT: Return ONLY a valid JSON object. No preamble, no explanation, no markdown fencing, no text before or after the JSON.\n\n" +
             "JSON structure:\n" +
             "- overallHealthScore: number 0-100\n" +
@@ -220,7 +223,7 @@ public class ReportService : IReportService
             ["messages"] = new[] { new { role = "user", content = prompt } }
         };
         if (!isReasoningModel) body["temperature"] = 0.3;
-        body[isReasoningModel ? "max_completion_tokens" : "max_tokens"] = 4000;
+        body[isReasoningModel ? "max_completion_tokens" : "max_tokens"] = 8000;
 
         try
         {
