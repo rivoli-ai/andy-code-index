@@ -247,9 +247,6 @@ interface CommitComparison {
             <button *ngIf="insightLayers.length > 0" (click)="exportHtml()" class="btn btn-secondary btn-sm">
               <i class="bi bi-download"></i> Export HTML
             </button>
-            <button *ngIf="insightLayers.length > 0" (click)="exportPdf()" class="btn btn-secondary btn-sm">
-              <i class="bi bi-file-earmark-pdf"></i> Export PDF
-            </button>
             <button *ngIf="insightLayers.length > 0" class="btn btn-secondary btn-sm" (click)="printReport()">
               <i class="bi bi-printer"></i> Print
             </button>
@@ -531,10 +528,7 @@ interface CommitComparison {
               <i class="bi bi-download"></i> Export HTML
             </button>
             <button *ngIf="reportData" (click)="exportPdf()" class="btn btn-secondary btn-sm">
-              <i class="bi bi-file-earmark-pdf"></i> Export PDF
-            </button>
-            <button *ngIf="reportData" class="btn btn-secondary btn-sm" (click)="printReport()">
-              <i class="bi bi-printer"></i> Print
+              <i class="bi bi-file-earmark-pdf"></i> Save as PDF
             </button>
             <span *ngIf="!insightLayers.length" class="text-muted" style="font-size:var(--font-xs);align-self:center">Generate insights first.</span>
           </div>
