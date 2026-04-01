@@ -1,3 +1,11 @@
+# ── Node build stage (Angular SPA) ────────────────────────────────────────────
+FROM node:22-alpine AS node-build
+WORKDIR /node-build
+COPY client/package.json client/package-lock.json ./
+RUN npm ci
+COPY client/ ./
+RUN npm run build
+
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /build
 
@@ -35,6 +43,7 @@ RUN groupadd -r codeindex && useradd -r -g codeindex -d /app -s /sbin/nologin co
 RUN mkdir -p /data /https && chown codeindex:codeindex /data
 
 COPY --from=build /app/publish .
+COPY --from=node-build /node-build/dist/client/browser ./wwwroot
 RUN chown -R codeindex:codeindex /app
 
 # Self-signed dev cert

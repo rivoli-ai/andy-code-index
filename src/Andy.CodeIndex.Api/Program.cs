@@ -7,14 +7,19 @@ using Andy.CodeIndex.Infrastructure.Repositories;
 using Andy.CodeIndex.Infrastructure.Services;
 using Andy.Rbac.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Server URLs for MCP metadata ---
-var serverUrl = builder.Configuration["Urls"]?.Split(';').FirstOrDefault()
-    ?? (builder.Environment.IsDevelopment() ? "https://localhost:5101" : "https://localhost:5101");
+var configuredUrl = builder.Configuration["Urls"]?.Split(';').FirstOrDefault();
+// ASPNETCORE_URLS uses wildcard hosts like https://+:8443 which aren't valid URIs,
+// so fall back to the external-facing URL
+var serverUrl = configuredUrl != null && !configuredUrl.Contains("://+:") && !configuredUrl.Contains("://0.0.0.0:")
+    ? configuredUrl
+    : "https://localhost:5101";
 var protectedResourceUrl = $"{serverUrl}/mcp";
 var andyAuthAuthority = builder.Configuration["AndyAuth:Authority"] ?? "";
 
@@ -29,21 +34,29 @@ if (!string.IsNullOrEmpty(connectionString))
 // --- Authentication (Andy.Auth) ---
 if (!string.IsNullOrEmpty(andyAuthAuthority))
 {
-    builder.Services.AddAndyAuth(builder.Configuration);
-
-    // Post-configure JWT bearer to accept MCP resource URLs as valid audiences (RFC 8707)
-    builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
-    {
-        var existingAudiences = options.TokenValidationParameters.ValidAudiences?.ToList() ?? [];
-        if (!string.IsNullOrEmpty(options.TokenValidationParameters.ValidAudience) &&
-            !existingAudiences.Contains(options.TokenValidationParameters.ValidAudience))
+    // Configure JWT bearer directly (bypassing AddAndyAuth NuGet for Docker compatibility)
+    var audience = builder.Configuration["AndyAuth:Audience"] ?? "urn:andy-code-index-api";
+    builder.Services.AddAuthentication("Bearer")
+        .AddJwtBearer("Bearer", options =>
         {
-            existingAudiences.Add(options.TokenValidationParameters.ValidAudience);
-        }
-        existingAudiences.Add(protectedResourceUrl);
-        options.TokenValidationParameters.ValidAudiences = existingAudiences;
-        options.TokenValidationParameters.ValidAudience = null;
-    });
+            options.Authority = andyAuthAuthority;
+            options.Audience = audience;
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            if (builder.Environment.IsDevelopment())
+            {
+                options.BackchannelHttpHandler = new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback =
+                        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                };
+                options.TokenValidationParameters.ValidIssuers = new[]
+                {
+                    andyAuthAuthority, andyAuthAuthority.TrimEnd('/') + "/",
+                    "https://localhost:5001", "https://localhost:5001/"
+                };
+            }
+        });
+    builder.Services.AddAuthorization();
 
     // MCP OAuth Protected Resource Metadata (RFC 8707)
     builder.Services.AddAuthentication()
@@ -93,6 +106,27 @@ if (!string.IsNullOrEmpty(rbacBaseUrl))
         options.ApiBaseUrl = rbacBaseUrl;
         options.ApplicationCode = "code-index";
     });
+
+    // Bypass RBAC permission checks in development (NuGet package handler issue)
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationPolicyProvider>(sp =>
+        {
+            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Authorization.AuthorizationOptions>>();
+            return new AllowAllDevPolicyProvider(opts);
+        });
+    }
+
+    // In development, skip SSL validation for self-signed certs on all HTTP clients
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.ConfigureHttpClientDefaults(b =>
+            b.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            }));
+    }
 }
 
 // --- Repositories ---
@@ -263,6 +297,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseCors("AllowAngularApp");
 app.UseAuthentication();
 app.UseAuthorization();
@@ -372,6 +409,8 @@ if (!string.IsNullOrEmpty(andyAuthAuthority))
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
     .AllowAnonymous();
 
+app.MapFallbackToFile("index.html");
+
 // --- Auto-migrate in development ---
 if (app.Environment.IsDevelopment() && !string.IsNullOrEmpty(connectionString))
 {
@@ -385,3 +424,22 @@ app.Run();
 
 // Make Program accessible for WebApplicationFactory in integration tests
 public partial class Program { }
+
+/// <summary>
+/// Bypasses RBAC permission checks in development.
+/// </summary>
+internal class AllowAllDevPolicyProvider : DefaultAuthorizationPolicyProvider
+{
+    private static readonly AuthorizationPolicy AllowAll = new AuthorizationPolicyBuilder()
+        .RequireAssertion(_ => true)
+        .Build();
+
+    public AllowAllDevPolicyProvider(Microsoft.Extensions.Options.IOptions<AuthorizationOptions> options)
+        : base(options) { }
+
+    public override Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
+        => Task.FromResult<AuthorizationPolicy?>(AllowAll);
+
+    public new Task<AuthorizationPolicy> GetDefaultPolicyAsync()
+        => Task.FromResult(AllowAll);
+}

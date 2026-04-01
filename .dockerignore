@@ -23,4 +23,6 @@ docker-compose.override.yml
 README.md
 LICENSE
 docs/
-client/
+client/node_modules
+client/dist
+client/.angular
