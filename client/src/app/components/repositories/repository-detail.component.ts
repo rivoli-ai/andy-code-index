@@ -244,10 +244,10 @@ interface CommitComparison {
             <button class="btn btn-secondary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
               <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
             </button>
-            <button *ngIf="reportData" (click)="exportHtml()" class="btn btn-secondary btn-sm">
+            <button *ngIf="insightLayers.length > 0" (click)="exportHtml()" class="btn btn-secondary btn-sm">
               <i class="bi bi-download"></i> Export HTML
             </button>
-            <button *ngIf="reportData" (click)="exportPdf()" class="btn btn-secondary btn-sm">
+            <button *ngIf="insightLayers.length > 0" (click)="exportPdf()" class="btn btn-secondary btn-sm">
               <i class="bi bi-file-earmark-pdf"></i> Export PDF
             </button>
             <button *ngIf="insightLayers.length > 0" class="btn btn-secondary btn-sm" (click)="printReport()">
@@ -2181,8 +2181,14 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
     if (!this.repo) return;
     this.http.get(`${environment.apiUrl}/repositories/${this.repo.id}/report/pdf`, { responseType: 'text' }).subscribe({
       next: (html) => {
-        const win = window.open('', '_blank');
-        if (win) { win.document.write(html); win.document.close(); }
+        // Download as HTML file — user opens it and browser auto-prints for PDF save
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.repo!.name}-report-print.html`;
+        a.click();
+        URL.revokeObjectURL(url);
       },
       error: (err) => { console.error('PDF export failed', err); }
     });
