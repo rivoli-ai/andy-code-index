@@ -33,6 +33,7 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=andy_code_index;Username=andy_code_index;Password=andy_code_index_dev_password
       - AndyAuth__Authority=https://host.docker.internal:5001
       - AndyAuth__Audience=urn:andy-code-index-api
+      - AndyAuth__RequireHttpsMetadata=false
       - Rbac__ApiBaseUrl=https://host.docker.internal:7003
       - Rbac__ApplicationCode=code-index
       - Indexing__DataDir=/data
@@ -41,6 +42,7 @@ services:
     ports:
       - "5101:8443"
       - "5102:8080"
+      - "4201:8443"
     volumes:
       - ./certs:/usr/local/share/ca-certificates/custom:ro
       - code_index_data:/data
@@ -53,19 +55,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-    restart: unless-stopped
-    networks:
-      - andy-code-index-network
-
-  web:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: andy-code-index-web
-    depends_on:
-      - api
-    ports:
-      - "4201:80"
     restart: unless-stopped
     networks:
       - andy-code-index-network
