@@ -2179,16 +2179,28 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
 
   exportPdf() {
     if (!this.repo) return;
-    this.http.get(`${environment.apiUrl}/repositories/${this.repo.id}/report/pdf`, { responseType: 'text' }).subscribe({
+    this.http.get(`${environment.apiUrl}/repositories/${this.repo.id}/report/html`, { responseType: 'text' }).subscribe({
       next: (html) => {
-        // Download as HTML file — user opens it and browser auto-prints for PDF save
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.repo!.name}-report-print.html`;
-        a.click();
-        URL.revokeObjectURL(url);
+        // Open in a hidden iframe and trigger print (Save as PDF from print dialog)
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+          doc.open();
+          doc.write(html);
+          doc.close();
+          // Wait for mermaid to render, then print
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+            setTimeout(() => document.body.removeChild(iframe), 1000);
+          }, 2000);
+        }
       },
       error: (err) => { console.error('PDF export failed', err); }
     });
