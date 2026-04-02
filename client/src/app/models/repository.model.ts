@@ -42,3 +42,29 @@ export interface CreateRepositoryRequest {
   url: string;
   personalAccessToken?: string;
 }
+
+export interface WeeklyActivity {
+  weekStart: string;
+  commitCount: number;
+  authorCount?: number;
+}
+
+export interface SparklineData {
+  weeklyData: WeeklyActivity[];
+}
+
+export interface ActivityStats {
+  totalCommits: number;
+  uniqueAuthors: number;
+  avgPerDay: number;
+  maxCommitsInDay: number;
+  mostActiveDay: string;
+  longestInactiveStreak: number;
+  lastCommitDate?: string;
+}
+
+export interface ActivityHeatmap {
+  dailyData: { date: string; commitCount: number }[];
+  weeklyData: WeeklyActivity[];
+  stats: ActivityStats;
+}

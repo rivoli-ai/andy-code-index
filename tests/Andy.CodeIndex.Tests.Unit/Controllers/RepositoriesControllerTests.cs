@@ -11,11 +11,12 @@ namespace Andy.CodeIndex.Tests.Unit.Controllers;
 public class RepositoriesControllerTests
 {
     private readonly Mock<IRepositoryService> _serviceMock = new();
+    private readonly Mock<IActivityAnalyticsService> _activityServiceMock = new();
     private readonly RepositoriesController _controller;
 
     public RepositoriesControllerTests()
     {
-        _controller = new RepositoriesController(_serviceMock.Object);
+        _controller = new RepositoriesController(_serviceMock.Object, _activityServiceMock.Object);
     }
 
     // --- List ---

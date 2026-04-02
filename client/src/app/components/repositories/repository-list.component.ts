@@ -4,12 +4,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { HealthService } from '../../services/health.service';
-import { Repository } from '../../models/repository.model';
+import { Repository, SparklineData } from '../../models/repository.model';
+import { RepositorySparklineComponent } from './repository-sparkline.component';
 
 @Component({
   selector: 'app-repository-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, RepositorySparklineComponent],
   template: `
     <div class="warning-banner" *ngIf="!(healthService.isConnected$ | async)">
       <i class="bi bi-exclamation-triangle"></i> Backend unavailable - some features are disabled
@@ -74,6 +75,7 @@ import { Repository } from '../../models/repository.model';
             <th>Name</th>
             <th>Provider</th>
             <th>Status</th>
+            <th>Activity</th>
             <th>Enrichments</th>
             <th>Embeddings</th>
             <th>Last Synced</th>
@@ -91,6 +93,13 @@ import { Repository } from '../../models/repository.model';
             <td><span class="badge badge-muted">{{ repo.provider }}</span></td>
             <td>
               <span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span>
+            </td>
+            <td>
+              <app-repository-sparkline
+                *ngIf="sparklines.get(repo.id)"
+                [weeklyData]="sparklines.get(repo.id)!.weeklyData">
+              </app-repository-sparkline>
+              <span *ngIf="!sparklines.get(repo.id)" class="text-muted" style="font-size:0.75rem">--</span>
             </td>
             <td class="text-muted">{{ repo.stats?.enrichmentCount || 0 }}</td>
             <td>
@@ -130,6 +139,7 @@ export class RepositoryListComponent implements OnInit {
   error = '';
   syncing: Record<string, boolean> = {};
   busyRepos: Set<string> = new Set();
+  sparklines: Map<string, SparklineData> = new Map();
   nameFilter = '';
   statusFilter = '';
   providerFilter = '';
@@ -145,7 +155,11 @@ export class RepositoryListComponent implements OnInit {
   loadRepositories() {
     this.loading = true;
     this.api.getRepositories().subscribe({
-      next: repos => { this.repositories = repos; this.loading = false; },
+      next: repos => {
+        this.repositories = repos;
+        this.loading = false;
+        this.loadSparklines(repos);
+      },
       error: (err: any) => {
         if (err.status === 403) {
           this.error = err.error?.error || 'Access denied. You do not have permission to view repositories.';
@@ -155,6 +169,18 @@ export class RepositoryListComponent implements OnInit {
           this.error = 'Failed to load repositories. Check that the server is running.';
         }
         this.loading = false;
+      }
+    });
+  }
+
+  loadSparklines(repos: Repository[]) {
+    if (repos.length === 0) return;
+    const repoIds = repos.map(r => r.id);
+    this.api.getBulkSparklines(repoIds).subscribe({
+      next: data => {
+        Object.entries(data).forEach(([id, sparkline]) => {
+          this.sparklines.set(id, sparkline);
+        });
       }
     });
   }

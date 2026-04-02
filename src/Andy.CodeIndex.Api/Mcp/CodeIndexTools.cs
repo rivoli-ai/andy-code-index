@@ -28,6 +28,7 @@ public class CodeIndexTools
     private readonly IReportService _reportService;
     private readonly IApiKeyResolver _apiKeyResolver;
     private readonly IEncryptionService _encryption;
+    private readonly IActivityAnalyticsService _activityService;
     private readonly CodeIndexDbContext _dbContext;
     private readonly IndexingOptions _options;
     private readonly EmbeddingOptions _embeddingOptions;
@@ -47,6 +48,7 @@ public class CodeIndexTools
         IReportService reportService,
         IApiKeyResolver apiKeyResolver,
         IEncryptionService encryption,
+        IActivityAnalyticsService activityService,
         CodeIndexDbContext dbContext,
         IOptions<IndexingOptions> options,
         IOptions<EmbeddingOptions> embeddingOptions,
@@ -65,6 +67,7 @@ public class CodeIndexTools
         _reportService = reportService;
         _apiKeyResolver = apiKeyResolver;
         _encryption = encryption;
+        _activityService = activityService;
         _dbContext = dbContext;
         _options = options.Value;
         _embeddingOptions = embeddingOptions.Value;
@@ -1251,6 +1254,40 @@ public class CodeIndexTools
     }
 
     // --- Helpers ---
+
+    [McpServerTool(Name = "code_index_repo_activity"), Description("Get git activity heatmap data for a repository (weekly commit counts, stats)")]
+    public async Task<object> GetRepoActivity(
+        [Description("Repository URL or name")] string repo_url,
+        [Description("Weeks of history (default 52)")] int? weeks_back = null)
+    {
+        var repo = await ResolveRepo(repo_url);
+        if (repo is null)
+            return new { error = $"Repository '{repo_url}' not found" };
+
+        var weeksBack = weeks_back ?? 52;
+        var heatmap = await _activityService.GetHeatmapAsync(repo.Id, weeksBack);
+
+        return new
+        {
+            repository = repo.Name,
+            stats = new
+            {
+                heatmap.Stats.TotalCommits,
+                heatmap.Stats.UniqueAuthors,
+                heatmap.Stats.AvgPerDay,
+                heatmap.Stats.MaxCommitsInDay,
+                heatmap.Stats.MostActiveDay,
+                heatmap.Stats.LongestInactiveStreak,
+                heatmap.Stats.LastCommitDate
+            },
+            weeklyData = heatmap.WeeklyData.Select(w => new
+            {
+                weekStart = w.WeekStart.ToString("yyyy-MM-dd"),
+                w.CommitCount,
+                w.AuthorCount
+            })
+        };
+    }
 
     private async Task<RepositoryDto?> ResolveRepo(string urlOrName)
     {

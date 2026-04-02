@@ -98,6 +98,7 @@ public class CodeIndexDbContext : DbContext
             builder.HasIndex(c => c.Sha);
             builder.HasIndex(c => new { c.RepositoryId, c.Sha }).IsUnique();
             builder.HasIndex(c => c.CommittedAt);
+            builder.HasIndex(c => new { c.RepositoryId, c.CommittedAt });
         });
     }
 

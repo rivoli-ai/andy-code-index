@@ -1,3 +1,4 @@
+using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Enums;
 using Andy.CodeIndex.Infrastructure.Data;
 using Andy.Rbac.Authorization;
@@ -14,10 +15,12 @@ namespace Andy.CodeIndex.Api.Controllers;
 public class AnalyticsController : ControllerBase
 {
     private readonly CodeIndexDbContext _context;
+    private readonly IActivityAnalyticsService _activityService;
 
-    public AnalyticsController(CodeIndexDbContext context)
+    public AnalyticsController(CodeIndexDbContext context, IActivityAnalyticsService activityService)
     {
         _context = context;
+        _activityService = activityService;
     }
 
     /// <summary>Get language breakdown for a repository.</summary>
@@ -185,5 +188,31 @@ public class AnalyticsController : ControllerBase
             },
             enrichmentsByType
         });
+    }
+
+    /// <summary>Get git activity heatmap data for a repository.</summary>
+    [HttpGet("activity-heatmap")]
+    [RequirePermission("repository:read")]
+    [ResponseCache(Duration = 3600)]
+    public async Task<IActionResult> GetActivityHeatmap(Guid repositoryId, [FromQuery] int weeksBack = 52, CancellationToken ct = default)
+    {
+        var repo = await _context.Repositories.FindAsync([repositoryId], ct);
+        if (repo is null) return NotFound();
+
+        var result = await _activityService.GetHeatmapAsync(repositoryId, weeksBack, ct);
+        return Ok(result);
+    }
+
+    /// <summary>Get lightweight sparkline data for a repository.</summary>
+    [HttpGet("activity-sparkline")]
+    [RequirePermission("repository:read")]
+    [ResponseCache(Duration = 1800)]
+    public async Task<IActionResult> GetActivitySparkline(Guid repositoryId, [FromQuery] int weeksBack = 52, CancellationToken ct = default)
+    {
+        var repo = await _context.Repositories.FindAsync([repositoryId], ct);
+        if (repo is null) return NotFound();
+
+        var result = await _activityService.GetSparklineAsync(repositoryId, weeksBack, ct);
+        return Ok(result);
     }
 }

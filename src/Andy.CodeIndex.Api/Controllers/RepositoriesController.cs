@@ -14,10 +14,12 @@ namespace Andy.CodeIndex.Api.Controllers;
 public class RepositoriesController : ControllerBase
 {
     private readonly IRepositoryService _service;
+    private readonly IActivityAnalyticsService _activityService;
 
-    public RepositoriesController(IRepositoryService service)
+    public RepositoriesController(IRepositoryService service, IActivityAnalyticsService activityService)
     {
         _service = service;
+        _activityService = activityService;
     }
 
     /// <summary>List all tracked repositories.</summary>
@@ -164,5 +166,28 @@ public class RepositoriesController : ControllerBase
         {
             return Conflict(new { error = ex.Message });
         }
+    }
+
+    /// <summary>Get bulk sparkline data for multiple repositories.</summary>
+    [HttpGet("analytics/bulk/activity-sparklines")]
+    [RequirePermission("repository:read")]
+    public async Task<IActionResult> GetBulkSparklines([FromQuery] string repositoryIds, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryIds))
+            return BadRequest(new { error = "repositoryIds parameter is required" });
+
+        var ids = repositoryIds
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => Guid.TryParse(s, out var id) ? id : (Guid?)null)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Take(50)
+            .ToList();
+
+        if (ids.Count == 0)
+            return BadRequest(new { error = "No valid repository IDs provided" });
+
+        var result = await _activityService.GetBulkSparklinesAsync(ids, ct: ct);
+        return Ok(result);
     }
 }

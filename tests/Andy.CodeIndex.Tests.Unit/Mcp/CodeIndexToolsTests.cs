@@ -52,6 +52,7 @@ public class CodeIndexToolsTests
             new Mock<IReportService>().Object,
             new Mock<IApiKeyResolver>().Object,
             new Mock<IEncryptionService>().Object,
+            new Mock<IActivityAnalyticsService>().Object,
             dbContext,
             Options.Create(new IndexingOptions { DataDir = "/tmp/test" }),
             Options.Create(new EmbeddingOptions()),

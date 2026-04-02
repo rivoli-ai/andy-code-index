@@ -141,6 +141,7 @@ builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<IApiKeyResolver, ApiKeyResolver>();
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddScoped<ICommitComparisonService, CommitComparisonService>();
+builder.Services.AddScoped<IActivityAnalyticsService, ActivityAnalyticsService>();
 builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddSingleton<IFileFilterService, FileFilterService>();
 builder.Services.AddSingleton<IBinaryDetectionService, BinaryDetectionService>();

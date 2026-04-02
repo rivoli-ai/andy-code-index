@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Repository, CreateRepositoryRequest } from '../models/repository.model';
+import { Repository, CreateRepositoryRequest, SparklineData } from '../models/repository.model';
 import { SearchResults, SearchRequest } from '../models/search.model';
 import { EnrichmentListResponse, Enrichment } from '../models/enrichment.model';
 import { IndexingTask } from '../models/task.model';
@@ -84,6 +84,16 @@ export class ApiService {
 
   getEnrichment(id: string): Observable<Enrichment> {
     return this.http.get<Enrichment>(`${this.baseUrl}/enrichments/${id}`);
+  }
+
+  // Activity Analytics
+  getActivitySparkline(repoId: string): Observable<SparklineData> {
+    return this.http.get<SparklineData>(`${this.baseUrl}/repositories/${repoId}/analytics/activity-sparkline`);
+  }
+
+  getBulkSparklines(repoIds: string[]): Observable<Record<string, SparklineData>> {
+    const ids = repoIds.join(',');
+    return this.http.get<Record<string, SparklineData>>(`${this.baseUrl}/repositories/analytics/bulk/activity-sparklines?repositoryIds=${ids}`);
   }
 
   // Tasks
