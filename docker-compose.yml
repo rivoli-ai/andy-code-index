@@ -46,6 +46,7 @@ services:
     volumes:
       - ./certs:/usr/local/share/ca-certificates/custom:ro
       - code_index_data:/data
+      - dpkeys:/app/.aspnet/DataProtection-Keys
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,6 +74,7 @@ services:
       - ollama
 
 volumes:
+  dpkeys:
   postgres_data:
   code_index_data:
   ollama_data:
