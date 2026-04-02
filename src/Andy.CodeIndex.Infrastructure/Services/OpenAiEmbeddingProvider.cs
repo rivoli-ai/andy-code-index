@@ -31,7 +31,6 @@ public class OpenAiEmbeddingProvider : IEmbeddingProvider
         _apiKeyResolver = apiKeyResolver;
         _logger = logger;
 
-        _httpClient.BaseAddress = new Uri(_options.BaseUrl.TrimEnd('/') + "/");
         _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
     }
 
@@ -45,8 +44,7 @@ public class OpenAiEmbeddingProvider : IEmbeddingProvider
         if (string.IsNullOrEmpty(apiKey))
             throw new InvalidOperationException("No embedding API key available");
 
-        _httpClient.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        var requestBaseUrl = baseUrl.TrimEnd('/') + "/";
 
         var request = new EmbeddingRequest
         {
@@ -61,7 +59,10 @@ public class OpenAiEmbeddingProvider : IEmbeddingProvider
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("embeddings", request, ct);
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, requestBaseUrl + "embeddings");
+                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                httpRequest.Content = JsonContent.Create(request);
+                var response = await _httpClient.SendAsync(httpRequest, ct);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
