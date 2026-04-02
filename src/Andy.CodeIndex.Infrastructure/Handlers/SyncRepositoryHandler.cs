@@ -42,7 +42,21 @@ public class SyncRepositoryHandler : ITaskHandler
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
         var cloneDir = _gitService.GetCloneDir(_options.DataDir, repo.Id);
-        await _gitService.FetchAsync(cloneDir, repo.PersonalAccessToken, ct);
+
+        if (!Directory.Exists(cloneDir))
+        {
+            _logger.LogWarning("Clone directory missing for {Name}, re-cloning", repo.Name);
+            if (trackedTask is not null)
+            {
+                trackedTask.ProgressMessage = "Clone directory missing, re-cloning...";
+                await _context.SaveChangesAsync(ct);
+            }
+            await _gitService.CloneAsync(repo.Url, cloneDir, repo.PersonalAccessToken, ct);
+        }
+        else
+        {
+            await _gitService.FetchAsync(cloneDir, repo.PersonalAccessToken, ct);
+        }
 
         repo.LastSyncedAt = DateTime.UtcNow;
         repo.UpdatedAt = DateTime.UtcNow;

@@ -4,7 +4,7 @@ WORKDIR /node-build
 COPY client/package.json client/package-lock.json ./
 RUN npm ci
 COPY client/ ./
-RUN npm run build
+RUN npx ng build --configuration docker
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /build
@@ -37,6 +37,15 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl openssl git && rm -rf /var/lib/apt/lists/*
+
+# Copy corporate CA certs from build stage and install them (must happen as root)
+COPY --from=certs . /usr/local/share/ca-certificates/corporate/
+RUN find /usr/local/share/ca-certificates/corporate/ -name '.git*' -delete 2>/dev/null || true && \
+    find /usr/local/share/ca-certificates/corporate/ -name 'README.md' -delete 2>/dev/null || true && \
+    update-ca-certificates
+
+# Configure git to trust /data repos (ownership may differ in containers)
+RUN git config --system --add safe.directory '*'
 
 # Non-root user
 RUN groupadd -r codeindex && useradd -r -g codeindex -d /app -s /sbin/nologin codeindex

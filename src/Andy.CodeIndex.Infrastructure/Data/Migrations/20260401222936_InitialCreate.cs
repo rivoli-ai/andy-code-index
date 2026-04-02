@@ -29,13 +29,53 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     PersonalAccessToken = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     LastIndexedCommitSha = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: true),
                     LastSyncedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    SyncIntervalMinutes = table.Column<int>(type: "integer", nullable: true),
                     Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    FileFilterOverrides = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Repositories", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SettingsChangeLogs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    UserEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    Field = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    OldValue = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    NewValue = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    Action = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SettingsChangeLogs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserSettings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    EmbeddingApiKey = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    EmbeddingModel = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    EmbeddingBaseUrl = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    LlmApiKey = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    LlmModel = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    LlmBaseUrl = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserSettings", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -58,6 +98,30 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         principalTable: "Repositories",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ChatConversations",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Title = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    RepositoryId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsPinned = table.Column<bool>(type: "boolean", nullable: false),
+                    PinnedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ChatConversations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ChatConversations_Repositories_RepositoryId",
+                        column: x => x.RepositoryId,
+                        principalTable: "Repositories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -86,6 +150,38 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "IndexingRuns",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    RepositoryId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ChainId = table.Column<Guid>(type: "uuid", nullable: true),
+                    StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    SnippetsAdded = table.Column<int>(type: "integer", nullable: false),
+                    SnippetsUpdated = table.Column<int>(type: "integer", nullable: false),
+                    SnippetsDeleted = table.Column<int>(type: "integer", nullable: false),
+                    SnippetsUnchanged = table.Column<int>(type: "integer", nullable: false),
+                    ApiDocsGenerated = table.Column<int>(type: "integer", nullable: false),
+                    CommitsScanned = table.Column<int>(type: "integer", nullable: false),
+                    FilesFiltered = table.Column<int>(type: "integer", nullable: false),
+                    FilesSkipped = table.Column<int>(type: "integer", nullable: false),
+                    ErrorMessage = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_IndexingRuns", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_IndexingRuns_Repositories_RepositoryId",
+                        column: x => x.RepositoryId,
+                        principalTable: "Repositories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "IndexingTasks",
                 columns: table => new
                 {
@@ -95,8 +191,11 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     Operation = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     Progress = table.Column<int>(type: "integer", nullable: false),
+                    ProgressMessage = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     ErrorMessage = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: true),
                     ChainId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ChainStepIndex = table.Column<int>(type: "integer", nullable: true),
+                    ChainTotalSteps = table.Column<int>(type: "integer", nullable: true),
                     Priority = table.Column<int>(type: "integer", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -135,6 +234,28 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ChatMessages",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    ConversationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Role = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    Content = table.Column<string>(type: "text", nullable: false),
+                    SourcesJson = table.Column<string>(type: "text", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ChatMessages", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ChatMessages_ChatConversations_ConversationId",
+                        column: x => x.ConversationId,
+                        principalTable: "ChatConversations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Enrichments",
                 columns: table => new
                 {
@@ -150,6 +271,7 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     EndLine = table.Column<int>(type: "integer", nullable: true),
                     Language = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true, computedColumnSql: "to_tsvector('english', coalesce(\"Content\", ''))", stored: true),
+                    Quality = table.Column<double>(type: "double precision", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
@@ -240,6 +362,26 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ChatConversations_RepositoryId",
+                table: "ChatConversations",
+                column: "RepositoryId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatConversations_UserId_IsPinned",
+                table: "ChatConversations",
+                columns: new[] { "UserId", "IsPinned" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatConversations_UserId_UpdatedAt",
+                table: "ChatConversations",
+                columns: new[] { "UserId", "UpdatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatMessages_ConversationId",
+                table: "ChatMessages",
+                column: "ConversationId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ChunkLineRanges_EnrichmentId",
                 table: "ChunkLineRanges",
                 column: "EnrichmentId");
@@ -309,6 +451,21 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                 columns: new[] { "Type", "Subtype" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_IndexingRuns_ChainId",
+                table: "IndexingRuns",
+                column: "ChainId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IndexingRuns_RepositoryId",
+                table: "IndexingRuns",
+                column: "RepositoryId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IndexingRuns_StartedAt",
+                table: "IndexingRuns",
+                column: "StartedAt");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_IndexingTasks_ChainId",
                 table: "IndexingTasks",
                 column: "ChainId");
@@ -356,9 +513,25 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                 column: "Language");
 
             migrationBuilder.CreateIndex(
+                name: "IX_SettingsChangeLogs_CreatedAt",
+                table: "SettingsChangeLogs",
+                column: "CreatedAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SettingsChangeLogs_UserId",
+                table: "SettingsChangeLogs",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Tags_RepositoryId_Name",
                 table: "Tags",
                 columns: new[] { "RepositoryId", "Name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserSettings_UserId",
+                table: "UserSettings",
+                column: "UserId",
                 unique: true);
         }
 
@@ -369,10 +542,16 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                 name: "Branches");
 
             migrationBuilder.DropTable(
+                name: "ChatMessages");
+
+            migrationBuilder.DropTable(
                 name: "ChunkLineRanges");
 
             migrationBuilder.DropTable(
                 name: "ContentEmbeddings");
+
+            migrationBuilder.DropTable(
+                name: "IndexingRuns");
 
             migrationBuilder.DropTable(
                 name: "IndexingTasks");
@@ -381,7 +560,16 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                 name: "RepositoryFiles");
 
             migrationBuilder.DropTable(
+                name: "SettingsChangeLogs");
+
+            migrationBuilder.DropTable(
                 name: "Tags");
+
+            migrationBuilder.DropTable(
+                name: "UserSettings");
+
+            migrationBuilder.DropTable(
+                name: "ChatConversations");
 
             migrationBuilder.DropTable(
                 name: "Enrichments");

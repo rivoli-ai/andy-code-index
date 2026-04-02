@@ -15,9 +15,23 @@
 | 9: Chat, Analytics, Discovery | 15 | Complete (RAG chat, repo discovery, analytics, settings, dependency parsing) |
 | 10: UI/UX Polish | 10 | Complete (enrichment totals, task descriptions, font alignment, subtype filtering, quality scoring, search feedback, repo filtering) |
 
-Tests: 446 total (327 backend unit + 58 integration + 61 frontend).
+Tests: 449 total (330 backend unit + 58 integration + 61 frontend).
 Coverage: Domain 92.5%, Application 86.3%, Api 67.5%, Infrastructure 31.3% (excludes auto-generated migrations; LLM/git handlers tested manually).
-Issues: 160 closed, 0 open.
+Issues: 162 closed, 0 open.
+
+### Bug Fixes
+
+**Docker: Sync/clone fails in container** — Corporate CA certificates were installed in the
+build stage but not copied to the runtime image. Git operations failed with SSL errors when
+connecting to internal repositories. Fixed by copying certs into the runtime stage and running
+`update-ca-certificates` as root before switching to the `codeindex` user. Also added
+`git config --system safe.directory '*'` to prevent ownership errors on volume-mounted repos.
+
+**Duplicate repository addition** — URL normalization was missing, allowing the same repository
+to be added twice with trivial URL variations (trailing slash, `.git` suffix, mixed case host).
+Added `NormalizeUrl()` to `RepositoryService` that strips `.git` suffix, trailing slashes,
+whitespace, and lowercases the host before comparison and storage. The original URL is preserved
+in `CloneUrl` for git operations.
 
 ## 1. Implementation Order
 

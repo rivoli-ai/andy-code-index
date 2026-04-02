@@ -50,8 +50,10 @@ interface CommitComparison {
         </div>
         <div style="display:flex;gap:0.75rem">
           <button class="btn btn-secondary" (click)="sync()" [disabled]="syncing">
-            <i class="bi bi-arrow-repeat"></i> Sync
+            <i class="bi bi-arrow-repeat"></i> {{ syncing ? 'Syncing...' : 'Sync' }}
           </button>
+          <span *ngIf="syncMessage" style="color:var(--success);font-size:0.85rem;align-self:center">{{ syncMessage }}</span>
+          <span *ngIf="syncError" style="color:var(--danger);font-size:0.85rem;align-self:center">{{ syncError }}</span>
           <button class="btn btn-secondary" style="color:var(--danger);border-color:var(--danger)" (click)="wipeEnrichments()">
             <i class="bi bi-eraser"></i> Wipe Enrichments
           </button>
@@ -1525,6 +1527,8 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   repo: Repository | null = null;
   loading = true;
   syncing = false;
+  syncMessage = '';
+  syncError = '';
   summary: any = null;
   commits: CommitSummary[] = [];
   compareFrom = '';
@@ -1624,9 +1628,19 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   sync() {
     if (!this.repo) return;
     this.syncing = true;
+    this.syncMessage = '';
+    this.syncError = '';
     this.api.syncRepository(this.repo.id).subscribe({
-      next: () => this.syncing = false,
-      error: () => this.syncing = false
+      next: () => {
+        this.syncing = false;
+        this.syncMessage = 'Sync queued successfully';
+        setTimeout(() => this.syncMessage = '', 5000);
+      },
+      error: (err) => {
+        this.syncing = false;
+        this.syncError = err?.error?.error || 'Sync failed';
+        setTimeout(() => this.syncError = '', 10000);
+      }
     });
   }
 

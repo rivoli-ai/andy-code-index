@@ -33,21 +33,23 @@ public class RepositoryService : IRepositoryService
 
     public async Task<RepositoryDto> AddAsync(CreateRepositoryRequest request, CancellationToken ct = default)
     {
-        var existingRepo = await _repositoryRepo.GetByUrlAsync(request.Url, ct);
+        var normalizedUrl = NormalizeUrl(request.Url);
+
+        var existingRepo = await _repositoryRepo.GetByUrlAsync(normalizedUrl, ct);
         if (existingRepo is not null)
-            throw new InvalidOperationException($"Repository with URL '{request.Url}' already exists.");
+            throw new InvalidOperationException($"Repository with URL '{normalizedUrl}' already exists.");
 
         if (!SyncIntervalValidator.IsValid(request.SyncIntervalMinutes))
             throw new ArgumentException($"Invalid sync interval value: {request.SyncIntervalMinutes}. Allowed values: null (default), 0 (manual only), 15, 30, 60, 120, 360, 720, 1440.");
 
-        var provider = ParseProvider(request.Url);
-        var name = ParseName(request.Url);
+        var provider = ParseProvider(normalizedUrl);
+        var name = ParseName(normalizedUrl);
 
         var repo = new Repository
         {
             Id = Guid.NewGuid(),
             Name = name,
-            Url = request.Url,
+            Url = normalizedUrl,
             CloneUrl = request.Url,
             Provider = provider,
             PersonalAccessToken = request.PersonalAccessToken,
@@ -263,6 +265,19 @@ public class RepositoryService : IRepositoryService
         await _repositoryRepo.SaveChangesAsync(ct);
 
         // Enrichments wiped successfully
+    }
+
+    internal static string NormalizeUrl(string url)
+    {
+        var trimmed = url.Trim().TrimEnd('/');
+
+        // Remove .git suffix for consistent comparison
+        if (trimmed.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed[..^4];
+
+        // Lowercase the scheme and host
+        var uri = new Uri(trimmed);
+        return $"{uri.Scheme}://{uri.Host.ToLowerInvariant()}{uri.AbsolutePath.TrimEnd('/')}";
     }
 
     internal static GitProvider ParseProvider(string url)

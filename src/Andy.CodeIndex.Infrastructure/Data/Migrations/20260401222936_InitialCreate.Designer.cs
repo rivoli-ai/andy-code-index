@@ -14,8 +14,8 @@ using Pgvector;
 namespace Andy.CodeIndex.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(CodeIndexDbContext))]
-    [Migration("20260324001255_AddSettingsChangeLog")]
-    partial class AddSettingsChangeLog
+    [Migration("20260401222936_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -58,6 +58,79 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Branches");
+                });
+
+            modelBuilder.Entity("Andy.CodeIndex.Domain.Entities.ChatConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("PinnedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RepositoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RepositoryId");
+
+                    b.HasIndex("UserId", "IsPinned");
+
+                    b.HasIndex("UserId", "UpdatedAt");
+
+                    b.ToTable("ChatConversations");
+                });
+
+            modelBuilder.Entity("Andy.CodeIndex.Domain.Entities.ChatMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("SourcesJson")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId");
+
+                    b.ToTable("ChatMessages");
                 });
 
             modelBuilder.Entity("Andy.CodeIndex.Domain.Entities.ChunkLineRange", b =>
@@ -191,6 +264,9 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<double>("Quality")
+                        .HasColumnType("double precision");
+
                     b.Property<Guid>("RepositoryId")
                         .HasColumnType("uuid");
 
@@ -260,6 +336,12 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasMaxLength(4096)
                         .HasColumnType("character varying(4096)");
 
+                    b.Property<int>("FilesFiltered")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FilesSkipped")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("RepositoryId")
                         .HasColumnType("uuid");
 
@@ -303,6 +385,12 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     b.Property<Guid?>("ChainId")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("ChainStepIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ChainTotalSteps")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("CommitId")
                         .HasColumnType("uuid");
 
@@ -326,6 +414,10 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
 
                     b.Property<int>("Progress")
                         .HasColumnType("integer");
+
+                    b.Property<string>("ProgressMessage")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<Guid>("RepositoryId")
                         .HasColumnType("uuid");
@@ -368,6 +460,10 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("FileFilterOverrides")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
                     b.Property<string>("LastIndexedCommitSha")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
@@ -393,6 +489,9 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<int?>("SyncIntervalMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -479,6 +578,10 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("UserEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -536,6 +639,10 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
 
+                    b.Property<string>("EmbeddingBaseUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<string>("EmbeddingModel")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -543,6 +650,14 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                     b.Property<string>("LlmApiKey")
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("LlmBaseUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("LlmModel")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -569,6 +684,27 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Repository");
+                });
+
+            modelBuilder.Entity("Andy.CodeIndex.Domain.Entities.ChatConversation", b =>
+                {
+                    b.HasOne("Andy.CodeIndex.Domain.Entities.Repository", "Repository")
+                        .WithMany()
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Repository");
+                });
+
+            modelBuilder.Entity("Andy.CodeIndex.Domain.Entities.ChatMessage", b =>
+                {
+                    b.HasOne("Andy.CodeIndex.Domain.Entities.ChatConversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
                 });
 
             modelBuilder.Entity("Andy.CodeIndex.Domain.Entities.ChunkLineRange", b =>
@@ -664,6 +800,11 @@ namespace Andy.CodeIndex.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Repository");
+                });
+
+            modelBuilder.Entity("Andy.CodeIndex.Domain.Entities.ChatConversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("Andy.CodeIndex.Domain.Entities.Commit", b =>

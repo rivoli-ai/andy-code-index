@@ -245,6 +245,47 @@ public class RepositoryServiceTests
         _repoRepoMock.Verify(r => r.GetByProviderAsync(GitProvider.GitLab, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task AddAsync_DuplicateUrlWithGitSuffix_Throws()
+    {
+        // Repo exists as normalized URL
+        _repoRepoMock.Setup(r => r.GetByUrlAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Repository
+            {
+                Id = Guid.NewGuid(), Name = "repo", Url = "https://github.com/test/repo",
+                Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            });
+
+        // Adding with .git suffix should be caught as duplicate
+        var act = () => _service.AddAsync(new CreateRepositoryRequest { Url = "https://github.com/test/repo.git" });
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already exists*");
+    }
+
+    [Fact]
+    public async Task AddAsync_DuplicateUrlWithTrailingSlash_Throws()
+    {
+        _repoRepoMock.Setup(r => r.GetByUrlAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Repository
+            {
+                Id = Guid.NewGuid(), Name = "repo", Url = "https://github.com/test/repo",
+                Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            });
+
+        var act = () => _service.AddAsync(new CreateRepositoryRequest { Url = "https://github.com/test/repo/" });
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already exists*");
+    }
+
+    [Theory]
+    [InlineData("https://github.com/test/repo", "https://github.com/test/repo")]
+    [InlineData("https://github.com/test/repo.git", "https://github.com/test/repo")]
+    [InlineData("https://github.com/test/repo/", "https://github.com/test/repo")]
+    [InlineData("https://GitHub.COM/test/repo", "https://github.com/test/repo")]
+    [InlineData("  https://github.com/test/repo  ", "https://github.com/test/repo")]
+    public void NormalizeUrl_ReturnsConsistentForm(string input, string expected)
+    {
+        RepositoryService.NormalizeUrl(input).Should().Be(expected);
+    }
+
     // URL parsing tests
     [Theory]
     [InlineData("https://github.com/rivoli-ai/andy-docs", GitProvider.GitHub)]
