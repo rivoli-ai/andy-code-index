@@ -49,7 +49,8 @@ RUN git config --system --add safe.directory '*'
 
 # Non-root user
 RUN groupadd -r codeindex && useradd -r -g codeindex -d /app -s /sbin/nologin codeindex
-RUN mkdir -p /data /https && chown codeindex:codeindex /data
+RUN mkdir -p /data /https /app/.aspnet/DataProtection-Keys && \
+    chown codeindex:codeindex /data /app/.aspnet/DataProtection-Keys
 
 COPY --from=build /app/publish .
 COPY --from=node-build /node-build/dist/client/browser ./wwwroot
