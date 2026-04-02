@@ -56,17 +56,27 @@ public class ApiKeyResolver : IApiKeyResolver
         }
 
         // Tier 3: Fall back to any user's embedding key (for background tasks that don't have a user context)
-        var anyUserSettings = await _context.UserSettings
-            .FirstOrDefaultAsync(s => s.EmbeddingApiKey != null, ct);
-        if (anyUserSettings?.EmbeddingApiKey is not null)
+        // Try most recently updated first (likely encrypted with current DP keys)
+        var allEmbedUsers = await _context.UserSettings
+            .Where(s => s.EmbeddingApiKey != null)
+            .OrderByDescending(s => s.UpdatedAt)
+            .ToListAsync(ct);
+        foreach (var settings in allEmbedUsers)
         {
-            var decrypted = _encryption.Decrypt(anyUserSettings.EmbeddingApiKey);
-            if (!string.IsNullOrEmpty(decrypted))
+            try
             {
-                _logger.LogDebug("Using fallback embedding key from user {UserId}", anyUserSettings.UserId);
-                var baseUrl = anyUserSettings.EmbeddingBaseUrl ?? _embeddingOptions.BaseUrl;
-                var model = anyUserSettings.EmbeddingModel ?? _embeddingOptions.Model;
-                return (decrypted, baseUrl, model, "user-fallback");
+                var decrypted = _encryption.Decrypt(settings.EmbeddingApiKey!);
+                if (!string.IsNullOrEmpty(decrypted))
+                {
+                    _logger.LogDebug("Using fallback embedding key from user {UserId}", settings.UserId);
+                    var baseUrl = settings.EmbeddingBaseUrl ?? _embeddingOptions.BaseUrl;
+                    var model = settings.EmbeddingModel ?? _embeddingOptions.Model;
+                    return (decrypted, baseUrl, model, "user-fallback");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug("Could not decrypt embedding key for user {UserId}: {Error}", settings.UserId, ex.Message);
             }
         }
 
@@ -122,21 +132,28 @@ public class ApiKeyResolver : IApiKeyResolver
         }
 
         // Tier 4: Fall back to any user's key (for background tasks without user context)
-        var anyUser = await _context.UserSettings
-            .FirstOrDefaultAsync(s => s.LlmApiKey != null || s.EmbeddingApiKey != null, ct);
-        if (anyUser is not null)
+        var allLlmUsers = await _context.UserSettings
+            .Where(s => s.LlmApiKey != null || s.EmbeddingApiKey != null)
+            .OrderByDescending(s => s.UpdatedAt)
+            .ToListAsync(ct);
+        foreach (var user in allLlmUsers)
         {
-            var key = anyUser.LlmApiKey ?? anyUser.EmbeddingApiKey;
-            if (key is not null)
+            var key = user.LlmApiKey ?? user.EmbeddingApiKey;
+            if (key is null) continue;
+            try
             {
                 var decrypted = _encryption.Decrypt(key);
                 if (!string.IsNullOrEmpty(decrypted))
                 {
-                    _logger.LogDebug("Using fallback LLM key from user {UserId}", anyUser.UserId);
-                    var baseUrl = anyUser.LlmBaseUrl ?? _llmOptions.BaseUrl;
-                    var model = anyUser.LlmModel ?? _llmOptions.Model;
+                    _logger.LogDebug("Using fallback LLM key from user {UserId}", user.UserId);
+                    var baseUrl = user.LlmBaseUrl ?? _llmOptions.BaseUrl;
+                    var model = user.LlmModel ?? _llmOptions.Model;
                     return (decrypted, baseUrl, model, "user-fallback");
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug("Could not decrypt LLM key for user {UserId}: {Error}", user.UserId, ex.Message);
             }
         }
 
