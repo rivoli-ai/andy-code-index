@@ -212,6 +212,59 @@ public class OpenAiEmbeddingProviderTests
         authHeader.Should().Be("Bearer test-key");
     }
 
+    [Fact]
+    public async Task GenerateEmbeddingsAsync_CalledTwice_DoesNotThrowHttpClientReuseError()
+    {
+        // This test reproduces the bug where calling GenerateEmbeddingsAsync twice
+        // threw "This instance has already started one or more requests" because
+        // BaseAddress/DefaultRequestHeaders were set on a reused HttpClient.
+        var responseJson = JsonSerializer.Serialize(new
+        {
+            data = new[] { new { index = 0, embedding = new[] { 0.1f, 0.2f } } }
+        });
+
+        var handler = new MockHttpHandler(HttpStatusCode.OK, responseJson);
+        var provider = CreateProvider(handler);
+
+        // First call should succeed
+        var result1 = await provider.GenerateEmbeddingsAsync(["first call"]);
+        result1.Should().HaveCount(1);
+
+        // Second call MUST also succeed (was throwing before the fix)
+        var result2 = await provider.GenerateEmbeddingsAsync(["second call"]);
+        result2.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task GenerateEmbeddingsAsync_CalledMultipleTimes_AllSucceed()
+    {
+        // Stress test: 5 consecutive calls to ensure no HttpClient reuse issues
+        var responseJson = JsonSerializer.Serialize(new
+        {
+            data = new[] { new { index = 0, embedding = new[] { 0.1f } } }
+        });
+
+        var callCount = 0;
+        var handler = new MockHttpHandler(_ =>
+        {
+            callCount++;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        var provider = CreateProvider(handler);
+
+        for (var i = 0; i < 5; i++)
+        {
+            var result = await provider.GenerateEmbeddingsAsync([$"call {i}"]);
+            result.Should().HaveCount(1, $"call {i} should return embeddings");
+        }
+
+        callCount.Should().Be(5);
+    }
+
     /// <summary>Mock HTTP handler for testing.</summary>
     private class MockHttpHandler : HttpMessageHandler
     {
