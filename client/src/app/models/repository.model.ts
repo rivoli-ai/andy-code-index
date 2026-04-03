@@ -63,8 +63,13 @@ export interface ActivityStats {
   lastCommitDate?: string;
 }
 
+export interface DailyActivity {
+  date: string;
+  commitCount: number;
+}
+
 export interface ActivityHeatmap {
-  dailyData: { date: string; commitCount: number }[];
+  dailyData: DailyActivity[];
   weeklyData: WeeklyActivity[];
   stats: ActivityStats;
 }

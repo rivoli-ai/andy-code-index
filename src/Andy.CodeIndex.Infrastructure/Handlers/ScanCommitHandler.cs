@@ -49,7 +49,7 @@ public class ScanCommitHandler : ITaskHandler
             ?? throw new InvalidOperationException($"Repository {task.RepositoryId} not found");
 
         var cloneDir = _gitService.GetCloneDir(_options.DataDir, repo.Id);
-        var commits = await _gitService.GetCommitsAsync(cloneDir, sinceSha: repo.LastIndexedCommitSha, ct: ct);
+        var commits = await _gitService.GetCommitsAsync(cloneDir, limit: 10000, sinceSha: repo.LastIndexedCommitSha, ct: ct);
 
         var newCount = 0;
         Commit? latestNewCommit = null;

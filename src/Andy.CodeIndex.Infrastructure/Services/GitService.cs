@@ -89,7 +89,7 @@ public class GitService : IGitService
         _logger.LogInformation("Fetched latest for {Dir}", repoDir);
     }
 
-    public async Task<List<GitCommitInfo>> GetCommitsAsync(string repoDir, int limit = 100, string? sinceSha = null, CancellationToken ct = default)
+    public async Task<List<GitCommitInfo>> GetCommitsAsync(string repoDir, int limit = 10000, string? sinceSha = null, CancellationToken ct = default)
     {
         var args = new List<string> { "log", "--all", $"--max-count={limit}", "--format=%H%n%P%n%s%n%an%n%ae%n%aI%n---" };
 

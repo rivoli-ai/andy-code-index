@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Repository, CreateRepositoryRequest, SparklineData } from '../models/repository.model';
+import { Repository, CreateRepositoryRequest, SparklineData, ActivityHeatmap } from '../models/repository.model';
 import { SearchResults, SearchRequest } from '../models/search.model';
 import { EnrichmentListResponse, Enrichment } from '../models/enrichment.model';
 import { IndexingTask } from '../models/task.model';
@@ -89,6 +89,10 @@ export class ApiService {
   // Activity Analytics
   getActivitySparkline(repoId: string): Observable<SparklineData> {
     return this.http.get<SparklineData>(`${this.baseUrl}/repositories/${repoId}/analytics/activity-sparkline`);
+  }
+
+  getActivityHeatmap(repoId: string, weeksBack = 52): Observable<ActivityHeatmap> {
+    return this.http.get<ActivityHeatmap>(`${this.baseUrl}/repositories/${repoId}/analytics/activity-heatmap?weeksBack=${weeksBack}`);
   }
 
   getBulkSparklines(repoIds: string[]): Observable<Record<string, SparklineData>> {

@@ -136,4 +136,77 @@ public class GitServiceTests
         commits[0].CommittedAt.Kind.Should().Be(DateTimeKind.Utc);
         commits[0].CommittedAt.Hour.Should().Be(5); // 10:30 +05:00 = 05:30 UTC
     }
+
+    [Fact]
+    public void ParseCommitLog_LargeHistory_ParsesAllCommits()
+    {
+        // Simulate a repo with 500 commits spanning 12 months.
+        // This validates that ParseCommitLog handles large volumes and
+        // preserves the original commit dates (regression: limit=100 caused
+        // only the most recent commits to be imported, making heatmaps empty).
+        var sb = new System.Text.StringBuilder();
+        var baseDate = new DateTime(2025, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        for (int i = 0; i < 500; i++)
+        {
+            var date = baseDate.AddDays(i * 0.7); // spread across ~350 days
+            var sha = $"sha{i:D6}";
+            var parent = i > 0 ? $"sha{i - 1:D6}" : "";
+            sb.Append($"{sha}\n{parent}\nCommit #{i}\nDev\ndev@test.com\n{date:yyyy-MM-ddTHH:mm:ss+00:00}\n---\n");
+        }
+
+        var commits = GitService.ParseCommitLog(sb.ToString());
+
+        commits.Should().HaveCount(500);
+
+        // Verify dates span the full range, not clustered in a single day
+        var distinctDates = commits.Select(c => c.CommittedAt.Date).Distinct().ToList();
+        distinctDates.Count.Should().BeGreaterThan(300, "commits should span many distinct days, not be clustered");
+
+        // Verify earliest and latest dates are months apart
+        var earliest = commits.Min(c => c.CommittedAt);
+        var latest = commits.Max(c => c.CommittedAt);
+        (latest - earliest).TotalDays.Should().BeGreaterThan(300, "history should span nearly a year");
+    }
+
+    [Fact]
+    public void ParseCommitLog_PreservesOriginalDates_NotSyncTime()
+    {
+        // Regression test: commits must retain their original git author dates,
+        // NOT the timestamp when the sync happened.
+        var oldDate = "2024-06-15T14:30:00+00:00";
+        var recentDate = "2025-03-20T09:00:00+00:00";
+        var output =
+            $"sha001\n\nOld commit\nAlice\nalice@test.com\n{oldDate}\n---\n" +
+            $"sha002\nsha001\nRecent commit\nBob\nbob@test.com\n{recentDate}\n---\n";
+
+        var commits = GitService.ParseCommitLog(output);
+
+        commits.Should().HaveCount(2);
+        commits[0].CommittedAt.Should().Be(new DateTime(2024, 6, 15, 14, 30, 0, DateTimeKind.Utc));
+        commits[1].CommittedAt.Should().Be(new DateTime(2025, 3, 20, 9, 0, 0, DateTimeKind.Utc));
+
+        // Dates should be months apart, proving we're using git dates not sync time
+        (commits[1].CommittedAt - commits[0].CommittedAt).TotalDays.Should().BeGreaterThan(200);
+    }
+
+    [Fact]
+    public void GetCommitsAsync_DefaultLimit_IsHighEnoughForFullHistory()
+    {
+        // Verify the default limit parameter is >= 5000 to prevent
+        // truncating commit history on initial import.
+        // This was the root cause of empty heatmaps: limit=100 meant only
+        // the most recent 100 commits were imported on first sync.
+        var method = typeof(GitService).GetMethod("GetCommitsAsync",
+            new[] { typeof(string), typeof(int), typeof(string), typeof(CancellationToken) });
+
+        method.Should().NotBeNull("GetCommitsAsync should exist");
+
+        var limitParam = method!.GetParameters().First(p => p.Name == "limit");
+        limitParam.HasDefaultValue.Should().BeTrue();
+
+        var defaultLimit = (int)limitParam.DefaultValue!;
+        defaultLimit.Should().BeGreaterOrEqualTo(5000,
+            "default limit must be high enough to capture full repo history on initial import");
+    }
 }
