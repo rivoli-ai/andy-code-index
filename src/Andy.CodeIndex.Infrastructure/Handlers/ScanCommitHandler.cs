@@ -83,6 +83,15 @@ public class ScanCommitHandler : ITaskHandler
         // Create RepositoryFile records for the latest commit
         if (latestNewCommit != null)
         {
+            // Update LastIndexedCommitSha so the next sync only fetches newer commits
+            // and downstream handlers (ExtractSnippets, etc.) know which commit to process
+            repo.LastIndexedCommitSha = latestNewCommit.Sha;
+            repo.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(ct);
+
+            // Propagate CommitId to the task so chained tasks can reference it
+            task.CommitId = latestNewCommit.Id;
+
             var files = await _gitService.ListFilesAsync(cloneDir, latestNewCommit.Sha, ct: ct);
             foreach (var file in files)
             {
@@ -102,6 +111,7 @@ public class ScanCommitHandler : ITaskHandler
                 files.Count, latestNewCommit.Sha[..Math.Min(8, latestNewCommit.Sha.Length)]);
         }
 
-        _logger.LogInformation("Scanned {New} new commits for {Name}", newCount, repo.Name);
+        _logger.LogInformation("Scanned {New} new commits ({Total} total) for {Name}",
+            newCount, commits.Count, repo.Name);
     }
 }

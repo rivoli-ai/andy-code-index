@@ -275,7 +275,7 @@ public class ScanCommitHandler_CreatesRepositoryFileRecordsTests : IDisposable
         _repoRepoMock.Setup(r => r.GetByIdAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(_testRepo);
         _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
-        _gitServiceMock.Setup(g => g.GetCommitsAsync("/tmp/test/repos/x", 100, null, It.IsAny<CancellationToken>()))
+        _gitServiceMock.Setup(g => g.GetCommitsAsync("/tmp/test/repos/x", 10000, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new GitCommitInfo { Sha = "abc123", Message = "First", AuthorName = "Test", CommittedAt = DateTime.UtcNow }
             ]);
@@ -299,6 +299,72 @@ public class ScanCommitHandler_CreatesRepositoryFileRecordsTests : IDisposable
         repoFiles.Should().HaveCount(2);
         repoFiles.Should().Contain(f => f.Path == "Program.cs" && f.Hash == "blob_sha_1" && f.Language == "csharp");
         repoFiles.Should().Contain(f => f.Path == "README.md" && f.Hash == "blob_sha_2" && f.Language == "markdown");
+    }
+
+    [Fact]
+    public async Task HandleAsync_UpdatesLastIndexedCommitSha_AfterScanningNewCommits()
+    {
+        // Regression test for #214: ScanCommitHandler must update LastIndexedCommitSha
+        // so downstream handlers know which commit to process and future syncs
+        // only fetch newer commits.
+        _context.Repositories.Add(_testRepo);
+        await _context.SaveChangesAsync();
+
+        _repoRepoMock.Setup(r => r.GetByIdAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_testRepo);
+        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
+        _gitServiceMock.Setup(g => g.GetCommitsAsync("/tmp/test/repos/x", 10000, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new GitCommitInfo { Sha = "latest_sha_456", Message = "Latest commit", AuthorName = "Dev", CommittedAt = DateTime.UtcNow },
+                new GitCommitInfo { Sha = "older_sha_123", Message = "Older commit", AuthorName = "Dev", CommittedAt = DateTime.UtcNow.AddDays(-1) }
+            ]);
+        _gitServiceMock.Setup(g => g.ListFilesAsync("/tmp/test/repos/x", "latest_sha_456", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _commitRepoMock.Setup(r => r.ExistsAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var task = new IndexingTask
+        {
+            Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+            Operation = TaskOperation.ScanCommit, ChainId = Guid.NewGuid(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _handler.HandleAsync(task);
+
+        // LastIndexedCommitSha should be set to the first (latest) commit
+        _testRepo.LastIndexedCommitSha.Should().Be("latest_sha_456",
+            "ScanCommitHandler must update LastIndexedCommitSha so future syncs only fetch newer commits");
+
+        // CommitId should be propagated to the task for chaining
+        task.CommitId.Should().NotBeNull("CommitId should be set on the task for downstream chain steps");
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoNewCommits_DoesNotUpdateLastIndexedCommitSha()
+    {
+        _testRepo.LastIndexedCommitSha = "existing_sha";
+        _context.Repositories.Add(_testRepo);
+        await _context.SaveChangesAsync();
+
+        _repoRepoMock.Setup(r => r.GetByIdAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_testRepo);
+        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
+        _gitServiceMock.Setup(g => g.GetCommitsAsync("/tmp/test/repos/x", 10000, "existing_sha", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]); // No new commits
+
+        var task = new IndexingTask
+        {
+            Id = Guid.NewGuid(), RepositoryId = _testRepo.Id,
+            Operation = TaskOperation.ScanCommit, ChainId = Guid.NewGuid(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _handler.HandleAsync(task);
+
+        _testRepo.LastIndexedCommitSha.Should().Be("existing_sha",
+            "LastIndexedCommitSha should not change when there are no new commits");
+        task.CommitId.Should().BeNull("CommitId should remain null when no new commits found");
     }
 }
 

@@ -105,6 +105,30 @@ public class TaskQueueServiceTests
     }
 
     [Fact]
+    public async Task EnqueueNextInChainAsync_SyncCompleted_EnqueuesScanCommit()
+    {
+        // Regression test for #214: Sync must chain to ScanCommit
+        // so that the enrichment pipeline runs after fetching new changes.
+        var task = new IndexingTask
+        {
+            Id = Guid.NewGuid(),
+            RepositoryId = Guid.NewGuid(),
+            Operation = TaskOperation.SyncRepository,
+            Status = IndexingTaskStatus.Completed,
+            ChainId = Guid.NewGuid(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _service.EnqueueNextInChainAsync(task);
+
+        _taskRepoMock.Verify(r => r.AddAsync(
+            It.Is<IndexingTask>(t =>
+                t.Operation == TaskOperation.ScanCommit &&
+                t.ChainId == task.ChainId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task EnqueueNextInChainAsync_ScanCompleted_EnqueuesExtractSnippets()
     {
         var task = new IndexingTask

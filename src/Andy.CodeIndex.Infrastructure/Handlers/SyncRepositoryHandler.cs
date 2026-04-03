@@ -60,6 +60,11 @@ public class SyncRepositoryHandler : ITaskHandler
 
         repo.LastSyncedAt = DateTime.UtcNow;
         repo.UpdatedAt = DateTime.UtcNow;
+
+        // Mark as indexing so the UI shows activity while the chain runs
+        if (task.ChainId is not null)
+            repo.Status = "indexing";
+
         await _context.SaveChangesAsync(ct);
 
         _logger.LogInformation("Synced {Name}", repo.Name);
