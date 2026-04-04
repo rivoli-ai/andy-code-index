@@ -116,9 +116,10 @@ public class SettingsController : ControllerBase
 
         if (request.EmbeddingModel is not null)
         {
-            LogChange(userId, "EmbeddingModel", settings.EmbeddingModel, request.EmbeddingModel,
+            var newModel = request.EmbeddingModel == "" ? null : request.EmbeddingModel;
+            LogChange(userId, "EmbeddingModel", settings.EmbeddingModel, newModel,
                 settings.EmbeddingModel is null ? "set" : "updated");
-            settings.EmbeddingModel = request.EmbeddingModel;
+            settings.EmbeddingModel = newModel;
         }
 
         if (request.EmbeddingBaseUrl is not null)
@@ -141,9 +142,10 @@ public class SettingsController : ControllerBase
 
         if (request.LlmModel is not null)
         {
-            LogChange(userId, "LlmModel", settings.LlmModel, request.LlmModel,
+            var newModel = request.LlmModel == "" ? null : request.LlmModel;
+            LogChange(userId, "LlmModel", settings.LlmModel, newModel,
                 settings.LlmModel is null ? "set" : "updated");
-            settings.LlmModel = request.LlmModel;
+            settings.LlmModel = newModel;
         }
 
         if (request.LlmBaseUrl is not null)

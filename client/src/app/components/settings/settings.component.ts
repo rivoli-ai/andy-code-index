@@ -229,12 +229,12 @@ export class SettingsComponent implements OnInit {
     this.embedMessage = '';
     const body: any = {};
     if (this.embeddingKey) body.embeddingApiKey = this.embeddingKey;
-    if (this.embeddingModel) body.embeddingModel = this.embeddingModel;
-    if (this.embeddingBaseUrl) body.embeddingBaseUrl = this.embeddingBaseUrl;
+    if (this.embeddingModel !== undefined) body.embeddingModel = this.embeddingModel;
+    if (this.embeddingBaseUrl !== undefined) body.embeddingBaseUrl = this.embeddingBaseUrl;
 
     this.http.put(`${environment.apiUrl}/settings`, body).subscribe({
       next: () => { this.embedMessage = 'Saved'; this.savingEmbed = false; this.embeddingKey = ''; this.ngOnInit(); },
-      error: () => this.savingEmbed = false
+      error: (err) => { this.embedMessage = err.error?.error || 'Save failed'; this.savingEmbed = false; }
     });
   }
 
@@ -243,12 +243,12 @@ export class SettingsComponent implements OnInit {
     this.llmMessage = '';
     const body: any = {};
     if (this.llmKey) body.llmApiKey = this.llmKey;
-    if (this.llmModel) body.llmModel = this.llmModel;
-    if (this.llmBaseUrl) body.llmBaseUrl = this.llmBaseUrl;
+    if (this.llmModel !== undefined) body.llmModel = this.llmModel;
+    if (this.llmBaseUrl !== undefined) body.llmBaseUrl = this.llmBaseUrl;
 
     this.http.put(`${environment.apiUrl}/settings`, body).subscribe({
       next: () => { this.llmMessage = 'Saved'; this.savingLlm = false; this.llmKey = ''; this.ngOnInit(); },
-      error: () => this.savingLlm = false
+      error: (err) => { this.llmMessage = err.error?.error || 'Save failed'; this.savingLlm = false; }
     });
   }
 
