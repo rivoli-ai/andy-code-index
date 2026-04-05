@@ -74,11 +74,12 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="form-group">
           <label>Model</label>
-          <select class="form-control" [(ngModel)]="embeddingModel">
-            <option value="">Default ({{ settings.embedding.model }})</option>
-            <option value="text-embedding-3-small">text-embedding-3-small (1536 dims)</option>
-            <option value="text-embedding-3-large">text-embedding-3-large (3072 dims)</option>
-          </select>
+          <input class="form-control" [(ngModel)]="embeddingModel" name="embeddingModel" list="embedding-models" placeholder="e.g., text-embedding-3-small">
+          <datalist id="embedding-models">
+            <option value="text-embedding-3-small">
+            <option value="text-embedding-3-large">
+            <option value="text-embedding-ada-002">
+          </datalist>
         </div>
         <button class="btn btn-primary btn-sm" (click)="saveEmbedding()" [disabled]="savingEmbed || (!embeddingKey && !embeddingModel && !embeddingBaseUrl)">
           {{ savingEmbed ? 'Saving...' : 'Save Embedding Settings' }}
@@ -145,15 +146,16 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="form-group">
           <label>LLM Model</label>
-          <select class="form-control" [(ngModel)]="llmModel">
-            <option value="">Default ({{ settings.llm.model }})</option>
-            <option value="gpt-4o">gpt-4o</option>
-            <option value="gpt-4o-mini">gpt-4o-mini (recommended)</option>
-            <option value="gpt-4-turbo">gpt-4-turbo</option>
-            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-            <option value="gpt-5">gpt-5 (experimental — slow, may ignore context)</option>
-            <option value="gpt-5-mini">gpt-5-mini (experimental)</option>
-          </select>
+          <input class="form-control" [(ngModel)]="llmModel" name="llmModel" list="llm-models" placeholder="e.g., gpt-4o-mini">
+          <datalist id="llm-models">
+            <option value="gpt-4o-mini">
+            <option value="gpt-4o">
+            <option value="gpt-4.1-mini">
+            <option value="gpt-4.1">
+            <option value="gpt-5">
+            <option value="o3-mini">
+            <option value="claude-sonnet-4-20250514">
+          </datalist>
         </div>
         <button class="btn btn-primary btn-sm" (click)="saveLlm()" [disabled]="savingLlm || (!llmKey && !llmModel && !llmBaseUrl)">
           {{ savingLlm ? 'Saving...' : 'Save LLM Settings' }}

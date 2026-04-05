@@ -11,11 +11,12 @@ namespace Andy.CodeIndex.Tests.Unit.Controllers;
 public class EnrichmentsControllerTests
 {
     private readonly Mock<IEnrichmentGeneratorService> _serviceMock = new();
+    private readonly Mock<IRepositoryService> _repoServiceMock = new();
     private readonly EnrichmentsController _controller;
 
     public EnrichmentsControllerTests()
     {
-        _controller = new EnrichmentsController(_serviceMock.Object);
+        _controller = new EnrichmentsController(_serviceMock.Object, _repoServiceMock.Object);
     }
 
     [Fact]

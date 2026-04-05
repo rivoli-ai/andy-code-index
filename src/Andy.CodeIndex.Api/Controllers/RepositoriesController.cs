@@ -200,6 +200,19 @@ public class RepositoriesController : ControllerBase
         }
     }
 
+    /// <summary>Get enrichment storage stats for a repository.</summary>
+    [HttpGet("{id:guid}/storage")]
+    [RequirePermission("repository:read")]
+    [ProducesResponseType(typeof(StorageStatsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetStorageStats(Guid id, CancellationToken ct = default)
+    {
+        var repo = await _service.GetByIdAsync(id, ct);
+        if (repo is null) return NotFound();
+        var stats = await _service.GetStorageStatsAsync(id, ct);
+        return Ok(stats);
+    }
+
     /// <summary>Get bulk sparkline data for multiple repositories.</summary>
     [HttpGet("analytics/bulk/activity-sparklines")]
     [RequirePermission("repository:read")]

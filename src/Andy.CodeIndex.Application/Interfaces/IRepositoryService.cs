@@ -14,4 +14,6 @@ public interface IRepositoryService
     Task SyncAsync(Guid id, CancellationToken ct = default);
     Task WipeEnrichmentsAsync(Guid id, CancellationToken ct = default);
     Task<RepositoryDto?> FindByUrlAsync(string url, CancellationToken ct = default);
+    Task<StorageStatsDto> GetStorageStatsAsync(Guid repositoryId, CancellationToken ct = default);
+    Task<StorageStatsDto> GetGlobalStorageStatsAsync(CancellationToken ct = default);
 }

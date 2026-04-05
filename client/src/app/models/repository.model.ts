@@ -20,12 +20,25 @@ export interface RepositoryStats {
   commitCount: number;
   fileCount: number;
   enrichmentCount: number;
+  storageSizeBytes: number;
   embeddingCount: number;
   hasEmbeddings: boolean;
   pendingTaskCount: number;
   needsAttention?: boolean;
   attentionReason?: string;
   hasInsights?: boolean;
+}
+
+export interface StorageStats {
+  totalEnrichments: number;
+  totalSizeBytes: number;
+  byType: StorageByType[];
+}
+
+export interface StorageByType {
+  type: string;
+  count: number;
+  sizeBytes: number;
 }
 
 export interface Branch {

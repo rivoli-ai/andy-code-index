@@ -124,10 +124,15 @@ public class RepositoryService : IRepositoryService
         else if (enrichmentCount > 0 && !hasInsights)
         { needsAttention = true; attentionReason = "No insights generated"; }
 
+        var storageSizeBytes = await _context.Enrichments
+            .Where(e => e.RepositoryId == id)
+            .SumAsync(e => (long)e.Content.Length, ct);
+
         dto.Stats = new RepositoryStatsDto
         {
             CommitCount = await _commitRepo.CountAsync(c => c.RepositoryId == id, ct),
             EnrichmentCount = enrichmentCount,
+            StorageSizeBytes = storageSizeBytes,
             EmbeddingCount = embeddingCount,
             HasEmbeddings = embeddingCount > 0,
             PendingTaskCount = await _taskRepo.CountAsync(
@@ -161,9 +166,13 @@ public class RepositoryService : IRepositoryService
                     .Where(e => e.RepositoryId == repo.Id)
                     .Select(e => e.Id)
                     .Contains(ce.EnrichmentId), ct);
+            var storageSizeBytes = await _context.Enrichments
+                .Where(e => e.RepositoryId == repo.Id)
+                .SumAsync(e => (long)e.Content.Length, ct);
             dto.Stats = new RepositoryStatsDto
             {
                 EnrichmentCount = enrichmentCount,
+                StorageSizeBytes = storageSizeBytes,
                 EmbeddingCount = embeddingCount,
                 HasEmbeddings = embeddingCount > 0
             };
@@ -279,6 +288,47 @@ public class RepositoryService : IRepositoryService
         {
             return null;
         }
+    }
+
+    public async Task<StorageStatsDto> GetStorageStatsAsync(Guid repositoryId, CancellationToken ct = default)
+    {
+        var byType = await _context.Enrichments
+            .Where(e => e.RepositoryId == repositoryId)
+            .GroupBy(e => e.Subtype)
+            .Select(g => new StorageByTypeDto
+            {
+                Type = g.Key.ToString(),
+                Count = g.Count(),
+                SizeBytes = g.Sum(e => (long)e.Content.Length)
+            })
+            .ToListAsync(ct);
+
+        return new StorageStatsDto
+        {
+            TotalEnrichments = byType.Sum(b => b.Count),
+            TotalSizeBytes = byType.Sum(b => b.SizeBytes),
+            ByType = byType
+        };
+    }
+
+    public async Task<StorageStatsDto> GetGlobalStorageStatsAsync(CancellationToken ct = default)
+    {
+        var byType = await _context.Enrichments
+            .GroupBy(e => e.Subtype)
+            .Select(g => new StorageByTypeDto
+            {
+                Type = g.Key.ToString(),
+                Count = g.Count(),
+                SizeBytes = g.Sum(e => (long)e.Content.Length)
+            })
+            .ToListAsync(ct);
+
+        return new StorageStatsDto
+        {
+            TotalEnrichments = byType.Sum(b => b.Count),
+            TotalSizeBytes = byType.Sum(b => b.SizeBytes),
+            ByType = byType
+        };
     }
 
     internal static string NormalizeUrl(string url)

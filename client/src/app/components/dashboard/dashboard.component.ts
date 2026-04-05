@@ -51,6 +51,7 @@ import { RepositorySparklineComponent } from '../repositories/repository-sparkli
           <div class="stat">
             <span class="stat-value">{{ repo.stats?.enrichmentCount || 0 }}</span>
             <span class="stat-label">Enrichments</span>
+            <span class="stat-sub" *ngIf="repo.stats?.storageSizeBytes" style="font-size:var(--font-xs);color:var(--text-muted)">{{ formatBytes(repo.stats!.storageSizeBytes) }}</span>
           </div>
           <div class="stat">
             <span class="stat-value">{{ repo.stats?.hasEmbeddings ? (repo.stats?.embeddingCount || 0) : '--' }}</span>
@@ -235,5 +236,13 @@ export class DashboardComponent implements OnInit {
       case 'error': return 'badge-danger';
       default: return 'badge-muted';
     }
+  }
+
+  formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, i);
+    return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
   }
 }

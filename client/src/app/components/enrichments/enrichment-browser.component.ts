@@ -59,7 +59,7 @@ import { environment } from '../../../environments/environment';
     <!-- Summary bar -->
     <div class="card mb-2" *ngIf="!loading && typeCounts.length > 0" style="padding:0.75rem 1rem">
       <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;font-size:var(--font-xs)">
-        <span class="text-muted">{{ totalCount }} total</span>
+        <span style="font-weight:600">{{ totalCount }} enrichments<span *ngIf="globalStorageSizeBytes > 0"> &middot; {{ formatBytes(globalStorageSizeBytes) }}</span></span>
         <span *ngFor="let tc of typeCounts" style="display:inline-flex;align-items:center;gap:0.25rem">
           <span class="badge badge-muted">{{ getSubtypeLabel(tc.subtype) }}</span>
           <span>{{ tc.count }}</span>
@@ -138,6 +138,7 @@ export class EnrichmentBrowserComponent implements OnInit {
   offset = 0;
   repos: { id: string; name: string }[] = [];
   typeCounts: { subtype: string; count: number }[] = [];
+  globalStorageSizeBytes = 0;
 
   private typeLabels: Record<string, string> = {
     'Architecture': 'Architecture',
@@ -254,6 +255,14 @@ export class EnrichmentBrowserComponent implements OnInit {
       next: r => this.repos = r.map((repo: any) => ({ id: repo.id, name: repo.name }))
     });
     this.loadEnrichments();
+    this.loadStorageStats();
+  }
+
+  loadStorageStats() {
+    this.api.getGlobalStorage().subscribe({
+      next: stats => this.globalStorageSizeBytes = stats.totalSizeBytes,
+      error: () => {}
+    });
   }
 
   loadEnrichments() {
@@ -322,5 +331,13 @@ export class EnrichmentBrowserComponent implements OnInit {
     if (quality >= 0.8) return 'badge-success';
     if (quality >= 0.5) return 'badge-warning';
     return 'badge-danger';
+  }
+
+  formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, i);
+    return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
   }
 }

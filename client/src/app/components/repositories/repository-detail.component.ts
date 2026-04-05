@@ -119,7 +119,11 @@ interface CommitComparison {
           <h3 style="margin-bottom:1rem;font-size:1rem">Statistics</h3>
           <div class="stat-grid">
             <div class="stat"><div class="stat-value">{{ repo.stats.commitCount }}</div><div class="stat-label">Commits</div></div>
-            <div class="stat"><div class="stat-value">{{ repo.stats.enrichmentCount }}</div><div class="stat-label">Enrichments</div></div>
+            <div class="stat">
+              <div class="stat-value">{{ repo.stats.enrichmentCount }}</div>
+              <div class="stat-label">Enrichments</div>
+              <div class="stat-sub" *ngIf="repo.stats.storageSizeBytes > 0" style="font-size:var(--font-xs);color:var(--text-muted);margin-top:0.125rem">{{ formatBytes(repo.stats.storageSizeBytes) }}</div>
+            </div>
             <div class="stat">
               <div class="stat-value" [style.color]="repo.stats.hasEmbeddings ? 'var(--primary)' : 'var(--text-muted)'">
                 {{ repo.stats.embeddingCount }}
@@ -1747,6 +1751,14 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
       case 'error': return 'badge-danger';
       default: return 'badge-muted';
     }
+  }
+
+  formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, i);
+    return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
   }
 
   loadInsights() {

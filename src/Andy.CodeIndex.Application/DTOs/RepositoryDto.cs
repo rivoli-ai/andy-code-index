@@ -27,12 +27,27 @@ public class RepositoryStatsDto
     public int CommitCount { get; set; }
     public int FileCount { get; set; }
     public int EnrichmentCount { get; set; }
+    public long StorageSizeBytes { get; set; }
     public int EmbeddingCount { get; set; }
     public int PendingTaskCount { get; set; }
     public bool HasEmbeddings { get; set; }
     public bool NeedsAttention { get; set; }
     public string? AttentionReason { get; set; }
     public bool HasInsights { get; set; }
+}
+
+public class StorageStatsDto
+{
+    public int TotalEnrichments { get; set; }
+    public long TotalSizeBytes { get; set; }
+    public List<StorageByTypeDto> ByType { get; set; } = [];
+}
+
+public class StorageByTypeDto
+{
+    public required string Type { get; set; }
+    public int Count { get; set; }
+    public long SizeBytes { get; set; }
 }
 
 public class BranchDto

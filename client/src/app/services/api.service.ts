@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Repository, CreateRepositoryRequest, SparklineData, ActivityHeatmap } from '../models/repository.model';
+import { Repository, CreateRepositoryRequest, SparklineData, ActivityHeatmap, StorageStats } from '../models/repository.model';
 import { SearchResults, SearchRequest } from '../models/search.model';
 import { EnrichmentListResponse, Enrichment } from '../models/enrichment.model';
 import { IndexingTask } from '../models/task.model';
@@ -68,6 +68,15 @@ export class ApiService {
     if (language) params = params.set('language', language);
     if (repositoryId) params = params.set('repositoryId', repositoryId);
     return this.http.get<SearchResults>(`${this.baseUrl}/search/keyword`, { params });
+  }
+
+  // Storage
+  getRepositoryStorage(id: string): Observable<StorageStats> {
+    return this.http.get<StorageStats>(`${this.baseUrl}/repositories/${id}/storage`);
+  }
+
+  getGlobalStorage(): Observable<StorageStats> {
+    return this.http.get<StorageStats>(`${this.baseUrl}/enrichments/storage`);
   }
 
   // Enrichments

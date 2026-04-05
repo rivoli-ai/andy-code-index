@@ -14,10 +14,12 @@ namespace Andy.CodeIndex.Api.Controllers;
 public class EnrichmentsController : ControllerBase
 {
     private readonly IEnrichmentGeneratorService _service;
+    private readonly IRepositoryService _repoService;
 
-    public EnrichmentsController(IEnrichmentGeneratorService service)
+    public EnrichmentsController(IEnrichmentGeneratorService service, IRepositoryService repoService)
     {
         _service = service;
+        _repoService = repoService;
     }
 
     /// <summary>Query enrichments with filters.</summary>
@@ -56,6 +58,15 @@ public class EnrichmentsController : ControllerBase
     {
         var counts = await _service.GetCountsBySubtypeAsync(type, repositoryId, ct);
         return Ok(counts);
+    }
+
+    /// <summary>Get global enrichment storage stats across all repositories.</summary>
+    [RequirePermission("enrichment:read")]    [HttpGet("storage")]
+    [ProducesResponseType(typeof(StorageStatsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetGlobalStorageStats(CancellationToken ct = default)
+    {
+        var stats = await _repoService.GetGlobalStorageStatsAsync(ct);
+        return Ok(stats);
     }
 
     /// <summary>Get enrichment by ID with full content.</summary>
