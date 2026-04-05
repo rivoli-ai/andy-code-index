@@ -12,7 +12,7 @@ RUN apk add --no-cache ca-certificates && \
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
 COPY client/package.json client/package-lock.json ./
-RUN npm ci
+RUN npm ci || (cat /root/.npm/_logs/*-debug-0.log 2>/dev/null; exit 1)
 COPY client/ ./
 RUN npx ng build --configuration docker
 
