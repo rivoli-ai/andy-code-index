@@ -275,12 +275,56 @@ public class RepositoryServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already exists*");
     }
 
+    [Fact]
+    public async Task AddAsync_DuplicateUrl_IncludesExistingRepoId()
+    {
+        var existingId = Guid.NewGuid();
+        _repoRepoMock.Setup(r => r.GetByUrlAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Repository
+            {
+                Id = existingId, Name = "repo", Url = "https://github.com/test/repo",
+                Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            });
+
+        var act = () => _service.AddAsync(new CreateRepositoryRequest { Url = "https://github.com/test/repo" });
+        var ex = await act.Should().ThrowAsync<InvalidOperationException>();
+        ex.Which.Message.Should().Contain(existingId.ToString(),
+            "error message should include existing repo ID for the 409 response");
+    }
+
+    [Fact]
+    public async Task FindByUrlAsync_ExistingUrl_ReturnsDto()
+    {
+        var repoId = Guid.NewGuid();
+        _repoRepoMock.Setup(r => r.GetByUrlAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Repository
+            {
+                Id = repoId, Name = "repo", Url = "https://github.com/test/repo",
+                Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            });
+
+        var result = await _service.FindByUrlAsync("https://github.com/test/repo.git");
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(repoId);
+    }
+
+    [Fact]
+    public async Task FindByUrlAsync_NonExistentUrl_ReturnsNull()
+    {
+        _repoRepoMock.Setup(r => r.GetByUrlAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Repository?)null);
+
+        var result = await _service.FindByUrlAsync("https://github.com/unknown/repo");
+        result.Should().BeNull();
+    }
+
     [Theory]
     [InlineData("https://github.com/test/repo", "https://github.com/test/repo")]
     [InlineData("https://github.com/test/repo.git", "https://github.com/test/repo")]
     [InlineData("https://github.com/test/repo/", "https://github.com/test/repo")]
     [InlineData("https://GitHub.COM/test/repo", "https://github.com/test/repo")]
     [InlineData("  https://github.com/test/repo  ", "https://github.com/test/repo")]
+    [InlineData("http://github.com/test/repo", "http://github.com/test/repo")]
     public void NormalizeUrl_ReturnsConsistentForm(string input, string expected)
     {
         RepositoryService.NormalizeUrl(input).Should().Be(expected);

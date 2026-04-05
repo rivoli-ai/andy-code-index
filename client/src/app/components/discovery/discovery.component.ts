@@ -74,13 +74,17 @@ interface DiscoveredRepo {
         </div>
       </div>
 
-      <div class="card" *ngFor="let repo of filteredRepos" style="margin-bottom:0.5rem;padding:1rem">
+      <div class="card" *ngFor="let repo of filteredRepos"
+           [class.tracked-repo]="repo.alreadyTracked"
+           style="margin-bottom:0.5rem;padding:1rem">
         <div style="display:flex;align-items:center;gap:0.75rem">
-          <input type="checkbox" [(ngModel)]="repo.selected" [disabled]="repo.alreadyTracked" style="width:18px;height:18px">
+          <input type="checkbox" [(ngModel)]="repo.selected" [disabled]="repo.alreadyTracked" style="width:18px;height:18px"
+                 *ngIf="!repo.alreadyTracked">
+          <i class="bi bi-check-circle-fill" *ngIf="repo.alreadyTracked" style="color:var(--success);font-size:1.125rem;min-width:18px"></i>
           <div style="flex:1">
             <strong>{{ repo.name }}</strong>
             <span class="text-muted" style="margin-left:0.5rem;font-size:0.8125rem">{{ repo.fullName }}</span>
-            <span class="badge badge-success" style="margin-left:0.5rem" *ngIf="repo.alreadyTracked">Tracked</span>
+            <span class="badge badge-success" style="margin-left:0.5rem" *ngIf="repo.alreadyTracked">Already Tracked</span>
           </div>
           <span class="badge badge-muted">{{ repo.provider }}</span>
           <span class="text-muted" style="font-size:0.8125rem" *ngIf="repo.defaultBranch">{{ repo.defaultBranch }}</span>
@@ -105,6 +109,7 @@ interface DiscoveredRepo {
     .discover-field .form-control,
     .discover-field .btn { height: 42px; }
     .discover-action { justify-content: flex-end; }
+    :host ::ng-deep .tracked-repo { opacity: 0.55; }
   `]
 })
 export class DiscoveryComponent {

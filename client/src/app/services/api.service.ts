@@ -26,6 +26,11 @@ export class ApiService {
     return this.http.post<Repository>(`${this.baseUrl}/repositories`, request);
   }
 
+  checkRepositoryUrl(url: string): Observable<{ tracked: boolean; existingRepositoryId?: string; name?: string }> {
+    return this.http.get<{ tracked: boolean; existingRepositoryId?: string; name?: string }>(
+      `${this.baseUrl}/repositories/check-url?url=${encodeURIComponent(url)}`);
+  }
+
   updateRepository(id: string, update: { syncIntervalMinutes?: number | null }): Observable<Repository> {
     return this.http.put<Repository>(`${this.baseUrl}/repositories/${id}`, update);
   }

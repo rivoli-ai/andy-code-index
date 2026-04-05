@@ -35,6 +35,18 @@ public class RepositoriesController : ControllerBase
         return Ok(repos);
     }
 
+    /// <summary>Check if a repository URL is already tracked.</summary>
+    [HttpGet("check-url")]
+    [RequirePermission("repository:read")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> CheckUrl([FromQuery] string url, CancellationToken ct = default)
+    {
+        var existing = await _service.FindByUrlAsync(url, ct);
+        if (existing is null)
+            return Ok(new { tracked = false });
+        return Ok(new { tracked = true, existingRepositoryId = existing.Id, name = existing.Name });
+    }
+
     /// <summary>Add a new repository for indexing.</summary>
     [HttpPost]
     [RequirePermission("repository:write")]
@@ -55,7 +67,10 @@ public class RepositoriesController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
         {
-            return Conflict(new { error = ex.Message });
+            var parts = ex.Message.Split('|');
+            var message = parts[0];
+            var existingId = parts.Length > 1 ? parts[1] : null;
+            return Conflict(new { error = message, existingRepositoryId = existingId });
         }
         catch (ArgumentException ex)
         {

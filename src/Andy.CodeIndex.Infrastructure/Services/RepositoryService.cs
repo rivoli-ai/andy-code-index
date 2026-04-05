@@ -37,7 +37,7 @@ public class RepositoryService : IRepositoryService
 
         var existingRepo = await _repositoryRepo.GetByUrlAsync(normalizedUrl, ct);
         if (existingRepo is not null)
-            throw new InvalidOperationException($"Repository with URL '{normalizedUrl}' already exists.");
+            throw new InvalidOperationException($"Repository with URL '{normalizedUrl}' already exists.|{existingRepo.Id}");
 
         if (!SyncIntervalValidator.IsValid(request.SyncIntervalMinutes))
             throw new ArgumentException($"Invalid sync interval value: {request.SyncIntervalMinutes}. Allowed values: null (default), 0 (manual only), 15, 30, 60, 120, 360, 720, 1440.");
@@ -265,6 +265,20 @@ public class RepositoryService : IRepositoryService
         await _repositoryRepo.SaveChangesAsync(ct);
 
         // Enrichments wiped successfully
+    }
+
+    public async Task<RepositoryDto?> FindByUrlAsync(string url, CancellationToken ct = default)
+    {
+        try
+        {
+            var normalized = NormalizeUrl(url);
+            var repo = await _repositoryRepo.GetByUrlAsync(normalized, ct);
+            return repo is null ? null : MapToDto(repo);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     internal static string NormalizeUrl(string url)

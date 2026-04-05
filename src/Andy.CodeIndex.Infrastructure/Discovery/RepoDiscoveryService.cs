@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Andy.CodeIndex.Application.Interfaces;
+using Andy.CodeIndex.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Andy.CodeIndex.Infrastructure.Discovery;
@@ -182,10 +183,22 @@ public class RepoDiscoveryService : IRepoDiscoveryService
     private async Task MarkTracked(List<DiscoveredRepo> repos, CancellationToken ct)
     {
         var tracked = await _repoRepo.GetAllAsync(ct);
-        var trackedUrls = new HashSet<string>(tracked.Select(r => r.Url), StringComparer.OrdinalIgnoreCase);
+        var trackedUrls = new HashSet<string>(
+            tracked.Select(r => r.Url), StringComparer.OrdinalIgnoreCase);
 
         foreach (var repo in repos)
-            repo.AlreadyTracked = trackedUrls.Contains(repo.CloneUrl);
+        {
+            try
+            {
+                var normalized = RepositoryService.NormalizeUrl(repo.CloneUrl);
+                repo.AlreadyTracked = trackedUrls.Contains(normalized);
+            }
+            catch
+            {
+                // If normalization fails, fall back to direct comparison
+                repo.AlreadyTracked = trackedUrls.Contains(repo.CloneUrl);
+            }
+        }
     }
 
     // --- GitHub API DTOs ---

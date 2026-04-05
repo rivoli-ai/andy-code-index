@@ -13,4 +13,5 @@ public interface IRepositoryService
     Task DeleteAsync(Guid id, CancellationToken ct = default);
     Task SyncAsync(Guid id, CancellationToken ct = default);
     Task WipeEnrichmentsAsync(Guid id, CancellationToken ct = default);
+    Task<RepositoryDto?> FindByUrlAsync(string url, CancellationToken ct = default);
 }
