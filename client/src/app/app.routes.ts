@@ -2,7 +2,8 @@ import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'repositories', pathMatch: 'full' },
+  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: 'dashboard', loadComponent: () => import('./components/dashboard/dashboard.component').then(m => m.DashboardComponent), canActivate: [authGuard] },
   { path: 'login', loadComponent: () => import('./components/auth/login.component').then(m => m.LoginComponent) },
   { path: 'callback', loadComponent: () => import('./components/auth/callback.component').then(m => m.CallbackComponent) },
   { path: 'repositories', loadComponent: () => import('./components/repositories/repository-list.component').then(m => m.RepositoryListComponent), canActivate: [authGuard] },
@@ -14,4 +15,6 @@ export const routes: Routes = [
   { path: 'discover', loadComponent: () => import('./components/discovery/discovery.component').then(m => m.DiscoveryComponent), canActivate: [authGuard] },
   { path: 'settings', loadComponent: () => import('./components/settings/settings.component').then(m => m.SettingsComponent), canActivate: [authGuard] },
   { path: 'chat', loadComponent: () => import('./components/chat/chat.component').then(m => m.ChatComponent), canActivate: [authGuard] },
+  { path: 'docs', loadComponent: () => import('./components/docs/docs.component').then(m => m.DocsComponent) },
+  { path: 'docs/:page', loadComponent: () => import('./components/docs/docs.component').then(m => m.DocsComponent) },
 ];

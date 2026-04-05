@@ -1,6 +1,6 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 
 interface IndexingRun {
@@ -18,11 +18,54 @@ interface IndexingRun {
   errorMessage?: string;
 }
 
+interface GitLogCommit {
+  sha: string;
+  abbreviatedSha: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  committedAt: string;
+  isIndexed: boolean;
+  enrichmentCount: number;
+}
+
 @Component({
   selector: 'app-repository-history',
   standalone: true,
   imports: [CommonModule],
   template: `
+    <!-- Git Commits (filtered by branch) -->
+    <div class="card" *ngIf="gitCommits.length > 0" style="margin-bottom:1.5rem">
+      <h3 style="margin-bottom:1rem;font-size:1rem">
+        Commits
+        <span *ngIf="ref" class="badge badge-primary" style="font-size:0.75rem;margin-left:0.5rem">{{ ref }}</span>
+      </h3>
+      <div class="commit-item" *ngFor="let commit of gitCommits">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
+              <code style="font-size:0.75rem;color:var(--primary);flex-shrink:0">{{ commit.abbreviatedSha }}</code>
+              <span *ngIf="commit.isIndexed" class="badge badge-success" style="font-size:0.625rem;flex-shrink:0">indexed</span>
+              <span *ngIf="commit.enrichmentCount > 0" class="badge badge-muted" style="font-size:0.625rem;flex-shrink:0">{{ commit.enrichmentCount }} enrichments</span>
+            </div>
+            <div style="font-size:0.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ commit.message }}</div>
+            <div class="text-muted" style="font-size:0.75rem;margin-top:0.125rem">
+              {{ commit.authorName }} &middot; {{ commit.committedAt | date:'short' }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="hasMoreCommits" style="text-align:center;padding:0.75rem 0">
+        <button class="btn btn-secondary btn-sm" (click)="loadMoreCommits()" [disabled]="loadingCommits" style="font-size:0.75rem">
+          {{ loadingCommits ? 'Loading...' : 'Load more' }}
+        </button>
+      </div>
+    </div>
+    <div *ngIf="gitCommits.length === 0 && !loadingCommits && ref" class="card" style="margin-bottom:1.5rem">
+      <p class="text-muted" style="font-size:0.8125rem">No commits found for branch "{{ ref }}"</p>
+    </div>
+
+    <!-- Indexing History -->
     <div class="card" *ngIf="runs.length > 0">
       <h3 style="margin-bottom:1rem;font-size:1rem">Indexing History</h3>
       <div class="run-item" *ngFor="let run of runs">
@@ -50,13 +93,15 @@ interface IndexingRun {
         </div>
       </div>
     </div>
-    <div class="empty-state card" *ngIf="runs.length === 0 && !loading">
-      <p class="text-muted">No indexing history yet</p>
+    <div class="empty-state card" *ngIf="runs.length === 0 && gitCommits.length === 0 && !loading && !loadingCommits">
+      <p class="text-muted">No history yet</p>
     </div>
   `,
   styles: [`
     .run-item { padding: 0.625rem 0; border-bottom: 1px solid var(--border); }
     .run-item:last-child { border-bottom: none; }
+    .commit-item { padding: 0.625rem 0; border-bottom: 1px solid var(--border); }
+    .commit-item:last-child { border-bottom: none; }
     .stats { display: flex; gap: 0.375rem; }
     .stat-badge { font-size: 0.6875rem; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 100px; }
     .stat-badge.added { background: rgba(40,167,69,0.1); color: var(--success); }
@@ -65,10 +110,15 @@ interface IndexingRun {
     .stat-badge.unchanged { background: var(--surface-2); color: var(--text-muted); }
   `]
 })
-export class RepositoryHistoryComponent implements OnInit {
+export class RepositoryHistoryComponent implements OnInit, OnChanges {
   @Input() repositoryId!: string;
+  @Input() ref = '';
   runs: IndexingRun[] = [];
+  gitCommits: GitLogCommit[] = [];
   loading = true;
+  loadingCommits = false;
+  hasMoreCommits = false;
+  private nextCursor: string | null = null;
 
   constructor(private http: HttpClient) {}
 
@@ -78,5 +128,41 @@ export class RepositoryHistoryComponent implements OnInit {
         next: runs => { this.runs = runs; this.loading = false; },
         error: () => this.loading = false
       });
+    this.loadGitCommits();
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['ref'] && !changes['ref'].firstChange) {
+      this.gitCommits = [];
+      this.nextCursor = null;
+      this.hasMoreCommits = false;
+      this.loadGitCommits();
+    }
+  }
+
+  loadGitCommits() {
+    this.loadingCommits = true;
+    let params = new HttpParams().set('limit', '50');
+    if (this.ref) {
+      params = params.set('ref', this.ref);
+    }
+    if (this.nextCursor) {
+      params = params.set('before', this.nextCursor);
+    }
+
+    this.http.get<any>(`${environment.apiUrl}/repositories/${this.repositoryId}/git/log`, { params })
+      .subscribe({
+        next: res => {
+          this.gitCommits = [...this.gitCommits, ...(res.commits || [])];
+          this.hasMoreCommits = res.hasMore || false;
+          this.nextCursor = res.nextCursor || null;
+          this.loadingCommits = false;
+        },
+        error: () => this.loadingCommits = false
+      });
+  }
+
+  loadMoreCommits() {
+    this.loadGitCommits();
   }
 }

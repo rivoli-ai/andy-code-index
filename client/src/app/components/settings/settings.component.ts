@@ -26,7 +26,11 @@ import { environment } from '../../../environments/environment';
         <div *ngIf="settings.embedding.hasKey" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--background-alt);border-radius:var(--radius);margin-bottom:1rem">
           <i class="bi bi-key-fill" style="color:var(--success);font-size:1.25rem"></i>
           <div style="flex:1">
-            <div style="font-weight:500;font-size:0.875rem">Key configured</div>
+            <div style="font-weight:500;font-size:0.875rem">
+              Key configured
+              <i *ngIf="health && health.embeddingKeyValid" class="bi bi-check-circle-fill" style="color:var(--success);margin-left:0.375rem" title="Key is valid"></i>
+              <i *ngIf="health && !health.embeddingKeyValid && health.embeddingError" class="bi bi-x-circle-fill" style="color:var(--danger);margin-left:0.375rem" [title]="health.embeddingError"></i>
+            </div>
             <div class="text-muted" style="font-size:0.8125rem">
               <code>{{ settings.embedding.maskedKey }}</code>
               <span class="badge" [ngClass]="settings.embedding.source === 'user' ? 'badge-primary' : 'badge-muted'" style="margin-left:0.375rem">
@@ -94,7 +98,11 @@ import { environment } from '../../../environments/environment';
         <div *ngIf="settings.llm.hasKey" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--background-alt);border-radius:var(--radius);margin-bottom:1rem">
           <i class="bi bi-key-fill" style="color:var(--success);font-size:1.25rem"></i>
           <div style="flex:1">
-            <div style="font-weight:500;font-size:0.875rem">LLM key configured</div>
+            <div style="font-weight:500;font-size:0.875rem">
+              LLM key configured
+              <i *ngIf="health && health.llmKeyValid" class="bi bi-check-circle-fill" style="color:var(--success);margin-left:0.375rem" title="Key is valid"></i>
+              <i *ngIf="health && !health.llmKeyValid && health.llmError" class="bi bi-x-circle-fill" style="color:var(--danger);margin-left:0.375rem" [title]="health.llmError"></i>
+            </div>
             <code class="text-muted" style="font-size:0.8125rem">{{ settings.llm.maskedKey }}</code>
           </div>
           <button class="btn btn-sm btn-secondary" (click)="deleteLlmKey()">Remove</button>
@@ -202,6 +210,7 @@ export class SettingsComponent implements OnInit {
   testingLlm = false;
   embedTestResult: any = null;
   llmTestResult: any = null;
+  health: any = null;
 
   constructor(private http: HttpClient) {}
 
@@ -221,6 +230,10 @@ export class SettingsComponent implements OnInit {
     });
     this.http.get<any[]>(`${environment.apiUrl}/settings/history`).subscribe({
       next: h => this.history = h
+    });
+    this.http.get(`${environment.apiUrl}/settings/health`).subscribe({
+      next: (h: any) => this.health = h,
+      error: () => {}
     });
   }
 

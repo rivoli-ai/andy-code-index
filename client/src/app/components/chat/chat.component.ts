@@ -28,6 +28,23 @@ interface Repository {
   name: string;
 }
 
+interface GitRefBranch {
+  name: string;
+  sha: string;
+  isDefault: boolean;
+}
+
+interface GitRefTag {
+  name: string;
+  sha: string;
+}
+
+interface GitRefsResponse {
+  head: string;
+  branches: GitRefBranch[];
+  tags: GitRefTag[];
+}
+
 interface SuggestionDimension {
   id: string;
   name: string;
@@ -133,9 +150,18 @@ interface ConversationGroup {
         <div class="chat-header">
           <h1>Chat with Code</h1>
           <div style="display:flex;gap:0.75rem;align-items:center">
-            <select class="form-control" [(ngModel)]="selectedRepo" style="width:180px">
+            <select class="form-control" [(ngModel)]="selectedRepo" (ngModelChange)="onRepoChange($event)" style="width:180px">
               <option value="">All Repositories</option>
               <option *ngFor="let r of repos" [value]="r.id">{{ r.name }}</option>
+            </select>
+            <select *ngIf="selectedRepo && (repoBranches.length > 0 || repoTags.length > 0)" class="form-control" [(ngModel)]="selectedRef" style="width:160px">
+              <option value="">All branches</option>
+              <optgroup label="Branches" *ngIf="repoBranches.length > 0">
+                <option *ngFor="let b of repoBranches" [value]="b.name">{{ b.name }}{{ b.isDefault ? ' (default)' : '' }}</option>
+              </optgroup>
+              <optgroup label="Tags" *ngIf="repoTags.length > 0">
+                <option *ngFor="let t of repoTags" [value]="t.name">{{ t.name }}</option>
+              </optgroup>
             </select>
             <span class="badge badge-muted" *ngIf="!chatAvailable">LLM not configured</span>
           </div>
@@ -322,6 +348,9 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   sending = false;
   repos: Repository[] = [];
   selectedRepo = '';
+  selectedRef = '';
+  repoBranches: GitRefBranch[] = [];
+  repoTags: GitRefTag[] = [];
   conversationId: string | null = null;
   chatAvailable = false;
   activeCategory = '';
@@ -387,6 +416,21 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     ).subscribe(term => {
       this.loadConversations(term || undefined);
     });
+  }
+
+  onRepoChange(repoId: string) {
+    this.selectedRef = '';
+    this.repoBranches = [];
+    this.repoTags = [];
+    if (repoId) {
+      this.http.get<GitRefsResponse>(`${environment.apiUrl}/repositories/${repoId}/git/refs`).subscribe({
+        next: res => {
+          this.repoBranches = res.branches || [];
+          this.repoTags = res.tags || [];
+        },
+        error: () => {}
+      });
+    }
   }
 
   ngAfterViewChecked() {
@@ -585,6 +629,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
     const body: any = { message, conversationId: this.conversationId };
     if (this.selectedRepo) body.repositoryId = this.selectedRepo;
+    if (this.selectedRef) body.ref = this.selectedRef;
 
     this.http.post<any>(`${environment.apiUrl}/chat`, body).subscribe({
       next: res => {

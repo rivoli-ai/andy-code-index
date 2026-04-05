@@ -17,6 +17,9 @@ import { AuthService } from '../../services/auth.service';
       <nav class="sidebar-nav">
         <div class="nav-section">
           <div class="nav-section-title">Overview</div>
+          <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+            <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+          </a>
           <a routerLink="/repositories" routerLinkActive="active" class="nav-item">
             <i class="bi bi-folder2-open"></i><span>Repositories</span>
           </a>
@@ -43,6 +46,9 @@ import { AuthService } from '../../services/auth.service';
           <div class="nav-section-title">Account</div>
           <a routerLink="/settings" routerLinkActive="active" class="nav-item">
             <i class="bi bi-gear"></i><span>Settings</span>
+          </a>
+          <a routerLink="/docs" routerLinkActive="active" class="nav-item">
+            <i class="bi bi-book"></i><span>Docs</span>
           </a>
         </div>
       </nav>

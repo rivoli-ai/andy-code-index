@@ -5,6 +5,7 @@ using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Infrastructure.Data;
+using Andy.CodeIndex.Infrastructure.Services;
 using Andy.Rbac.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +27,7 @@ public class SettingsController : ControllerBase
     private readonly EnrichmentLlmOptions _llmOptions;
     private readonly IApiKeyResolver _apiKeyResolver;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ApiKeyHealthStatus _healthStatus;
 
     public SettingsController(
         CodeIndexDbContext context,
@@ -33,7 +35,8 @@ public class SettingsController : ControllerBase
         IOptions<EmbeddingOptions> embeddingOptions,
         IOptions<EnrichmentLlmOptions> llmOptions,
         IApiKeyResolver apiKeyResolver,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        ApiKeyHealthStatus healthStatus)
     {
         _context = context;
         _encryption = encryption;
@@ -41,6 +44,7 @@ public class SettingsController : ControllerBase
         _llmOptions = llmOptions.Value;
         _apiKeyResolver = apiKeyResolver;
         _httpClientFactory = httpClientFactory;
+        _healthStatus = healthStatus;
     }
 
     private string GetUserId() =>
@@ -82,6 +86,14 @@ public class SettingsController : ControllerBase
                 baseUrl = settings?.LlmBaseUrl ?? _llmOptions.BaseUrl,
             }
         });
+    }
+
+    [RequirePermission("settings:read")]
+    [HttpGet("health")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetHealth()
+    {
+        return Ok(_healthStatus);
     }
 
     /// <summary>Update current user's settings with audit trail.</summary>

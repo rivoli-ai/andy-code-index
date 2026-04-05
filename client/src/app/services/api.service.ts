@@ -18,6 +18,10 @@ export class ApiService {
     return this.http.get<Repository[]>(`${this.baseUrl}/repositories`);
   }
 
+  getOrganizations(): Observable<{ name: string; count: number }[]> {
+    return this.http.get<{ name: string; count: number }[]>(`${this.baseUrl}/repositories/organizations`);
+  }
+
   getRepository(id: string): Observable<Repository> {
     return this.http.get<Repository>(`${this.baseUrl}/repositories/${id}`);
   }
@@ -112,5 +116,15 @@ export class ApiService {
 
   getPipelines(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/queue/pipelines`);
+  }
+
+  getKeyHealth(): Observable<{
+    llmKeyValid: boolean;
+    embeddingKeyValid: boolean;
+    llmError: string | null;
+    embeddingError: string | null;
+    lastChecked: string;
+  }> {
+    return this.http.get<any>(`${this.baseUrl}/settings/health`);
   }
 }

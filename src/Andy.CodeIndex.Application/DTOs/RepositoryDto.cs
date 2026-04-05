@@ -7,6 +7,7 @@ public class RepositoryDto
     public Guid Id { get; set; }
     public required string Name { get; set; }
     public required string Url { get; set; }
+    public string? Organization { get; set; }
     public GitProvider Provider { get; set; }
     public string? DefaultBranch { get; set; }
     public string? LastIndexedCommitSha { get; set; }

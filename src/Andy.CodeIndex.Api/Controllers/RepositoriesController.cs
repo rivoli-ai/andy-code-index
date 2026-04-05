@@ -35,6 +35,23 @@ public class RepositoriesController : ControllerBase
         return Ok(repos);
     }
 
+    /// <summary>Get unique organizations with repository counts.</summary>
+    [HttpGet("organizations")]
+    [RequirePermission("repository:read")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOrganizations(CancellationToken ct = default)
+    {
+        var repos = await _service.ListAsync(ct: ct);
+        var orgs = repos
+            .Where(r => !string.IsNullOrEmpty(r.Organization))
+            .GroupBy(r => r.Organization!)
+            .Select(g => new { name = g.Key, count = g.Count() })
+            .OrderByDescending(o => o.count)
+            .ThenBy(o => o.name)
+            .ToList();
+        return Ok(orgs);
+    }
+
     /// <summary>Check if a repository URL is already tracked.</summary>
     [HttpGet("check-url")]
     [RequirePermission("repository:read")]

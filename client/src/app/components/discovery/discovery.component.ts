@@ -13,6 +13,11 @@ interface DiscoveredRepo {
   description?: string;
   alreadyTracked: boolean;
   selected?: boolean;
+  stars?: number;
+  openIssues?: number;
+  language?: string;
+  lastPushedAt?: string;
+  size?: number; // KB
 }
 
 @Component({
@@ -60,6 +65,16 @@ interface DiscoveredRepo {
       <div class="card mb-2" style="padding:0.75rem 1rem">
         <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
           <input class="form-control" [(ngModel)]="repoSearch" placeholder="Filter by name..." style="width:200px;padding:0.375rem 0.75rem">
+          <select class="form-control" [(ngModel)]="sortBy" style="width:150px;padding:0.375rem 0.75rem">
+            <option value="name">Sort: Name</option>
+            <option value="stars">Sort: Stars</option>
+            <option value="updated">Sort: Last Updated</option>
+            <option value="size">Sort: Size</option>
+          </select>
+          <select class="form-control" [(ngModel)]="languageFilter" style="width:150px;padding:0.375rem 0.75rem">
+            <option value="">All Languages</option>
+            <option *ngFor="let lang of availableLanguages" [value]="lang">{{ lang }}</option>
+          </select>
           <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.875rem;cursor:pointer;margin:0">
             <input type="checkbox" [(ngModel)]="hideTracked"> Hide already tracked
           </label>
@@ -88,6 +103,12 @@ interface DiscoveredRepo {
           </div>
           <span class="badge badge-muted">{{ repo.provider }}</span>
           <span class="text-muted" style="font-size:0.8125rem" *ngIf="repo.defaultBranch">{{ repo.defaultBranch }}</span>
+        </div>
+        <div style="display:flex;gap:0.75rem;align-items:center;margin-top:0.375rem;flex-wrap:wrap">
+          <span class="text-muted" style="font-size:0.8125rem" *ngIf="repo.stars != null" title="Stars">&#9733; {{ repo.stars }}</span>
+          <span class="badge badge-info" *ngIf="repo.language">{{ repo.language }}</span>
+          <span class="text-muted" style="font-size:0.8125rem" *ngIf="repo.lastPushedAt" title="Last pushed">{{ timeAgo(repo.lastPushedAt) }}</span>
+          <span class="text-muted" style="font-size:0.8125rem" *ngIf="repo.size != null" title="Repository size">{{ formatSize(repo.size) }}</span>
         </div>
         <div class="text-muted" style="font-size:0.8125rem;margin-top:0.25rem" *ngIf="repo.description">{{ repo.description }}</div>
       </div>
@@ -125,6 +146,8 @@ export class DiscoveryComponent {
   addMessage = '';
   repoSearch = '';
   hideTracked = false;
+  sortBy = 'name';
+  languageFilter = '';
 
   constructor(private http: HttpClient) {}
 
@@ -136,6 +159,12 @@ export class DiscoveryComponent {
     return this.repos.filter(r => r.alreadyTracked).length;
   }
 
+  get availableLanguages(): string[] {
+    const langs = new Set<string>();
+    this.repos.forEach(r => { if (r.language) langs.add(r.language); });
+    return Array.from(langs).sort();
+  }
+
   get filteredRepos(): DiscoveredRepo[] {
     let result = this.repos;
     if (this.repoSearch) {
@@ -143,7 +172,15 @@ export class DiscoveryComponent {
       result = result.filter(r => r.name.toLowerCase().includes(q) || r.fullName.toLowerCase().includes(q));
     }
     if (this.hideTracked) result = result.filter(r => !r.alreadyTracked);
-    return result.sort((a, b) => a.name.localeCompare(b.name));
+    if (this.languageFilter) result = result.filter(r => r.language === this.languageFilter);
+    return result.sort((a, b) => {
+      switch (this.sortBy) {
+        case 'stars': return (b.stars ?? 0) - (a.stars ?? 0);
+        case 'updated': return new Date(b.lastPushedAt ?? 0).getTime() - new Date(a.lastPushedAt ?? 0).getTime();
+        case 'size': return (b.size ?? 0) - (a.size ?? 0);
+        default: return a.name.localeCompare(b.name);
+      }
+    });
   }
 
   selectAllVisible() {
@@ -152,6 +189,31 @@ export class DiscoveryComponent {
 
   deselectAll() {
     this.repos.forEach(r => r.selected = false);
+  }
+
+  timeAgo(dateStr: string): string {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo ago`;
+    const years = Math.floor(days / 365);
+    return `${years}y ago`;
+  }
+
+  formatSize(kb: number): string {
+    if (kb < 1024) return `${kb} KB`;
+    const mb = kb / 1024;
+    if (mb < 1024) return `${mb.toFixed(1)} MB`;
+    const gb = mb / 1024;
+    return `${gb.toFixed(1)} GB`;
   }
 
   discover() {

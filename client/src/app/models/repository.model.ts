@@ -2,6 +2,7 @@ export interface Repository {
   id: string;
   name: string;
   url: string;
+  organization?: string;
   provider: string;
   defaultBranch?: string;
   lastIndexedCommitSha?: string;

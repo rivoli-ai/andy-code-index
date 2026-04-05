@@ -18,4 +18,9 @@ public class DiscoveredRepo
     public bool IsFork { get; set; }
     public bool IsDisabled { get; set; }
     public bool AlreadyTracked { get; set; }
+    public int? Stars { get; set; }
+    public int? OpenIssues { get; set; }
+    public string? Language { get; set; }
+    public DateTime? LastPushedAt { get; set; }
+    public int? Size { get; set; }  // KB
 }

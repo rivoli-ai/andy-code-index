@@ -71,7 +71,12 @@ public class RepoDiscoveryService : IRepoDiscoveryService
                     Description = item.Description,
                     IsArchived = item.Archived,
                     IsFork = item.Fork,
-                    IsDisabled = item.Disabled
+                    IsDisabled = item.Disabled,
+                    Stars = item.StargazersCount,
+                    OpenIssues = item.OpenIssuesCount,
+                    Language = item.Language,
+                    LastPushedAt = item.PushedAt,
+                    Size = item.Size
                 });
             }
 
@@ -212,6 +217,11 @@ public class RepoDiscoveryService : IRepoDiscoveryService
         [JsonPropertyName("archived")] public bool Archived { get; set; }
         [JsonPropertyName("fork")] public bool Fork { get; set; }
         [JsonPropertyName("disabled")] public bool Disabled { get; set; }
+        [JsonPropertyName("stargazers_count")] public int? StargazersCount { get; set; }
+        [JsonPropertyName("open_issues_count")] public int? OpenIssuesCount { get; set; }
+        [JsonPropertyName("language")] public string? Language { get; set; }
+        [JsonPropertyName("pushed_at")] public DateTime? PushedAt { get; set; }
+        [JsonPropertyName("size")] public int? Size { get; set; }
     }
 
     // --- Azure DevOps API DTOs ---

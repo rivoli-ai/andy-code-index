@@ -64,7 +64,7 @@ interface CommitComparison {
       </div>
 
       <!-- Tab Navigation -->
-      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem">
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem;align-items:center">
         <button *ngFor="let tab of ['Overview', 'Insights', 'Report', 'History', 'Analytics']"
                 (click)="activeTab = tab"
                 [style.border-bottom]="activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent'"
@@ -72,6 +72,19 @@ interface CommitComparison {
                 [style.color]="activeTab === tab ? 'var(--primary)' : 'var(--text-muted)'">
           {{ tab }}
         </button>
+        <div style="margin-left:auto;margin-bottom:-2px;padding:0.375rem 0">
+          <select [(ngModel)]="selectedRef" (ngModelChange)="onRefChange($event)"
+                  style="padding:0.375rem 0.625rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:160px"
+                  title="Filter by branch or tag">
+            <option value="">All branches</option>
+            <optgroup label="Branches" *ngIf="repo.branches && repo.branches.length > 0">
+              <option *ngFor="let b of repo.branches" [value]="b.name">{{ b.name }}{{ b.isDefault ? ' (default)' : '' }}</option>
+            </optgroup>
+            <optgroup label="Tags" *ngIf="repo.tags && repo.tags.length > 0">
+              <option *ngFor="let t of repo.tags" [value]="t.name">{{ t.name }}</option>
+            </optgroup>
+          </select>
+        </div>
       </div>
 
       <!-- Overview Tab -->
@@ -867,7 +880,7 @@ interface CommitComparison {
 
       <!-- History Tab -->
       <div *ngIf="activeTab === 'History'">
-        <app-repository-history [repositoryId]="repo.id" style="display:block" />
+        <app-repository-history [repositoryId]="repo.id" [ref]="selectedRef" style="display:block" />
       </div>
 
       <!-- Analytics Tab -->
@@ -1541,6 +1554,7 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   syncIntervalSaving = false;
   syncIntervalSaved = false;
   activeTab = 'Overview';
+  selectedRef = '';
   activeReportSection = 'rpt-health';
   showInsightsMethodology = false;
   showMethodology = false;
@@ -1704,6 +1718,10 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
 
   toggleSection(section: string) {
     this.expandedSection = this.expandedSection === section ? null : section;
+  }
+
+  onRefChange(ref: string) {
+    this.selectedRef = ref;
   }
 
   getRelativeTime(dateStr: string): string {

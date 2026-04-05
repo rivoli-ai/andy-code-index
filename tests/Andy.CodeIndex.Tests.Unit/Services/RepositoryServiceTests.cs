@@ -353,4 +353,15 @@ public class RepositoryServiceTests
     {
         RepositoryService.ParseName(url).Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData("https://github.com/rivoli-ai/andy-docs", "rivoli-ai")]
+    [InlineData("https://github.com/rivoli-ai/andy-docs.git", "rivoli-ai")]
+    [InlineData("https://gitlab.com/mygroup/project", "mygroup")]
+    [InlineData("https://dev.azure.com/myorg/project/_git/repo", "myorg")]
+    [InlineData("https://github.com/owner/repo/", "owner")]
+    public void ParseOrganization_ExtractsCorrectOrg(string url, string expected)
+    {
+        RepositoryService.ParseOrganization(url).Should().Be(expected);
+    }
 }

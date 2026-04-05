@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { HealthService } from '../../services/health.service';
+import { PinService } from '../../services/pin.service';
 import { Repository, SparklineData } from '../../models/repository.model';
 import { RepositorySparklineComponent } from './repository-sparkline.component';
 
@@ -46,6 +47,10 @@ import { RepositorySparklineComponent } from './repository-sparkline.component';
           <option value="indexing">Indexing</option>
           <option value="error">Error</option>
         </select>
+        <select class="form-control" [(ngModel)]="orgFilter" style="width:160px">
+          <option value="">All Organizations</option>
+          <option *ngFor="let org of organizations" [value]="org.name">{{ org.name }} ({{ org.count }})</option>
+        </select>
         <select class="form-control" [(ngModel)]="providerFilter" style="width:140px">
           <option value="">All Providers</option>
           <option value="GitHub">GitHub</option>
@@ -59,7 +64,7 @@ import { RepositorySparklineComponent } from './repository-sparkline.component';
           <option value="enrichments">Sort: Enrichments</option>
           <option value="embeddings">Sort: Embeddings</option>
         </select>
-        <button class="btn btn-sm btn-secondary" (click)="clearFilters()" *ngIf="nameFilter || statusFilter || providerFilter">
+        <button class="btn btn-sm btn-secondary" (click)="clearFilters()" *ngIf="nameFilter || statusFilter || providerFilter || orgFilter">
           Clear
         </button>
         <span class="text-muted" style="margin-left:auto;font-size:0.8125rem">
@@ -89,6 +94,7 @@ import { RepositorySparklineComponent } from './repository-sparkline.component';
               <i *ngIf="repo.stats?.needsAttention" class="bi bi-exclamation-triangle-fill"
                  style="color:#e6a700;margin-left:0.5rem;font-size:0.75rem;cursor:help"
                  [title]="repo.stats?.attentionReason || 'Needs attention'"></i>
+              <div *ngIf="repo.organization" class="text-muted" style="font-size:0.75rem">{{ repo.organization }}</div>
             </td>
             <td><span class="badge badge-muted">{{ repo.provider }}</span></td>
             <td>
@@ -108,10 +114,16 @@ import { RepositorySparklineComponent } from './repository-sparkline.component';
             </td>
             <td class="text-muted">{{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'short') : 'Never' }}</td>
             <td>
-              <button class="btn btn-sm btn-secondary" (click)="sync(repo)" [disabled]="isBusy(repo.id)">
-                <span *ngIf="!isBusy(repo.id)"><i class="bi bi-arrow-repeat"></i> Sync</span>
-                <span *ngIf="isBusy(repo.id)"><div class="spinner" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></div> Syncing...</span>
-              </button>
+              <div style="display:flex;gap:0.375rem;align-items:center">
+                <button class="btn btn-sm btn-secondary" (click)="togglePin(repo.id)"
+                        [title]="pinService.isPinned(repo.id) ? 'Unpin from dashboard' : 'Pin to dashboard'">
+                  <i class="bi" [ngClass]="pinService.isPinned(repo.id) ? 'bi-pin-fill' : 'bi-pin-angle'"></i>
+                </button>
+                <button class="btn btn-sm btn-secondary" (click)="sync(repo)" [disabled]="isBusy(repo.id)">
+                  <span *ngIf="!isBusy(repo.id)"><i class="bi bi-arrow-repeat"></i> Sync</span>
+                  <span *ngIf="isBusy(repo.id)"><div class="spinner" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></div> Syncing...</span>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -143,13 +155,16 @@ export class RepositoryListComponent implements OnInit {
   nameFilter = '';
   statusFilter = '';
   providerFilter = '';
+  orgFilter = '';
   sortBy = 'name';
+  organizations: { name: string; count: number }[] = [];
 
-  constructor(private api: ApiService, public healthService: HealthService) {}
+  constructor(private api: ApiService, public healthService: HealthService, public pinService: PinService) {}
 
   ngOnInit() {
     this.loadRepositories();
     this.loadPipelines();
+    this.loadOrganizations();
   }
 
   loadRepositories() {
@@ -193,6 +208,12 @@ export class RepositoryListComponent implements OnInit {
     });
   }
 
+  loadOrganizations() {
+    this.api.getOrganizations().subscribe({
+      next: orgs => { this.organizations = orgs; }
+    });
+  }
+
   get filteredRepositories(): Repository[] {
     let repos = this.repositories;
     if (this.nameFilter) {
@@ -201,6 +222,7 @@ export class RepositoryListComponent implements OnInit {
     }
     if (this.statusFilter) repos = repos.filter(r => r.status === this.statusFilter);
     if (this.providerFilter) repos = repos.filter(r => r.provider === this.providerFilter);
+    if (this.orgFilter) repos = repos.filter(r => r.organization === this.orgFilter);
 
     return repos.sort((a, b) => {
       switch (this.sortBy) {
@@ -216,6 +238,7 @@ export class RepositoryListComponent implements OnInit {
     this.nameFilter = '';
     this.statusFilter = '';
     this.providerFilter = '';
+    this.orgFilter = '';
     this.sortBy = 'name';
   }
 
@@ -235,6 +258,10 @@ export class RepositoryListComponent implements OnInit {
         }
       }
     });
+  }
+
+  togglePin(repoId: string) {
+    this.pinService.toggle(repoId);
   }
 
   statusClass(status: string): string {

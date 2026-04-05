@@ -332,6 +332,34 @@ public class RepositoryService : IRepositoryService
         return lastSlash >= 0 ? path[(lastSlash + 1)..] : path;
     }
 
+    internal static string? ParseOrganization(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            var path = uri.AbsolutePath.TrimEnd('/');
+
+            if (path.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+                path = path[..^4];
+
+            var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+            // Azure DevOps: /org/project/_git/repo → org is first segment
+            if (path.Contains("/_git/") && segments.Length >= 1)
+                return segments[0];
+
+            // Standard (GitHub/GitLab/Gitea): /owner/repo → owner is first segment
+            if (segments.Length >= 2)
+                return segments[0];
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static RepositoryDto MapToDto(Repository repo)
     {
         FileFilterOverridesDto? filterOverrides = null;
@@ -354,6 +382,7 @@ public class RepositoryService : IRepositoryService
             Id = repo.Id,
             Name = repo.Name,
             Url = repo.Url,
+            Organization = ParseOrganization(repo.Url),
             Provider = repo.Provider,
             DefaultBranch = repo.DefaultBranch,
             LastIndexedCommitSha = repo.LastIndexedCommitSha,

@@ -202,6 +202,8 @@ builder.Services.AddScoped<IDependencyParserService, Andy.CodeIndex.Infrastructu
 // --- Background services ---
 builder.Services.AddHostedService<BackgroundWorkerService>();
 builder.Services.AddHostedService<PeriodicSyncService>();
+builder.Services.AddSingleton<ApiKeyHealthStatus>();
+builder.Services.AddHostedService<ApiKeyHealthService>();
 
 // --- OpenTelemetry ---
 builder.Services.AddOpenTelemetry()

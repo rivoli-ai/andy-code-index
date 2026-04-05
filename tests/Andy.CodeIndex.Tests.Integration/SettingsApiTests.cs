@@ -93,4 +93,16 @@ public class SettingsApiTests : IClassFixture<CustomWebApplicationFactory>
 
         body.Should().Contain("updated"); // Second change should be "updated" not "set"
     }
+
+    [Fact]
+    public async Task GetHealth_ReturnsHealthStatus()
+    {
+        var response = await _client.GetAsync("/api/v1/settings/health");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("llmKeyValid");
+        body.Should().Contain("embeddingKeyValid");
+        body.Should().Contain("lastChecked");
+    }
 }
