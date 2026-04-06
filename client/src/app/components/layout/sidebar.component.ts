@@ -55,8 +55,13 @@ import { AuthService } from '../../services/auth.service';
       <div class="sidebar-footer">
         <div class="user-section" *ngIf="authService.authEnabled && authService.isAuthenticated()">
           <div class="user-info">
-            <i class="bi bi-person-circle"></i>
-            <span class="user-name">{{ authService.getUserName() || 'User' }}</span>
+            <svg class="user-avatar" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+            </svg>
+            <div class="user-details">
+              <span class="user-name">{{ authService.getUserName() || 'User' }}</span>
+              <span class="user-email" *ngIf="authService.getUserEmail()">{{ authService.getUserEmail() }}</span>
+            </div>
           </div>
           <button class="btn btn-sm btn-secondary sign-out-btn" (click)="signOut()">
             <i class="bi bi-box-arrow-right"></i> Sign Out
@@ -110,17 +115,33 @@ import { AuthService } from '../../services/auth.service';
     .user-info {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      font-size: var(--font-sm);
+      gap: 0.625rem;
       color: var(--text);
     }
-    .user-info i { font-size: var(--font-xl); color: var(--primary); }
+    .user-avatar {
+      width: 2rem;
+      height: 2rem;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+    .user-details {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
     .user-name {
-      flex: 1;
+      font-size: var(--font-sm);
+      font-weight: 500;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-weight: 500;
+    }
+    .user-email {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .sign-out-btn {
       width: 100%;

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, firstValueFrom } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 
 interface TokenResponse {
@@ -45,7 +46,7 @@ export class AuthService {
     return !!environment.auth.authority;
   }
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private router: Router) {
     this.checkAuthState();
     if (this.authEnabled) {
       this.loadDiscoveryDocument();
@@ -263,7 +264,7 @@ export class AuthService {
       document.body.removeChild(iframe);
     }
 
-    window.location.href = '/login';
+    this.router.navigate(['/login']);
   }
 
   private clearSession(): void {

@@ -28,8 +28,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
       return next(req).pipe(
         catchError((error: HttpErrorResponse) => {
-          if (error.status === 401) {
-            authService.signOut();
+          if (error.status === 401 && !router.url.startsWith('/login') && !router.url.startsWith('/callback')) {
+            localStorage.setItem('auth_return_url', router.url);
+            router.navigate(['/login']);
           }
           if (error.status === 403) {
             // Enrich the error with a clear message for the UI

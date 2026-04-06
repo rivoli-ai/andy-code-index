@@ -1,22 +1,24 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet, RouterLink } from '@angular/router';
+import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { SidebarComponent } from './components/layout/sidebar.component';
 import { ApiService } from './services/api.service';
+import { AuthService } from './services/auth.service';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, RouterOutlet, RouterLink, SidebarComponent],
   template: `
-    <app-sidebar />
-    <main class="main-content">
-      <div *ngIf="llmWarning" class="health-banner health-banner-warning">
+    <app-sidebar *ngIf="showChrome" />
+    <main [class.main-content]="showChrome" [class.main-content-full]="!showChrome">
+      <div *ngIf="showChrome && llmWarning" class="health-banner health-banner-warning">
         <i class="bi bi-exclamation-triangle-fill"></i>
         {{ llmWarning }}
         <a routerLink="/settings">Check Settings</a>
       </div>
-      <div *ngIf="embeddingWarning" class="health-banner health-banner-warning">
+      <div *ngIf="showChrome && embeddingWarning" class="health-banner health-banner-warning">
         <i class="bi bi-exclamation-triangle-fill"></i>
         {{ embeddingWarning }}
         <a routerLink="/settings">Check Settings</a>
@@ -48,18 +50,30 @@ import { ApiService } from './services/api.service';
       border: 1px solid rgba(255,193,7,0.3);
       color: #856404;
     }
+    .main-content-full {
+      min-height: 100vh;
+    }
   `]
 })
 export class AppComponent implements OnInit, OnDestroy {
   llmWarning: string | null = null;
   embeddingWarning: string | null = null;
+  showChrome = false;
   private healthTimer: any;
+  private readonly chromeExcludedRoutes = ['/login', '/callback'];
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private auth: AuthService, private router: Router) {}
 
   ngOnInit() {
-    this.checkHealth();
-    this.healthTimer = setInterval(() => this.checkHealth(), 5 * 60 * 1000);
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd)
+    ).subscribe(e => {
+      this.showChrome = !this.chromeExcludedRoutes.some(r => e.urlAfterRedirects.startsWith(r));
+      if (this.showChrome && this.auth.isAuthenticated() && !this.healthTimer) {
+        this.checkHealth();
+        this.healthTimer = setInterval(() => this.checkHealth(), 5 * 60 * 1000);
+      }
+    });
   }
 
   ngOnDestroy() {
@@ -67,6 +81,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private checkHealth() {
+    if (!this.auth.isAuthenticated()) return;
     this.api.getKeyHealth().subscribe({
       next: (h) => {
         if (!h.lastChecked) return;
