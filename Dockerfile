@@ -2,17 +2,20 @@
 FROM node:22-alpine AS node-build
 WORKDIR /node-build
 
-# Trust corporate CAs (same certs/ directory used by the .NET stages)
-COPY --from=certs . /usr/local/share/ca-certificates/corporate/
-RUN apk add --no-cache ca-certificates && \
-    find /usr/local/share/ca-certificates/corporate/ -name '.git*' -delete 2>/dev/null || true && \
-    find /usr/local/share/ca-certificates/corporate/ -name 'README.md' -delete 2>/dev/null || true && \
-    update-ca-certificates 2>/dev/null || true
+# Trust corporate CAs (must happen before apk/npm can reach HTTPS registries)
+COPY --from=certs . /tmp/certs/
+RUN find /tmp/certs/ -name '.git*' -delete 2>/dev/null || true && \
+    find /tmp/certs/ -name 'README.md' -delete 2>/dev/null || true && \
+    for f in /tmp/certs/*.crt /tmp/certs/*.pem; do \
+      [ -f "$f" ] && cp "$f" /usr/local/share/ca-certificates/ 2>/dev/null || true; \
+    done && \
+    cat /tmp/certs/*.crt /tmp/certs/*.pem >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true && \
+    rm -rf /tmp/certs/
 
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
 COPY client/package.json client/package-lock.json ./
-RUN npm ci || (cat /root/.npm/_logs/*-debug-0.log 2>/dev/null; exit 1)
+RUN npm ci
 COPY client/ ./
 RUN npx ng build --configuration docker
 
