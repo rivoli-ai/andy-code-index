@@ -51,23 +51,22 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl openssl git && rm -rf /var/lib/apt/lists/*
 
-# Copy corporate CA certs and install them (handles multi-cert PEM bundles)
+# Copy corporate CA certs and install them
 COPY --from=certs . /tmp/certs/
 RUN find /tmp/certs/ -name '.git*' -delete 2>/dev/null || true && \
     find /tmp/certs/ -name 'README.md' -delete 2>/dev/null || true && \
-    for f in /tmp/certs/*.pem /tmp/certs/*.crt; do \
+    find /tmp/certs/ -name '.gitkeep' -delete 2>/dev/null || true && \
+    find /tmp/certs/ -name '.gitignore' -delete 2>/dev/null || true && \
+    mkdir -p /usr/local/share/ca-certificates/corporate && \
+    for f in /tmp/certs/*.pem /tmp/certs/*.crt /tmp/certs/*.cer; do \
       [ -f "$f" ] || continue; \
-      csplit -z -f "/usr/local/share/ca-certificates/corporate/$(basename "$f" | sed 's/\.[^.]*$//')-" \
-        "$f" '/-----BEGIN CERTIFICATE-----/' '{*}' 2>/dev/null || \
-        cp "$f" /usr/local/share/ca-certificates/corporate/ 2>/dev/null || true; \
+      cp "$f" /usr/local/share/ca-certificates/corporate/"$(basename "$f").crt" 2>/dev/null || true; \
+      cat "$f" >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true; \
     done && \
-    for f in /usr/local/share/ca-certificates/corporate/*; do \
-      [ -f "$f" ] && [ "${f##*.}" != "crt" ] && mv "$f" "$f.crt" 2>/dev/null || true; \
-    done && \
-    update-ca-certificates && \
+    update-ca-certificates 2>/dev/null || true && \
     rm -rf /tmp/certs/
 
-# Configure git to use the system CA bundle and trust /data repos
+# Configure git to trust the system CA bundle and /data repos
 RUN git config --system http.sslCAInfo /etc/ssl/certs/ca-certificates.crt && \
     git config --system --add safe.directory '*'
 
