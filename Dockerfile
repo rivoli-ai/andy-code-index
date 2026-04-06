@@ -6,10 +6,11 @@ WORKDIR /node-build
 COPY --from=certs . /tmp/certs/
 RUN find /tmp/certs/ -name '.git*' -delete 2>/dev/null || true && \
     find /tmp/certs/ -name 'README.md' -delete 2>/dev/null || true && \
-    for f in /tmp/certs/*.crt /tmp/certs/*.pem; do \
-      [ -f "$f" ] && cp "$f" /usr/local/share/ca-certificates/ 2>/dev/null || true; \
+    find /tmp/certs/ -name '.gitkeep' -delete 2>/dev/null || true && \
+    find /tmp/certs/ -name '.gitignore' -delete 2>/dev/null || true && \
+    for f in /tmp/certs/*.crt /tmp/certs/*.pem /tmp/certs/*.cer; do \
+      [ -f "$f" ] && cat "$f" >> /etc/ssl/certs/ca-certificates.crt || true; \
     done && \
-    cat /tmp/certs/*.crt /tmp/certs/*.pem >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true && \
     rm -rf /tmp/certs/
 
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
@@ -23,10 +24,19 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl && rm -rf /var/lib/apt/lists/*
-COPY --from=certs . /usr/local/share/ca-certificates/corporate/
-RUN find /usr/local/share/ca-certificates/corporate/ -name '.git*' -delete 2>/dev/null || true && \
-    find /usr/local/share/ca-certificates/corporate/ -name 'README.md' -delete 2>/dev/null || true && \
-    update-ca-certificates
+
+# Trust corporate CAs for NuGet restore
+COPY --from=certs . /tmp/certs/
+RUN find /tmp/certs/ -name '.git*' -delete 2>/dev/null || true && \
+    find /tmp/certs/ -name 'README.md' -delete 2>/dev/null || true && \
+    find /tmp/certs/ -name '.gitkeep' -delete 2>/dev/null || true && \
+    find /tmp/certs/ -name '.gitignore' -delete 2>/dev/null || true && \
+    for f in /tmp/certs/*.crt /tmp/certs/*.pem /tmp/certs/*.cer; do \
+      [ -f "$f" ] || continue; \
+      cp "$f" /usr/local/share/ca-certificates/"$(basename "$f").crt" 2>/dev/null || true; \
+    done && \
+    update-ca-certificates && \
+    rm -rf /tmp/certs/
 
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
     SSL_CERT_DIR=/etc/ssl/certs \
@@ -46,12 +56,13 @@ RUN dotnet restore src/Andy.CodeIndex.Api/Andy.CodeIndex.Api.csproj
 COPY . .
 RUN dotnet publish src/Andy.CodeIndex.Api/Andy.CodeIndex.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
 
+# ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl openssl git && rm -rf /var/lib/apt/lists/*
 
-# Copy corporate CA certs and install them
+# Copy corporate CA certs and install them (as root, before switching user)
 COPY --from=certs . /tmp/certs/
 RUN find /tmp/certs/ -name '.git*' -delete 2>/dev/null || true && \
     find /tmp/certs/ -name 'README.md' -delete 2>/dev/null || true && \
@@ -62,6 +73,7 @@ RUN find /tmp/certs/ -name '.git*' -delete 2>/dev/null || true && \
       [ -f "$f" ] || continue; \
       cp "$f" /usr/local/share/ca-certificates/corporate/"$(basename "$f").crt" 2>/dev/null || true; \
       cat "$f" >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true; \
+      echo "Installed cert: $(basename "$f")" ; \
     done && \
     update-ca-certificates 2>/dev/null || true && \
     rm -rf /tmp/certs/
@@ -88,14 +100,17 @@ RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     rm -f /tmp/dev.key /tmp/dev.crt && \
     chown codeindex:codeindex /https/aspnetapp.pfx
 
-RUN printf '#!/bin/sh\nset -e\nif ls /usr/local/share/ca-certificates/custom/*.crt 1>/dev/null 2>&1 || ls /usr/local/share/ca-certificates/custom/*.pem 1>/dev/null 2>&1; then\n    for f in /usr/local/share/ca-certificates/custom/*.pem; do\n        [ -f "$f" ] && cat "$f" >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true\n    done\n    update-ca-certificates 2>/dev/null || true\nfi\nexec "$@"\n' > /docker-entrypoint.sh && \
+# Entrypoint: trust runtime-mounted custom CAs, then start the app
+# Runs as root briefly to update certs, then exec's the CMD as codeindex
+RUN printf '#!/bin/sh\nset -e\nif ls /usr/local/share/ca-certificates/custom/*.crt 1>/dev/null 2>&1 || ls /usr/local/share/ca-certificates/custom/*.pem 1>/dev/null 2>&1 || ls /usr/local/share/ca-certificates/custom/*.cer 1>/dev/null 2>&1; then\n    for f in /usr/local/share/ca-certificates/custom/*.pem /usr/local/share/ca-certificates/custom/*.crt /usr/local/share/ca-certificates/custom/*.cer; do\n        [ -f "$f" ] && cat "$f" >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true\n    done\n    update-ca-certificates 2>/dev/null || true\nfi\nexec "$@"\n' > /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
     SSL_CERT_DIR=/etc/ssl/certs \
     ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx \
     ASPNETCORE_Kestrel__Certificates__Default__Password=devcert \
-    Indexing__DataDir=/data
+    Indexing__DataDir=/data \
+    GIT_SSL_CAINFO=/etc/ssl/certs/ca-certificates.crt
 
 EXPOSE 8080
 USER codeindex
