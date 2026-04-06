@@ -21,15 +21,15 @@
   --text-muted: #6C757D;
   --text-light: #ADB5BD;
 
-  /* Font sizes - matching andy-rbac */
-  --font-xs: 0.875rem;     /* 14px */
-  --font-sm: 1rem;         /* 16px */
-  --font-base: 1.125rem;   /* 18px */
-  --font-md: 1.1875rem;    /* 19px */
-  --font-lg: 1.25rem;      /* 20px */
-  --font-xl: 1.5rem;       /* 24px */
-  --font-2xl: 1.75rem;     /* 28px */
-  --font-3xl: 2.25rem;     /* 36px */
+  /* Font sizes — system-standard scale (14px base) */
+  --font-xs: 0.75rem;       /* 12px */
+  --font-sm: 0.8125rem;     /* 13px */
+  --font-base: 0.875rem;    /* 14px */
+  --font-md: 0.9375rem;     /* 15px */
+  --font-lg: 1rem;          /* 16px */
+  --font-xl: 1.25rem;       /* 20px */
+  --font-2xl: 1.5rem;       /* 24px */
+  --font-3xl: 1.875rem;     /* 30px */
 
   --sidebar-width: 280px;
   --sidebar-collapsed: 70px;
@@ -43,8 +43,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  font-size: 18px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
   line-height: 1.6;
   font-weight: 400;
   letter-spacing: -0.01em;
