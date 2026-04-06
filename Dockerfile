@@ -51,14 +51,25 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl openssl git && rm -rf /var/lib/apt/lists/*
 
-# Copy corporate CA certs from build stage and install them (must happen as root)
-COPY --from=certs . /usr/local/share/ca-certificates/corporate/
-RUN find /usr/local/share/ca-certificates/corporate/ -name '.git*' -delete 2>/dev/null || true && \
-    find /usr/local/share/ca-certificates/corporate/ -name 'README.md' -delete 2>/dev/null || true && \
-    update-ca-certificates
+# Copy corporate CA certs and install them (handles multi-cert PEM bundles)
+COPY --from=certs . /tmp/certs/
+RUN find /tmp/certs/ -name '.git*' -delete 2>/dev/null || true && \
+    find /tmp/certs/ -name 'README.md' -delete 2>/dev/null || true && \
+    for f in /tmp/certs/*.pem /tmp/certs/*.crt; do \
+      [ -f "$f" ] || continue; \
+      csplit -z -f "/usr/local/share/ca-certificates/corporate/$(basename "$f" | sed 's/\.[^.]*$//')-" \
+        "$f" '/-----BEGIN CERTIFICATE-----/' '{*}' 2>/dev/null || \
+        cp "$f" /usr/local/share/ca-certificates/corporate/ 2>/dev/null || true; \
+    done && \
+    for f in /usr/local/share/ca-certificates/corporate/*; do \
+      [ -f "$f" ] && [ "${f##*.}" != "crt" ] && mv "$f" "$f.crt" 2>/dev/null || true; \
+    done && \
+    update-ca-certificates && \
+    rm -rf /tmp/certs/
 
-# Configure git to trust /data repos (ownership may differ in containers)
-RUN git config --system --add safe.directory '*'
+# Configure git to use the system CA bundle and trust /data repos
+RUN git config --system http.sslCAInfo /etc/ssl/certs/ca-certificates.crt && \
+    git config --system --add safe.directory '*'
 
 # Non-root user
 RUN groupadd -r codeindex && useradd -r -g codeindex -d /app -s /sbin/nologin codeindex
@@ -78,7 +89,7 @@ RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     rm -f /tmp/dev.key /tmp/dev.crt && \
     chown codeindex:codeindex /https/aspnetapp.pfx
 
-RUN printf '#!/bin/sh\nset -e\nif ls /usr/local/share/ca-certificates/custom/*.crt 1>/dev/null 2>&1 || ls /usr/local/share/ca-certificates/custom/*.pem 1>/dev/null 2>&1; then\n    update-ca-certificates 2>/dev/null || true\nfi\nexec "$@"\n' > /docker-entrypoint.sh && \
+RUN printf '#!/bin/sh\nset -e\nif ls /usr/local/share/ca-certificates/custom/*.crt 1>/dev/null 2>&1 || ls /usr/local/share/ca-certificates/custom/*.pem 1>/dev/null 2>&1; then\n    for f in /usr/local/share/ca-certificates/custom/*.pem; do\n        [ -f "$f" ] && cat "$f" >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true\n    done\n    update-ca-certificates 2>/dev/null || true\nfi\nexec "$@"\n' > /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
