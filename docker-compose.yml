@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: andy_code_index_dev_password
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5436:5432"
+      - "7436:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -40,9 +40,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "5101:8443"
-      - "5102:8080"
-      - "4201:8443"
+      - "7101:8443"
+      - "7102:8080"
+      - "6201:8443"
     volumes:
       - ./certs:/usr/local/share/ca-certificates/custom:ro
       - code_index_data:/data
