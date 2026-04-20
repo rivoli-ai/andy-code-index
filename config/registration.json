@@ -1,0 +1,66 @@
+{
+  "$schema": "../../andy-service-template/docs/registration.schema.json",
+  "service": {
+    "name": "andy-code-index",
+    "displayName": "Andy Code Index",
+    "description": "Semantic code search — repo discovery, indexing, embeddings, citations.",
+    "embeddedProxyPrefix": "/code-index",
+    "ports": {
+      "dotnetHttps": 5101,
+      "dotnetHttp":  5102,
+      "dotnetPostgres": 5436,
+      "dotnetClient": 4201,
+      "dockerHttps": 7101,
+      "dockerHttp":  7102,
+      "dockerPostgres": 7436,
+      "dockerClient": 6201,
+      "embeddedProxy": 9100
+    }
+  },
+  "auth": {
+    "audience": "urn:andy-code-index-api",
+    "webClient": {
+      "clientId": "andy-code-index-web",
+      "clientType": "public",
+      "displayName": "Andy Code Index Web",
+      "description": "Angular SPA for semantic code search",
+      "grantTypes": ["authorization_code", "refresh_token"],
+      "scopes": ["email", "profile", "roles", "scp:urn:andy-code-index-api"],
+      "redirectUris": [
+        "https://localhost:4201/callback",
+        "https://localhost:6201/callback",
+        "http://localhost:9100/code-index/callback"
+      ],
+      "postLogoutRedirectUris": [
+        "https://localhost:4201/",
+        "https://localhost:6201/",
+        "http://localhost:9100/code-index/"
+      ]
+    }
+  },
+  "rbac": {
+    "applicationCode": "code-index",
+    "applicationName": "Andy Code Index",
+    "description": "Code indexing and search platform",
+    "resourceTypes": [
+      { "code": "repository", "name": "Repository", "supportsInstances": true },
+      { "code": "index",      "name": "Index",      "supportsInstances": true },
+      { "code": "query",      "name": "Query",      "supportsInstances": true }
+    ],
+    "roles": [
+      { "code": "admin",  "name": "Administrator", "description": "Full access to code index", "isSystem": true },
+      { "code": "user",   "name": "User",          "description": "Standard user",             "isSystem": true },
+      { "code": "viewer", "name": "Viewer",        "description": "Read-only search access",   "isSystem": true }
+    ],
+    "testUserRole": "admin"
+  },
+  "settings": {
+    "definitions": [
+      { "key": "andy.codeindex.embedding.provider",    "displayName": "Embedding Provider",   "description": "Embedding API provider",       "category": "Embedding", "dataType": "String",  "defaultValue": "openai", "allowedScopes": ["Machine","Application","User","Team"] },
+      { "key": "andy.codeindex.embedding.model",       "displayName": "Embedding Model",      "description": "Model name for embeddings",    "category": "Embedding", "dataType": "String",  "defaultValue": "text-embedding-3-small" },
+      { "key": "andy.codeindex.embedding.dimensions",  "displayName": "Embedding Dimensions", "description": "Vector dimensions",            "category": "Embedding", "dataType": "Integer", "defaultValue": 1536 },
+      { "key": "andy.codeindex.embedding.apiKey",      "displayName": "Embedding API Key",    "description": "API key for embedding provider", "category": "Embedding", "dataType": "Secret",  "isSecret": true, "allowedScopes": ["Machine","Application","User"] },
+      { "key": "andy.codeindex.chunkSizeTokens",       "displayName": "Chunk Size",           "description": "Maximum tokens per chunk",     "category": "Indexing",  "dataType": "Integer", "defaultValue": 512 }
+    ]
+  }
+}
