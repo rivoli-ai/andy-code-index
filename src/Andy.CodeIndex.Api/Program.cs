@@ -1,4 +1,5 @@
 using Andy.Auth.Extensions;
+using Andy.CodeIndex.Api;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Data;
@@ -6,6 +7,7 @@ using Andy.CodeIndex.Infrastructure.Handlers;
 using Andy.CodeIndex.Infrastructure.Repositories;
 using Andy.CodeIndex.Infrastructure.Services;
 using Andy.Rbac.Client;
+using Andy.Settings.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -41,7 +43,9 @@ if (!string.IsNullOrEmpty(andyAuthAuthority))
         {
             options.Authority = andyAuthAuthority;
             options.Audience = audience;
-            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            // HTTPS metadata off in every non-production mode (Mode 1
+            // self-signed cert, Mode 2 docker http, Mode 3 localhost proxy).
+            options.RequireHttpsMetadata = !builder.Environment.IsLocalOrEmbedded();
             if (builder.Environment.IsDevelopment())
             {
                 options.BackchannelHttpHandler = new HttpClientHandler
@@ -53,6 +57,14 @@ if (!string.IsNullOrEmpty(andyAuthAuthority))
                 {
                     andyAuthAuthority, andyAuthAuthority.TrimEnd('/') + "/",
                     "https://localhost:5001", "https://localhost:5001/"
+                };
+            }
+            else
+            {
+                // Docker + Embedded: strict issuer match against configured Authority.
+                options.TokenValidationParameters.ValidIssuers = new[]
+                {
+                    andyAuthAuthority, andyAuthAuthority.TrimEnd('/') + "/"
                 };
             }
         });
@@ -128,6 +140,21 @@ if (!string.IsNullOrEmpty(rbacBaseUrl))
             }));
     }
 }
+
+// --- andy-settings client (fail loud if unreachable) ---
+//
+// andy-code-index reads its indexer configuration (embedding provider
+// API keys, repository-scope overrides) from andy-settings. Running
+// without it means stale or missing keys silently disable enrichment —
+// the bug class epic rivoli-ai/conductor#771 deletes.
+var settingsBaseUrl = builder.Configuration["AndySettings:ApiBaseUrl"];
+if (string.IsNullOrWhiteSpace(settingsBaseUrl))
+{
+    throw new InvalidOperationException(
+        "AndySettings:ApiBaseUrl must be configured. andy-code-index sources its " +
+        "indexer + embedding credentials from andy-settings and will not start without it.");
+}
+builder.Services.AddAndySettingsClient(builder.Configuration);
 
 // --- Repositories ---
 builder.Services.AddScoped<ICodeRepositoryRepository, CodeRepositoryRepository>();
