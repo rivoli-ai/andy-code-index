@@ -3,15 +3,15 @@
   "service": {
     "name": "andy-code-index",
     "displayName": "Andy Code Index",
-    "description": "Semantic code search — repo discovery, indexing, embeddings, citations.",
+    "description": "Semantic code search \u2014 repo discovery, indexing, embeddings, citations.",
     "embeddedProxyPrefix": "/code-index",
     "ports": {
       "dotnetHttps": 5101,
-      "dotnetHttp":  5102,
+      "dotnetHttp": 5102,
       "dotnetPostgres": 5436,
       "dotnetClient": 4201,
       "dockerHttps": 7101,
-      "dockerHttp":  7102,
+      "dockerHttp": 7102,
       "dockerPostgres": 7436,
       "dockerClient": 6201,
       "embeddedProxy": 9100
@@ -24,8 +24,16 @@
       "clientType": "public",
       "displayName": "Andy Code Index Web",
       "description": "Angular SPA for semantic code search",
-      "grantTypes": ["authorization_code", "refresh_token"],
-      "scopes": ["email", "profile", "roles", "scp:urn:andy-code-index-api"],
+      "grantTypes": [
+        "authorization_code",
+        "refresh_token"
+      ],
+      "scopes": [
+        "email",
+        "profile",
+        "roles",
+        "scp:urn:andy-code-index-api"
+      ],
       "redirectUris": [
         "https://localhost:4201/callback",
         "https://localhost:6201/callback",
@@ -43,24 +51,160 @@
     "applicationName": "Andy Code Index",
     "description": "Code indexing and search platform",
     "resourceTypes": [
-      { "code": "repository", "name": "Repository", "supportsInstances": true },
-      { "code": "index",      "name": "Index",      "supportsInstances": true },
-      { "code": "query",      "name": "Query",      "supportsInstances": true }
+      {
+        "code": "repository",
+        "name": "Repository",
+        "supportsInstances": true
+      },
+      {
+        "code": "index",
+        "name": "Index",
+        "supportsInstances": true
+      },
+      {
+        "code": "query",
+        "name": "Query",
+        "supportsInstances": true
+      }
     ],
     "roles": [
-      { "code": "admin",  "name": "Administrator", "description": "Full access to code index", "isSystem": true },
-      { "code": "user",   "name": "User",          "description": "Standard user",             "isSystem": true },
-      { "code": "viewer", "name": "Viewer",        "description": "Read-only search access",   "isSystem": true }
+      {
+        "code": "admin",
+        "name": "Administrator",
+        "description": "Full access to code index",
+        "isSystem": true
+      },
+      {
+        "code": "user",
+        "name": "User",
+        "description": "Standard user",
+        "isSystem": true
+      },
+      {
+        "code": "viewer",
+        "name": "Viewer",
+        "description": "Read-only search access",
+        "isSystem": true
+      }
     ],
     "testUserRole": "admin"
   },
   "settings": {
     "definitions": [
-      { "key": "andy.codeindex.embedding.provider",    "displayName": "Embedding Provider",   "description": "Embedding API provider",       "category": "Embedding", "dataType": "String",  "defaultValue": "openai", "allowedScopes": ["Machine","Application","User","Team"] },
-      { "key": "andy.codeindex.embedding.model",       "displayName": "Embedding Model",      "description": "Model name for embeddings",    "category": "Embedding", "dataType": "String",  "defaultValue": "text-embedding-3-small" },
-      { "key": "andy.codeindex.embedding.dimensions",  "displayName": "Embedding Dimensions", "description": "Vector dimensions",            "category": "Embedding", "dataType": "Integer", "defaultValue": 1536 },
-      { "key": "andy.codeindex.embedding.apiKey",      "displayName": "Embedding API Key",    "description": "API key for embedding provider", "category": "Embedding", "dataType": "Secret",  "isSecret": true, "allowedScopes": ["Machine","Application","User"] },
-      { "key": "andy.codeindex.chunkSizeTokens",       "displayName": "Chunk Size",           "description": "Maximum tokens per chunk",     "category": "Indexing",  "dataType": "Integer", "defaultValue": 512 }
+      {
+        "key": "andy.codeindex.embedding.provider",
+        "displayName": "Embedding Provider",
+        "description": "Embedding API provider",
+        "category": "Embedding",
+        "dataType": "String",
+        "defaultValue": "openai",
+        "allowedScopes": [
+          "Machine",
+          "Application",
+          "User",
+          "Team"
+        ]
+      },
+      {
+        "key": "andy.codeindex.embedding.model",
+        "displayName": "Embedding Model",
+        "description": "Model name for embeddings",
+        "category": "Embedding",
+        "dataType": "String",
+        "defaultValue": "text-embedding-3-small"
+      },
+      {
+        "key": "andy.codeindex.embedding.dimensions",
+        "displayName": "Embedding Dimensions",
+        "description": "Vector dimensions",
+        "category": "Embedding",
+        "dataType": "Integer",
+        "defaultValue": 1536
+      },
+      {
+        "key": "andy.codeindex.embedding.apiKey",
+        "displayName": "Embedding API Key",
+        "description": "API key for embedding provider",
+        "category": "Embedding",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": [
+          "Machine",
+          "Application",
+          "User"
+        ]
+      },
+      {
+        "key": "andy.codeindex.chunkSizeTokens",
+        "displayName": "Chunk Size",
+        "description": "Maximum tokens per chunk",
+        "category": "Indexing",
+        "dataType": "Integer",
+        "defaultValue": 512
+      },
+      {
+        "key": "andy.codeindex.embedding.baseUrl",
+        "displayName": "Embedding Base URL",
+        "description": "Base URL override for the embedding provider (e.g. Azure OpenAI custom endpoint).",
+        "category": "Embedding",
+        "dataType": "Uri",
+        "allowedScopes": [
+          "Machine",
+          "Application",
+          "User"
+        ]
+      },
+      {
+        "key": "andy.codeindex.llm.provider",
+        "displayName": "LLM Provider",
+        "description": "System-fallback LLM provider identifier (anthropic|openai|\u2026).",
+        "category": "Llm",
+        "dataType": "String",
+        "defaultValue": "anthropic",
+        "allowedScopes": [
+          "Machine",
+          "Application",
+          "User"
+        ]
+      },
+      {
+        "key": "andy.codeindex.llm.model",
+        "displayName": "LLM Model",
+        "description": "System-fallback LLM model name.",
+        "category": "Llm",
+        "dataType": "String",
+        "defaultValue": "claude-3-5-sonnet-latest",
+        "allowedScopes": [
+          "Machine",
+          "Application",
+          "User"
+        ]
+      },
+      {
+        "key": "andy.codeindex.llm.apiKey",
+        "displayName": "LLM API Key (system fallback)",
+        "description": "System-level LLM API key used when no user-owned key is present. Migrated from LlmOptions.ApiKey in appsettings.json.",
+        "category": "Llm",
+        "dataType": "Secret",
+        "isSecret": true,
+        "allowedScopes": [
+          "Machine",
+          "Application",
+          "User"
+        ]
+      },
+      {
+        "key": "andy.codeindex.llm.baseUrl",
+        "displayName": "LLM Base URL",
+        "description": "Base URL override for the LLM provider.",
+        "category": "Llm",
+        "dataType": "Uri",
+        "allowedScopes": [
+          "Machine",
+          "Application",
+          "User"
+        ]
+      }
     ]
   }
 }
