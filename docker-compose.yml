@@ -36,6 +36,9 @@ services:
       - AndyAuth__RequireHttpsMetadata=false
       - Rbac__ApiBaseUrl=https://host.docker.internal:7003
       - Rbac__ApplicationCode=code-index
+      # andy-settings client wiring (epic rivoli-ai/conductor#771)
+      - AndySettings__ApiBaseUrl=https://host.docker.internal:5300
+      - AndySettings__ApplicationCode=andy-code-index
       - Indexing__DataDir=/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
