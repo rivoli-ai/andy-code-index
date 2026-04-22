@@ -26,6 +26,9 @@ services:
       dockerfile: Dockerfile
       additional_contexts:
         certs: ./certs
+        # Mounts sibling andy-settings artifacts so the Dockerfile can
+        # restore Andy.Settings.Client 0.1.0-dev during the epic.
+        andy-settings-artifacts: ../andy-settings/artifacts
     container_name: andy-code-index-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
