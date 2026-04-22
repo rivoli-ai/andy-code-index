@@ -37,7 +37,9 @@ services:
       - Rbac__ApiBaseUrl=https://host.docker.internal:7003
       - Rbac__ApplicationCode=code-index
       # andy-settings client wiring (epic rivoli-ai/conductor#771)
-      - AndySettings__ApiBaseUrl=https://host.docker.internal:5300
+      # Port resolved from andy-settings' config/registration.json via
+      # ../andy-settings/scripts/generate-docker-ports-env.sh. See rivoli-ai/conductor#793.
+      - AndySettings__ApiBaseUrl=https://host.docker.internal:${ANDY_SETTINGS_DOCKER_HTTPS:-7300}
       - AndySettings__ApplicationCode=andy-code-index
       - Indexing__DataDir=/data
     extra_hosts:
