@@ -8,6 +8,7 @@ using Andy.CodeIndex.Infrastructure.Services;
 using Andy.Rbac.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -136,7 +137,14 @@ builder.Services.AddScoped<IEnrichmentRepository, EnrichmentRepository>();
 builder.Services.AddScoped<IIndexingTaskRepository, IndexingTaskRepository>();
 
 // --- Services ---
-builder.Services.AddDataProtection();
+// Persist Data Protection keys to the DB so encrypted values
+// (Repository.PersonalAccessToken via EncryptionService) survive
+// process restarts. Without this, AddDataProtection() uses an
+// ephemeral key ring and every restart re-keys, leaving any
+// previously-encrypted value un-Unprotectable. See conductor#1160.
+builder.Services.AddDataProtection()
+    .SetApplicationName("andy-code-index")
+    .PersistKeysToDbContext<CodeIndexDbContext>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<IApiKeyResolver, ApiKeyResolver>();
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
