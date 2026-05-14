@@ -1,4 +1,6 @@
 using Andy.Auth.Extensions;
+using Andy.CodeIndex.Api;
+// HostEnvironmentExtensions.IsEmbedded / IsLocalOrEmbedded
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Data;
@@ -41,7 +43,11 @@ if (!string.IsNullOrEmpty(andyAuthAuthority))
         {
             options.Authority = andyAuthAuthority;
             options.Audience = audience;
-            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            // HTTPS metadata off in every non-production mode. Conductor's
+            // embedded mode talks to andy-auth over HTTP via the unified
+            // proxy on port 9100 — without IsLocalOrEmbedded() the JWT
+            // bearer middleware would refuse the discovery document.
+            options.RequireHttpsMetadata = !builder.Environment.IsLocalOrEmbedded();
             if (builder.Environment.IsDevelopment())
             {
                 options.BackchannelHttpHandler = new HttpClientHandler
@@ -414,8 +420,12 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = Dat
 
 app.MapFallbackToFile("index.html");
 
-// --- Auto-migrate in development ---
-if (app.Environment.IsDevelopment() && !string.IsNullOrEmpty(connectionString))
+// --- Auto-migrate (every non-production mode) ---
+// Embedded needs schema-on-first-boot too — without IsLocalOrEmbedded
+// a fresh install would launch with an empty Postgres DB and every
+// index/search request 500s. The `IsNpgsql()` guard keeps the
+// migration logic out of integration tests (InMemory provider).
+if (app.Environment.IsLocalOrEmbedded() && !string.IsNullOrEmpty(connectionString))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<CodeIndexDbContext>();
