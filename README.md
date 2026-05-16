@@ -13,7 +13,7 @@ Andy.CodeIndex indexes Git repositories for AI-powered code search and understan
 - **AST-based API documentation** for C#, TypeScript, Python, Go, Java, JavaScript
 - **LLM-powered enrichments**: architecture docs, API docs, wiki, cookbook, commit descriptions, dependency extraction
 - **RAG chat** with intent detection for asking questions about indexed code
-- **19 MCP tools** for Claude Desktop, Cursor, and other AI assistants
+- **MCP tools** for Claude Desktop, Cursor, and other AI assistants (50+ tools across query, enrichment, management, discovery)
 - **Background indexing pipeline** with task chaining, incremental updates, and quality scoring
 - **Repository discovery** for GitHub and Azure DevOps organizations
 
@@ -115,13 +115,15 @@ Swagger UI available at `/swagger` in development mode.
 
 ## MCP Tools
 
-29 tools exposed at `/mcp` with the `code_index_` prefix:
+Tools are exposed at `/mcp` with the `code_index_` prefix and grouped roughly as:
 
-**Query:** `code_index_version`, `code_index_repositories`, `code_index_semantic_search`, `code_index_keyword_search`, `code_index_grep`, `code_index_read_resource`, `code_index_ls`, `code_index_chat`, `code_index_search_filters`, `code_index_commits`
+**Query / Search:** `code_index_version`, `code_index_repositories`, `code_index_get_repository`, `code_index_semantic_search`, `code_index_keyword_search`, `code_index_hybrid_search`, `code_index_grep`, `code_index_read_resource`, `code_index_fetch_file`, `code_index_ls`, `code_index_git_tree`, `code_index_git_log`, `code_index_git_refs`, `code_index_chat`, `code_index_chat_status`, `code_index_chat_suggestions`, `code_index_search_filters`, `code_index_commits`, `code_index_get_commit`, `code_index_commit_history`
 
-**Enrichments:** `code_index_architecture_docs`, `code_index_api_docs`, `code_index_database_schema`, `code_index_cookbook`, `code_index_wiki`, `code_index_wiki_page`, `code_index_commit_description`, `code_index_commit_history`, `code_index_dependencies`, `code_index_ownership`, `code_index_security`, `code_index_operations`, `code_index_quality`, `code_index_enrichment_counts`
+**Enrichments / Insights:** `code_index_architecture_docs`, `code_index_api_docs`, `code_index_database_schema`, `code_index_cookbook`, `code_index_wiki`, `code_index_wiki_page`, `code_index_commit_description`, `code_index_commit_summary`, `code_index_dependencies`, `code_index_ownership`, `code_index_security`, `code_index_operations`, `code_index_quality`, `code_index_insights`, `code_index_tech_stack`, `code_index_feature_map`, `code_index_health_score`, `code_index_report`, `code_index_repo_activity`, `code_index_committers`, `code_index_enrichment_counts`, `code_index_query_enrichments`, `code_index_get_enrichment`, `code_index_wipe_enrichments`
 
-**Management:** `code_index_add_repository`, `code_index_delete_repository`, `code_index_sync_repository`, `code_index_analytics`, `code_index_sync_status`
+**Management:** `code_index_add_repository`, `code_index_delete_repository`, `code_index_sync_repository`, `code_index_sync_status`, `code_index_analytics`, `code_index_settings`, `code_index_update_settings`, `code_index_queue_tasks`, `code_index_queue_task`, `code_index_indexing_history`
+
+**Discovery:** `code_index_discover_github`, `code_index_discover_azure_devops`, `code_index_discover_sync`
 
 ## Configuration
 

@@ -14,6 +14,9 @@
 | [010](010-update-enrichments-descriptions.md) | Update Enrichments Type Descriptions | Low | documentation, UX |
 | [011](011-chat-session-management.md) | Review and Improve Chat Session Management | Medium | feature, UX |
 | [012](012-static-documentation-site.md) | Static Documentation Site with TOC Navigation | Medium | feature, documentation |
+| [013](013-chat-agent-file-access.md) | Chat Agent Access to Specific Committed Files | High | feature, chat |
+| [014](014-repository-insights-lenses.md) | Repository Insights — Multi-Layer Analysis Lenses | High | feature, insights |
+| [015](015-insight-analysis-report.md) | Insight Analysis Report — Ratings, Feedback, and Exportable Report | Medium | feature, insights |
 
 ## Common Acceptance Criteria (all stories)
 
