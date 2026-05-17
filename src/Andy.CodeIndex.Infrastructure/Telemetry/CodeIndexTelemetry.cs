@@ -31,4 +31,12 @@ public static class CodeIndexTelemetry
         "code_index.tasks.duration", "seconds", "Task execution duration");
     public static readonly Histogram<double> SearchDuration = Meter.CreateHistogram<double>(
         "code_index.search.duration", "seconds", "Search execution duration");
+
+    // OT4 (rivoli-ai/conductor#1262) — IndexQuery duration histogram.
+    // Distinct from SearchDuration so the spec's `code_index.query.duration`
+    // tag (per-query latency including planning + fan-out) and
+    // `code_index.search.duration` (per-search-strategy latency) can each
+    // be aggregated independently in dashboards.
+    public static readonly Histogram<double> QueryDuration = Meter.CreateHistogram<double>(
+        "code_index.query.duration", "seconds", "End-to-end IndexQuery latency");
 }

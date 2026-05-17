@@ -6,10 +6,12 @@ using Andy.CodeIndex.Infrastructure.Handlers;
 using Andy.CodeIndex.Infrastructure.Repositories;
 using Andy.CodeIndex.Infrastructure.Services;
 using Andy.Rbac.Client;
+using Andy.Telemetry;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -205,12 +207,33 @@ builder.Services.AddHostedService<PeriodicSyncService>();
 builder.Services.AddSingleton<ApiKeyHealthStatus>();
 builder.Services.AddHostedService<ApiKeyHealthService>();
 
-// --- OpenTelemetry ---
+// --- OpenTelemetry (via Andy.Telemetry) ---
+// OT4 (rivoli-ai/conductor#1262): replaces the prior Console-only
+// OpenTelemetry wiring with the canonical Andy.Telemetry pipeline
+// (OTLP export to Conductor's local receiver, Prometheus /metrics,
+// W3C Trace Context propagation, runtime + http instrumentation).
+//
+// Conductor's UnifiedProxy already emits server-side request spans, so
+// EnableAspNetCoreInstrumentation stays off here to avoid double-counting.
+builder.Services.AddAndyTelemetry(builder.Configuration, o =>
+{
+    if (string.IsNullOrWhiteSpace(o.ServiceName))
+        o.ServiceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "andy-code-index";
+    if (string.IsNullOrWhiteSpace(o.OtlpEndpoint))
+        o.OtlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+    if (string.IsNullOrWhiteSpace(o.Protocol) || o.Protocol == "grpc")
+    {
+        var envProtocol = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_PROTOCOL");
+        if (!string.IsNullOrWhiteSpace(envProtocol))
+            o.Protocol = envProtocol;
+    }
+    o.ActivitySources.Add(Andy.CodeIndex.Infrastructure.Telemetry.CodeIndexTelemetry.ServiceName);
+    o.Meters.Add(Andy.CodeIndex.Infrastructure.Telemetry.CodeIndexTelemetry.ServiceName);
+    o.EnableAspNetCoreInstrumentation = false;
+});
+// EF Core tracing is service-specific (not bundled in Andy.Telemetry).
 builder.Services.AddOpenTelemetry()
-    .WithTracing(tracing => tracing
-        .AddSource(Andy.CodeIndex.Infrastructure.Telemetry.CodeIndexTelemetry.ServiceName))
-    .WithMetrics(metrics => metrics
-        .AddMeter(Andy.CodeIndex.Infrastructure.Telemetry.CodeIndexTelemetry.ServiceName));
+    .WithTracing(t => t.AddEntityFrameworkCoreInstrumentation());
 
 // --- Options ---
 builder.Services.Configure<IndexingOptions>(builder.Configuration.GetSection("Indexing"));
@@ -411,6 +434,11 @@ if (!string.IsNullOrEmpty(andyAuthAuthority))
 // --- Health check ---
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
     .AllowAnonymous();
+
+// --- Prometheus metrics scraping (via Andy.Telemetry) ---
+// OT4 (rivoli-ai/conductor#1262). Exposes /metrics for the Conductor
+// scraper; OTLP push is independent.
+app.MapAndyTelemetry();
 
 app.MapFallbackToFile("index.html");
 

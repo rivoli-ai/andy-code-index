@@ -37,6 +37,11 @@ project.fragment.lock.json
 !**/packages/build/
 *.nuget.props
 *.nuget.targets
+# OT4 (rivoli-ai/conductor#1262) — whitelist locally-vendored packages.
+# Andy.Telemetry 0.2.0 (introduced by OT4) is not yet on a shared
+# NuGet feed; the existing local-packages/ folder ships the .nupkg
+# alongside the source.
+!local-packages/*.nupkg
 
 # MSBuild Binary and Structured Log
 *.binlog
