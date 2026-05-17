@@ -252,11 +252,24 @@ public class ExtractSnippetsHandler : ITaskHandler
 
         await _context.SaveChangesAsync(ct);
 
-        // Emit telemetry
-        Telemetry.CodeIndexTelemetry.SnippetsAdded.Add(added, new KeyValuePair<string, object?>("repository", repo.Name));
-        Telemetry.CodeIndexTelemetry.SnippetsUpdated.Add(updated, new KeyValuePair<string, object?>("repository", repo.Name));
-        Telemetry.CodeIndexTelemetry.SnippetsDeleted.Add(deleted, new KeyValuePair<string, object?>("repository", repo.Name));
-        Telemetry.CodeIndexTelemetry.SnippetsUnchanged.Add(unchanged, new KeyValuePair<string, object?>("repository", repo.Name));
+        // Emit telemetry. OT7 (rivoli-ai/conductor#1265): dimensions
+        // renamed under `andy.code_index.repository` per
+        // docs/semconv-compliance.md. Legacy `repository` dimension
+        // dual-emits during the 0.2.4 transition window and disappears
+        // in Andy.Telemetry 0.3.0.
+        var repoName = repo.Name;
+        Telemetry.CodeIndexTelemetry.SnippetsAdded.Add(added,
+            new KeyValuePair<string, object?>("andy.code_index.repository", repoName),
+            new KeyValuePair<string, object?>("repository", repoName)); // deprecated
+        Telemetry.CodeIndexTelemetry.SnippetsUpdated.Add(updated,
+            new KeyValuePair<string, object?>("andy.code_index.repository", repoName),
+            new KeyValuePair<string, object?>("repository", repoName)); // deprecated
+        Telemetry.CodeIndexTelemetry.SnippetsDeleted.Add(deleted,
+            new KeyValuePair<string, object?>("andy.code_index.repository", repoName),
+            new KeyValuePair<string, object?>("repository", repoName)); // deprecated
+        Telemetry.CodeIndexTelemetry.SnippetsUnchanged.Add(unchanged,
+            new KeyValuePair<string, object?>("andy.code_index.repository", repoName),
+            new KeyValuePair<string, object?>("repository", repoName)); // deprecated
 
         repo.Status = "indexing";
         repo.UpdatedAt = DateTime.UtcNow;

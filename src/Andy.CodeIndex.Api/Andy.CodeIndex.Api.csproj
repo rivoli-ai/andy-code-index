@@ -19,7 +19,7 @@
          Exporter.Console packages are now transitively pulled in via
          Andy.Telemetry (which also adds OTLP, Prometheus, Http and
          Runtime instrumentation). -->
-    <PackageReference Include="Andy.Telemetry" Version="0.2.3" />
+    <PackageReference Include="Andy.Telemetry" Version="0.2.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">

@@ -178,9 +178,16 @@ public class SearchService : ISearchService
         // has data on first request.
         using var activity = CodeIndexTelemetry.ActivitySource.StartActivity(
             "IndexQuery", ActivityKind.Server);
-        activity?.SetTag("code_index.query.length", query.Length);
-        activity?.SetTag("code_index.query.limit", limit);
-        activity?.SetTag("code_index.query.mode", "hybrid");
+        // OT7 (rivoli-ai/conductor#1265). Attributes renamed under the
+        // `andy.code_index.*` namespace per docs/semconv-compliance.md.
+        // Legacy `code_index.*` names dual-emit during the 0.2.4
+        // transition window and disappear in Andy.Telemetry 0.3.0.
+        activity?.SetTag("andy.code_index.query.length", query.Length);
+        activity?.SetTag("andy.code_index.query.limit", limit);
+        activity?.SetTag("andy.code_index.query.mode", "hybrid");
+        activity?.SetTag("code_index.query.length", query.Length); // deprecated
+        activity?.SetTag("code_index.query.limit", limit);          // deprecated
+        activity?.SetTag("code_index.query.mode", "hybrid");        // deprecated
 
         var sw = Stopwatch.StartNew();
 
@@ -261,13 +268,16 @@ public class SearchService : ISearchService
         // histogram + result-count attribute on the span before the
         // `using var activity` at the top of the method disposes it.
         var elapsedSeconds = sw.Elapsed.TotalSeconds;
-        activity?.SetTag("code_index.query.results", result.TotalCount);
+        activity?.SetTag("andy.code_index.query.results", result.TotalCount);
+        activity?.SetTag("code_index.query.results", result.TotalCount); // deprecated
         CodeIndexTelemetry.QueryDuration.Record(
             elapsedSeconds,
-            new KeyValuePair<string, object?>("mode", "hybrid"));
+            new KeyValuePair<string, object?>("andy.code_index.query.mode", "hybrid"),
+            new KeyValuePair<string, object?>("mode", "hybrid")); // deprecated; removed in 0.3.0
         CodeIndexTelemetry.SearchRequests.Add(
             1,
-            new KeyValuePair<string, object?>("mode", "hybrid"));
+            new KeyValuePair<string, object?>("andy.code_index.query.mode", "hybrid"),
+            new KeyValuePair<string, object?>("mode", "hybrid")); // deprecated; removed in 0.3.0
         return result;
     }
 
