@@ -81,9 +81,18 @@ public class BackgroundWorkerService : BackgroundService
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             using var activity = Telemetry.CodeIndexTelemetry.ActivitySource.StartActivity($"Task:{task.Operation}");
-            activity?.SetTag("task.id", task.Id.ToString());
-            activity?.SetTag("task.operation", task.Operation.ToString());
-            activity?.SetTag("task.repository_id", task.RepositoryId.ToString());
+            // OT7 (rivoli-ai/conductor#1265). Attributes renamed under
+            // the `andy.code_index.*` namespace per
+            // docs/semconv-compliance.md. Legacy `task.*` / `operation`
+            // names dual-emit during the 0.2.4 transition window and
+            // disappear in Andy.Telemetry 0.3.0.
+            var operationTag = task.Operation.ToString();
+            activity?.SetTag("andy.code_index.task.id", task.Id.ToString());
+            activity?.SetTag("andy.code_index.task.operation", operationTag);
+            activity?.SetTag("andy.code_index.task.repository_id", task.RepositoryId.ToString());
+            activity?.SetTag("task.id", task.Id.ToString());                       // deprecated
+            activity?.SetTag("task.operation", operationTag);                      // deprecated
+            activity?.SetTag("task.repository_id", task.RepositoryId.ToString());  // deprecated
 
             await handler.HandleAsync(task, ct);
 
@@ -97,9 +106,11 @@ public class BackgroundWorkerService : BackgroundService
 
             sw.Stop();
             Telemetry.CodeIndexTelemetry.TasksCompleted.Add(1,
-                new KeyValuePair<string, object?>("operation", task.Operation.ToString()));
+                new KeyValuePair<string, object?>("andy.code_index.operation", operationTag),
+                new KeyValuePair<string, object?>("operation", operationTag)); // deprecated
             Telemetry.CodeIndexTelemetry.TaskDuration.Record(sw.Elapsed.TotalSeconds,
-                new KeyValuePair<string, object?>("operation", task.Operation.ToString()));
+                new KeyValuePair<string, object?>("andy.code_index.operation", operationTag),
+                new KeyValuePair<string, object?>("operation", operationTag)); // deprecated
 
             // Success — mark completed and chain next in a fresh scope
             using var successScope = _scopeFactory.CreateScope();
@@ -117,8 +128,10 @@ public class BackgroundWorkerService : BackgroundService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Task {Id} failed: {Operation}", task.Id, task.Operation);
+            var operationTag = task.Operation.ToString();
             Telemetry.CodeIndexTelemetry.TasksFailed.Add(1,
-                new KeyValuePair<string, object?>("operation", task.Operation.ToString()));
+                new KeyValuePair<string, object?>("andy.code_index.operation", operationTag),
+                new KeyValuePair<string, object?>("operation", operationTag)); // deprecated; removed in 0.3.0
             await UpdateTaskStatusAsync(task.Id, IndexingTaskStatus.Failed, ex.Message, ct);
         }
     }
