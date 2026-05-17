@@ -4,6 +4,7 @@ using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
 using Andy.CodeIndex.Infrastructure.Data;
+using Andy.CodeIndex.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -170,6 +171,17 @@ public class SearchService : ISearchService
 
     public async Task<SearchResultsDto> HybridSearchAsync(string query, SearchFilter? filter = null, int limit = 10, CancellationToken ct = default)
     {
+        // OT4 (rivoli-ai/conductor#1262). IndexQuery is the user-facing
+        // search entry. Span tags the query metadata (length, limit,
+        // repo filter); the QueryDuration histogram records end-to-end
+        // latency so the spec's `code_index.query.duration` dashboard
+        // has data on first request.
+        using var activity = CodeIndexTelemetry.ActivitySource.StartActivity(
+            "IndexQuery", ActivityKind.Server);
+        activity?.SetTag("code_index.query.length", query.Length);
+        activity?.SetTag("code_index.query.limit", limit);
+        activity?.SetTag("code_index.query.mode", "hybrid");
+
         var sw = Stopwatch.StartNew();
 
         // Run semantic and keyword searches concurrently
@@ -226,7 +238,7 @@ public class SearchService : ISearchService
 
         var fused = _fusionService.Fuse(inputs);
 
-        return new SearchResultsDto
+        var result = new SearchResultsDto
         {
             Results = fused.Take(limit).Select(f => new SearchResultItem
             {
@@ -244,6 +256,19 @@ public class SearchService : ISearchService
             SearchMode = "hybrid",
             DurationMs = sw.ElapsedMilliseconds
         };
+
+        // OT4 (rivoli-ai/conductor#1262) — emit the code_index.query.duration
+        // histogram + result-count attribute on the span before the
+        // `using var activity` at the top of the method disposes it.
+        var elapsedSeconds = sw.Elapsed.TotalSeconds;
+        activity?.SetTag("code_index.query.results", result.TotalCount);
+        CodeIndexTelemetry.QueryDuration.Record(
+            elapsedSeconds,
+            new KeyValuePair<string, object?>("mode", "hybrid"));
+        CodeIndexTelemetry.SearchRequests.Add(
+            1,
+            new KeyValuePair<string, object?>("mode", "hybrid"));
+        return result;
     }
 
     private static IQueryable<ContentEmbedding> ApplyEmbeddingFilters(IQueryable<ContentEmbedding> query, SearchFilter? filter)

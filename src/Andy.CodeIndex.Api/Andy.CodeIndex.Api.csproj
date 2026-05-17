@@ -13,6 +13,13 @@
   <ItemGroup>
     <PackageReference Include="Andy.Auth" Version="2025.11.17-rc.1" />
     <PackageReference Include="Andy.Rbac.Client" Version="1.0.0" />
+    <!-- OT4 (rivoli-ai/conductor#1262) — Andy.Telemetry replaces the prior
+         Console-only OpenTelemetry wiring with OTLP export to Conductor's
+         local receiver. The legacy AspNetCore + Extensions.Hosting +
+         Exporter.Console packages are now transitively pulled in via
+         Andy.Telemetry (which also adds OTLP, Prometheus, Http and
+         Runtime instrumentation). -->
+    <PackageReference Include="Andy.Telemetry" Version="0.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
@@ -21,9 +28,8 @@
     </PackageReference>
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.4.0-preview.3" />
-    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />
+    <!-- OT4 (rivoli-ai/conductor#1262) — service-specific EF Core tracing; not bundled in Andy.Telemetry. -->
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.12" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
   </ItemGroup>
 
