@@ -26,6 +26,14 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- #237 — ModelContextProtocol 0.4.0-preview.3 brings in
+         Microsoft.Extensions.AI.Abstractions 9.10.0, whose net8.0 DLL
+         has an AssemblyRef to Microsoft.Extensions.Logging.Abstractions
+         9.0.0.0. The ASP.NET Core 8 shared framework only ships the
+         8.x DLL, so Program.Main blows up with FileNotFoundException
+         before any host setup runs. Pin the 9.0 floor explicitly so
+         publish copies the matching DLL into the bundle. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.4.0-preview.3" />
     <!-- OT4 (rivoli-ai/conductor#1262) — service-specific EF Core tracing; not bundled in Andy.Telemetry. -->
