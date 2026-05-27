@@ -303,7 +303,7 @@ Base path: `/api/v1`
 - **Auth:** JWT Bearer via Andy.Auth, MCP authentication scheme
 - **CORS:** AllowMcpClients policy (any origin)
 - **Metadata:** `/.well-known/oauth-protected-resource` (RFC 8707)
-- **Tools:** 19 tools with `code_index_` prefix (see Requirements §3.5), including chat, analytics, dependencies, commit history, and sync status
+- **Tools:** 58 tools with `code_index_` prefix grouped into Query, Enrichments, Management, and Discovery (see README §MCP Tools), including chat, analytics, dependencies, commit history, and sync status
 
 ### 4.3 Swagger/OpenAPI
 
@@ -496,11 +496,11 @@ See [docs/security.md](security.md) for the full security reference covering:
   },
   "AndyAuth": {
     "Authority": "https://auth.example.com",
-    "Audience": "andy-code-index",
+    "Audience": "urn:andy-code-index-api",
     "AuthProvider": "AndyAuth"
   },
   "Rbac": {
-    "BaseUrl": "https://rbac.example.com",
+    "ApiBaseUrl": "https://rbac.example.com",
     "ApplicationCode": "code-index"
   },
   "Embedding": {
@@ -545,20 +545,23 @@ See [docs/security.md](security.md) for the full security reference covering:
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    ports: [5432:5432]
-    volumes: [pgdata:/var/lib/postgresql/data]
+    ports: [7436:5432]
+    volumes: [postgres_data:/var/lib/postgresql/data]
 
   api:
     build: .
-    ports: [5000:8080]
+    ports:
+      - "7101:8443"  # HTTPS
+      - "7102:8080"  # HTTP
+      - "6201:8443"  # Docker client alias
     depends_on: [postgres]
     volumes:
-      - ./data:/data         # clone directory
+      - code_index_data:/data         # clone directory
     environment:
       - ConnectionStrings__DefaultConnection=...
       - Embedding__ApiKey=...
 
-  ollama:  # optional, for local embeddings
+  ollama:  # optional, for local embeddings (profile: ollama)
     image: ollama/ollama
     ports: [11434:11434]
 ```

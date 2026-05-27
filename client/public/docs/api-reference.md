@@ -1,14 +1,14 @@
 # API Reference
 
-CodeIndex exposes a REST API for programmatic access to all features. The API server runs on port 3000 by default.
+CodeIndex exposes a REST API for programmatic access to all features. In Docker, the API runs on port `7101` (HTTPS) by default; the local .NET dev server runs on port `5101`.
 
 ## Base URL
 
 ```
-http://localhost:3000/api
+https://localhost:7101/api/v1
 ```
 
-All endpoints are prefixed with `/api`.
+All endpoints are prefixed with `/api/v1`. The OpenAPI spec is available at `/openapi.json` and Swagger UI at `/swagger` (Development).
 
 ## Authentication
 
@@ -25,7 +25,7 @@ In development mode, authentication is disabled by default.
 ### List Repositories
 
 ```
-GET /api/repositories
+GET /api/v1/repositories
 ```
 
 Returns all indexed repositories with metadata.
@@ -33,7 +33,7 @@ Returns all indexed repositories with metadata.
 ### Add Repository
 
 ```
-POST /api/repositories
+POST /api/v1/repositories
 Content-Type: application/json
 
 {
@@ -45,7 +45,7 @@ Content-Type: application/json
 ### Get Repository
 
 ```
-GET /api/repositories/:id
+GET /api/v1/repositories/:id
 ```
 
 Returns details for a specific repository including file count and sync status.
@@ -53,7 +53,7 @@ Returns details for a specific repository including file count and sync status.
 ### Delete Repository
 
 ```
-DELETE /api/repositories/:id
+DELETE /api/v1/repositories/:id
 ```
 
 Removes the repository and all associated data.
@@ -61,7 +61,7 @@ Removes the repository and all associated data.
 ### Sync Repository
 
 ```
-POST /api/repositories/:id/sync
+POST /api/v1/repositories/:id/sync
 ```
 
 Triggers an immediate synchronization.
@@ -71,7 +71,7 @@ Triggers an immediate synchronization.
 ### Search Code
 
 ```
-POST /api/search
+POST /api/v1/search
 Content-Type: application/json
 
 {
@@ -89,7 +89,7 @@ Supported modes: `semantic`, `keyword`, `hybrid`.
 ### Generate Enrichments
 
 ```
-POST /api/enrichments/generate
+POST /api/v1/enrichments/generate
 Content-Type: application/json
 
 {
@@ -101,7 +101,7 @@ Content-Type: application/json
 ### List Enrichments
 
 ```
-GET /api/enrichments?repositoryId=repo-id
+GET /api/v1/enrichments?repositoryId=repo-id
 ```
 
 ## Tasks
@@ -109,7 +109,7 @@ GET /api/enrichments?repositoryId=repo-id
 ### List Tasks
 
 ```
-GET /api/tasks
+GET /api/v1/queue
 ```
 
 Returns all active and recent tasks with status and progress.
@@ -119,7 +119,7 @@ Returns all active and recent tasks with status and progress.
 ### Send Message
 
 ```
-POST /api/chat
+POST /api/v1/chat
 Content-Type: application/json
 
 {
@@ -131,7 +131,7 @@ Content-Type: application/json
 ### List Conversations
 
 ```
-GET /api/chat/conversations
+GET /api/v1/chat/conversations
 ```
 
 ## Settings
@@ -139,13 +139,13 @@ GET /api/chat/conversations
 ### Get Settings
 
 ```
-GET /api/settings
+GET /api/v1/settings
 ```
 
 ### Update Settings
 
 ```
-PUT /api/settings
+PUT /api/v1/settings
 Content-Type: application/json
 
 {

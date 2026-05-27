@@ -69,7 +69,7 @@ Click a result to view the full file with the match highlighted.
 Search is also available via the REST API:
 
 ```bash
-curl -X POST http://localhost:3000/api/search \
+curl -k -X POST https://localhost:7101/api/v1/search \
   -H "Content-Type: application/json" \
   -d '{"query": "authentication middleware", "mode": "hybrid", "limit": 10}'
 ```

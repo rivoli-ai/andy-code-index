@@ -21,7 +21,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The application starts on `http://localhost:4200` by default. The API server runs on port `3000`.
+In Docker, the web client is available on `https://localhost:6201` and the API on `https://localhost:7101` by default. For local development outside Docker, the Angular dev server runs on `https://localhost:4201` and the .NET API on `https://localhost:5101`.
 
 ## Configuring an Embedding Key
 
@@ -59,7 +59,7 @@ You can toggle between semantic search, keyword search, or hybrid mode using the
 
 ### Containers fail to start
 
-Check that ports 3000 and 4200 are not in use. Review logs with:
+Check that ports 6201, 7101, 7102, and 7436 are not in use. Review logs with:
 
 ```bash
 docker compose logs -f

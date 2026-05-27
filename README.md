@@ -28,11 +28,11 @@ Andy.CodeIndex.sln
     Andy.CodeIndex.Infrastructure EF Core, repositories, services, handlers
     Andy.CodeIndex.Shared         Shared models for API and frontend
   tests/
-    Andy.CodeIndex.Tests.Unit         327 unit tests
-    Andy.CodeIndex.Tests.Integration  58 integration tests
+    Andy.CodeIndex.Tests.Unit         xUnit unit tests
+    Andy.CodeIndex.Tests.Integration  xUnit integration tests (WebApplicationFactory)
   tools/
     Andy.CodeIndex.Cli            Command-line tool
-  client/                         Angular 20 frontend (61 tests)
+  client/                         Angular 20 frontend (Jasmine/Karma)
   docs/
     requirements.md               Functional and non-functional requirements
     design.md                     Architecture, domain model, API, search
@@ -159,14 +159,14 @@ See [docs/security.md](docs/security.md) for the full security reference.
 ## Testing
 
 ```bash
-# Backend (327 unit + 58 integration = 385 tests)
+# Backend (xUnit: unit + integration)
 dotnet test
 
-# Frontend (61 tests)
+# Frontend (Jasmine + Karma)
 cd client && npx ng test --watch=false --browsers=ChromeHeadless
 ```
 
-Coverage: Domain 92.5%, Application 86.3%, Api 67.5%, Infrastructure 31.3% (handlers for LLM and git operations are integration-tested manually). Excluding auto-generated migrations.
+Coverage targets: Domain ≥ 90%, Application ≥ 85%, Api ≥ 65%. The Infrastructure layer's LLM and git handlers are exercised primarily through integration tests. Auto-generated EF Core migrations are excluded from coverage.
 
 ## Docker
 
