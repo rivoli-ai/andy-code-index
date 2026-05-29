@@ -1,14 +1,24 @@
 using Andy.CodeIndex.Domain.Entities;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Andy.CodeIndex.Infrastructure.Data;
 
-public class CodeIndexDbContext : DbContext
+public class CodeIndexDbContext : DbContext, IDataProtectionKeyContext
 {
     public CodeIndexDbContext(DbContextOptions<CodeIndexDbContext> options)
         : base(options)
     {
     }
+
+    // Persisted Data Protection key ring — see conductor#1160. Without
+    // this, AddDataProtection() generates ephemeral in-memory keys; every
+    // process restart re-keys, and previously-encrypted values
+    // (Repository.PersonalAccessToken protected by EncryptionService)
+    // fail Unprotect on the first read after restart. The
+    // DataProtectionKeys table is created by the AddDataProtectionKeys
+    // migration.
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     public DbSet<Repository> Repositories => Set<Repository>();
     public DbSet<Commit> Commits => Set<Commit>();
