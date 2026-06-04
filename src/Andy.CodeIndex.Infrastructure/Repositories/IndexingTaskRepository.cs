@@ -24,6 +24,8 @@ public class IndexingTaskRepository : RepositoryBase<IndexingTask>, IIndexingTas
 
         task.Status = IndexingTaskStatus.Running;
         task.StartedAt = DateTime.UtcNow;
+        task.LastHeartbeatAt = DateTime.UtcNow;
+        task.Seq++;
         await Context.SaveChangesAsync(ct);
 
         return task;
@@ -62,11 +64,16 @@ public class IndexingTaskRepository : RepositoryBase<IndexingTask>, IIndexingTas
 
         task.Status = status;
         task.ErrorMessage = errorMessage;
+        task.Seq++;
 
         if (status == IndexingTaskStatus.Running)
+        {
             task.StartedAt = DateTime.UtcNow;
+            task.LastHeartbeatAt = DateTime.UtcNow;
+        }
 
-        if (status is IndexingTaskStatus.Completed or IndexingTaskStatus.Failed or IndexingTaskStatus.Cancelled)
+        if (status is IndexingTaskStatus.Completed or IndexingTaskStatus.Failed
+                   or IndexingTaskStatus.Cancelled or IndexingTaskStatus.TimedOut)
             task.CompletedAt = DateTime.UtcNow;
 
         await Context.SaveChangesAsync(ct);
@@ -79,6 +86,8 @@ public class IndexingTaskRepository : RepositoryBase<IndexingTask>, IIndexingTas
 
         task.Progress = progress;
         task.ProgressMessage = progressMessage;
+        task.LastHeartbeatAt = DateTime.UtcNow;
+        task.Seq++;
         await Context.SaveChangesAsync(ct);
     }
 
@@ -92,8 +101,41 @@ public class IndexingTaskRepository : RepositoryBase<IndexingTask>, IIndexingTas
         {
             task.Status = IndexingTaskStatus.Cancelled;
             task.CompletedAt = DateTime.UtcNow;
+            task.Seq++;
         }
 
         await Context.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateHeartbeatAsync(Guid id, CancellationToken ct = default)
+    {
+        var task = await DbSet.FindAsync([id], ct);
+        if (task is null || task.Status != IndexingTaskStatus.Running)
+            return; // silently skip — task may have already transitioned
+
+        task.LastHeartbeatAt = DateTime.UtcNow;
+        task.Seq++;
+        await Context.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Guid>> TimeOutStalledTasksAsync(DateTime cutoff, CancellationToken ct = default)
+    {
+        var stalled = await DbSet
+            .Where(t => t.Status == IndexingTaskStatus.Running
+                        && (t.LastHeartbeatAt == null || t.LastHeartbeatAt < cutoff))
+            .ToListAsync(ct);
+
+        foreach (var task in stalled)
+        {
+            task.Status = IndexingTaskStatus.TimedOut;
+            task.CompletedAt = DateTime.UtcNow;
+            task.ErrorMessage = "Task timed out: no heartbeat received within the backstop window.";
+            task.Seq++;
+        }
+
+        if (stalled.Count > 0)
+            await Context.SaveChangesAsync(ct);
+
+        return stalled.Select(t => t.Id).ToList();
     }
 }

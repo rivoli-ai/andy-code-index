@@ -15,11 +15,16 @@ public class RepositoriesController : ControllerBase
 {
     private readonly IRepositoryService _service;
     private readonly IActivityAnalyticsService _activityService;
+    private readonly IIndexingTaskRepository _taskRepo;
 
-    public RepositoriesController(IRepositoryService service, IActivityAnalyticsService activityService)
+    public RepositoriesController(
+        IRepositoryService service,
+        IActivityAnalyticsService activityService,
+        IIndexingTaskRepository taskRepo)
     {
         _service = service;
         _activityService = activityService;
+        _taskRepo = taskRepo;
     }
 
     /// <summary>List all tracked repositories.</summary>
@@ -211,6 +216,72 @@ public class RepositoriesController : ControllerBase
         if (repo is null) return NotFound();
         var stats = await _service.GetStorageStatsAsync(id, ct);
         return Ok(stats);
+    }
+
+    /// <summary>
+    /// Get per-branch indexing status for a specific branch.
+    /// Returns the branch's status, lastIndexedCommitSha, current HEAD SHA,
+    /// and active task progress. Use this endpoint instead of synthesising a
+    /// default-branch assumption from the repository-level status — this is
+    /// the canonical per-branch status surface (SM.2.9 §3).
+    ///
+    /// Branch names containing slashes (e.g. <c>feature/auth</c>) are supported:
+    /// the route uses a catch-all <c>{*branchAndStatus}</c> parameter and strips
+    /// the trailing <c>/status</c> suffix so callers can use the natural path form
+    /// <c>GET …/branches/feature/auth/status</c>.
+    /// </summary>
+    [HttpGet("{id:guid}/branches/{*branchAndStatus}")]
+    [RequirePermission("repository:read")]
+    [ProducesResponseType(typeof(BranchIndexingStatusDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBranchStatus(
+        Guid id,
+        string branchAndStatus,
+        CancellationToken ct = default)
+    {
+        // Strip the required trailing "/status" suffix.
+        const string suffix = "/status";
+        if (!branchAndStatus.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            return NotFound(new { error = "Expected path to end with '/status'." });
+
+        var branch = branchAndStatus[..^suffix.Length];
+        if (string.IsNullOrWhiteSpace(branch))
+            return BadRequest(new { error = "Branch name must not be empty." });
+
+        var repo = await _service.GetDetailsByIdAsync(id, ct);
+        if (repo is null)
+            return NotFound(new { error = "Repository not found." });
+
+        // Resolve the branch from the repository's branch list
+        var branchEntry = repo.Branches?.FirstOrDefault(
+            b => string.Equals(b.Name, branch, StringComparison.OrdinalIgnoreCase));
+
+        if (branchEntry is null)
+            return NotFound(new { error = $"Branch '{branch}' not found in repository '{repo.Name}'." });
+
+        // Find an active indexing task for this repository
+        var activeTasks = await _taskRepo.GetByRepositoryAsync(id, ct);
+        var runningTask = activeTasks
+            .Where(t => t.Status is Domain.Enums.IndexingTaskStatus.Running
+                                or Domain.Enums.IndexingTaskStatus.Pending)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefault();
+
+        var dto = new BranchIndexingStatusDto
+        {
+            Branch = branchEntry.Name,
+            Status = repo.Status,
+            // For the default branch the repo-level LastIndexedCommitSha is authoritative;
+            // for other branches use the branch's HEAD (best available approximation
+            // until per-branch commit tracking is implemented in a future story).
+            LastIndexedCommitSha = branchEntry.IsDefault
+                ? repo.LastIndexedCommitSha
+                : branchEntry.HeadCommitSha,
+            HeadCommitSha = branchEntry.HeadCommitSha,
+            Progress = runningTask?.Progress
+        };
+
+        return Ok(dto);
     }
 
     /// <summary>Get bulk sparkline data for multiple repositories.</summary>

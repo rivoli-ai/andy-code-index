@@ -206,6 +206,8 @@ builder.Services.AddHostedService<BackgroundWorkerService>();
 builder.Services.AddHostedService<PeriodicSyncService>();
 builder.Services.AddSingleton<ApiKeyHealthStatus>();
 builder.Services.AddHostedService<ApiKeyHealthService>();
+// SM.2.9: watchdog emits backend-owned TimedOut signal for stalled tasks
+builder.Services.AddHostedService<WatchdogService>();
 
 // --- OpenTelemetry (via Andy.Telemetry) ---
 // OT4 (rivoli-ai/conductor#1262): replaces the prior Console-only

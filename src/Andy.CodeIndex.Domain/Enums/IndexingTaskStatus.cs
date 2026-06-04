@@ -7,5 +7,12 @@ public enum IndexingTaskStatus
     Running,
     Completed,
     Failed,
-    Cancelled
+    Cancelled,
+    /// <summary>
+    /// Terminal status emitted by the backend watchdog when a Running task stops
+    /// producing heartbeats for longer than the backstop window. The client
+    /// MUST NOT infer this from its own wall-clock timer; it must read the
+    /// status field from GET /api/v1/queue/{id}.
+    /// </summary>
+    TimedOut
 }

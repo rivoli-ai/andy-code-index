@@ -270,6 +270,12 @@ public class CodeIndexDbContext : DbContext
             builder.Property(t => t.ProgressMessage).HasMaxLength(512);
             builder.Property(t => t.ErrorMessage).HasMaxLength(4096);
 
+            // SM.2.9: watermark for out-of-order poll resolution
+            builder.Property(t => t.Seq).IsConcurrencyToken(false);
+
+            // SM.2.9: heartbeat timestamp for watchdog
+            builder.Property(t => t.LastHeartbeatAt);
+
             if (isNpgsql)
             {
                 // CreatedAt set in application code
@@ -283,6 +289,8 @@ public class CodeIndexDbContext : DbContext
             builder.HasIndex(t => t.Status);
             builder.HasIndex(t => t.ChainId);
             builder.HasIndex(t => new { t.Status, t.Priority, t.CreatedAt });
+            // SM.2.9: watchdog queries by status + heartbeat timestamp
+            builder.HasIndex(t => new { t.Status, t.LastHeartbeatAt });
         });
     }
 
