@@ -35,7 +35,9 @@ public class QueueController : ControllerBase
             t.ErrorMessage, t.ChainId,
             t.ChainStepIndex, t.ChainTotalSteps,
             t.Priority,
-            t.CreatedAt, t.StartedAt, t.CompletedAt
+            t.CreatedAt, t.StartedAt, t.CompletedAt,
+            t.LastHeartbeatAt,
+            t.Seq
         }).OrderByDescending(t => t.CreatedAt));
     }
 
@@ -105,7 +107,9 @@ public class QueueController : ControllerBase
             task.ErrorMessage, task.ChainId,
             task.ChainStepIndex, task.ChainTotalSteps,
             task.Priority,
-            task.CreatedAt, task.StartedAt, task.CompletedAt
+            task.CreatedAt, task.StartedAt, task.CompletedAt,
+            task.LastHeartbeatAt,
+            task.Seq
         });
     }
 

@@ -12,11 +12,15 @@ public class RepositoriesControllerTests
 {
     private readonly Mock<IRepositoryService> _serviceMock = new();
     private readonly Mock<IActivityAnalyticsService> _activityServiceMock = new();
+    private readonly Mock<IIndexingTaskRepository> _taskRepoMock = new();
     private readonly RepositoriesController _controller;
 
     public RepositoriesControllerTests()
     {
-        _controller = new RepositoriesController(_serviceMock.Object, _activityServiceMock.Object);
+        _controller = new RepositoriesController(
+            _serviceMock.Object,
+            _activityServiceMock.Object,
+            _taskRepoMock.Object);
     }
 
     // --- List ---
