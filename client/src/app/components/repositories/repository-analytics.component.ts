@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, OnInit, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -210,7 +210,7 @@ interface HeatmapCell {
   `]
 })
 export class RepositoryAnalyticsComponent implements OnInit {
-  @Input() repositoryId!: string;
+  readonly repositoryId = input.required<string>();
   languages: any[] = [];
   fileTypes: any[] = [];
   topTerms: any[] = [];
@@ -245,7 +245,7 @@ export class RepositoryAnalyticsComponent implements OnInit {
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
-    const base = `${environment.apiUrl}/repositories/${this.repositoryId}/analytics`;
+    const base = `${environment.apiUrl}/repositories/${this.repositoryId()}/analytics`;
     this.http.get<any[]>(`${base}/languages`).subscribe(d => this.languages = d);
     this.http.get<any[]>(`${base}/file-types`).subscribe(d => this.fileTypes = d);
     this.http.get<any[]>(`${base}/top-terms?limit=40`).subscribe(d => this.topTerms = d);
@@ -255,7 +255,7 @@ export class RepositoryAnalyticsComponent implements OnInit {
 
   private loadHeatmap() {
     this.heatmapLoading = true;
-    const url = `${environment.apiUrl}/repositories/${this.repositoryId}/analytics/activity-heatmap?weeksBack=52`;
+    const url = `${environment.apiUrl}/repositories/${this.repositoryId()}/analytics/activity-heatmap?weeksBack=52`;
     this.http.get<ActivityHeatmap>(url).subscribe({
       next: data => {
         this.heatmapStats = data.stats;
