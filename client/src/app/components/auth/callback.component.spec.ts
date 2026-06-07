@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { CallbackComponent } from './callback.component';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -23,7 +25,9 @@ describe('CallbackComponent', () => {
               queryParamMap: convertToParamMap({ code: 'test-code', state: 'test-state' })
             }
           }
-        }
+        },
+        provideHttpClient(),
+        provideHttpClientTesting()
       ]
     }).compileComponents();
   });

@@ -9,8 +9,9 @@ describe('TaskDashboardComponent', () => {
   let apiServiceSpy: jasmine.SpyObj<ApiService>;
 
   beforeEach(async () => {
-    apiServiceSpy = jasmine.createSpyObj('ApiService', ['getTasks']);
+    apiServiceSpy = jasmine.createSpyObj('ApiService', ['getTasks', 'getRepositories']);
     apiServiceSpy.getTasks.and.returnValue(of([]));
+    apiServiceSpy.getRepositories.and.returnValue(of([]));
 
     await TestBed.configureTestingModule({
       imports: [TaskDashboardComponent],

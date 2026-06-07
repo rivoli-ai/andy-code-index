@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
@@ -35,6 +35,12 @@ describe('AuthService', () => {
   });
 
   it('should have ensureInitialized method', async () => {
-    await expectAsync(service.ensureInitialized()).toBeResolved();
+    // When auth is enabled, ensureInitialized loads the discovery document over
+    // HTTP; flush any such request so the promise resolves.
+    const httpMock = TestBed.inject(HttpTestingController);
+    const promise = service.ensureInitialized();
+    httpMock.match(() => true).forEach(r =>
+      r.flush({ authorization_endpoint: 'https://auth.test/authorize', token_endpoint: 'https://auth.test/token' }));
+    await expectAsync(promise).toBeResolved();
   });
 });

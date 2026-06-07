@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { RepositoryListComponent } from './repository-list.component';
 import { ApiService } from '../../services/api.service';
 import { HealthService } from '../../services/health.service';
@@ -10,9 +12,10 @@ describe('RepositoryListComponent', () => {
   let healthServiceStub: { isConnected$: BehaviorSubject<boolean>; ngOnDestroy: jasmine.Spy };
 
   beforeEach(async () => {
-    apiServiceSpy = jasmine.createSpyObj('ApiService', ['getRepositories', 'syncRepository', 'getPipelines']);
+    apiServiceSpy = jasmine.createSpyObj('ApiService', ['getRepositories', 'syncRepository', 'getPipelines', 'getOrganizations']);
     apiServiceSpy.getRepositories.and.returnValue(of([]));
     apiServiceSpy.getPipelines.and.returnValue(of([]));
+    apiServiceSpy.getOrganizations.and.returnValue(of([] as any));
 
     healthServiceStub = {
       isConnected$: new BehaviorSubject<boolean>(true),
@@ -24,7 +27,9 @@ describe('RepositoryListComponent', () => {
       providers: [
         { provide: ApiService, useValue: apiServiceSpy },
         { provide: HealthService, useValue: healthServiceStub },
-        provideRouter([])
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting()
       ]
     }).compileComponents();
   });

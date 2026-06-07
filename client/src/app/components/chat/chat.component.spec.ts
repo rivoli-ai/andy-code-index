@@ -29,7 +29,9 @@ describe('ChatComponent', () => {
       ]
     }));
     httpMock.match('/api/v1/chat/status').forEach(r => r.flush({ available: true }));
-    httpMock.match('/api/v1/chat/conversations').forEach(r => r.flush({
+    // The component requests conversations with a `?limit=50` query, so match by
+    // URL prefix rather than exact string.
+    httpMock.match(r => r.url.startsWith('/api/v1/chat/conversations')).forEach(r => r.flush({
       conversations: [
         { id: 'conv-1', title: 'Test conversation', updatedAt: new Date().toISOString(), messageCount: 2, isPinned: false, pinnedAt: null }
       ], total: 1
