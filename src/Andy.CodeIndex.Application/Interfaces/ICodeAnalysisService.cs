@@ -69,6 +69,7 @@ public class ApiFunction
     public required string ReturnType { get; set; }
     public List<ApiParameter> Parameters { get; set; } = [];
     public bool IsExported { get; set; }
+    public bool IsAsync { get; set; }
     public string? Summary { get; set; }
 }
 

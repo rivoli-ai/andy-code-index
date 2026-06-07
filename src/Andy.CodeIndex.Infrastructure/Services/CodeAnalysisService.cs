@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Acornima;
+using Acornima.Ast;
 using Andy.CodeIndex.Application.Interfaces;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -25,8 +27,10 @@ public class CodeAnalysisService : ICodeAnalysisService
             case "csharp":
                 AnalyzeCSharp(content, result);
                 break;
-            case "typescript":
             case "javascript":
+                AnalyzeJavaScript(content, result);
+                break;
+            case "typescript":
                 AnalyzeTypeScript(content, result);
                 break;
             case "python":
@@ -310,6 +314,125 @@ public class CodeAnalysisService : ICodeAnalysisService
         return string.IsNullOrEmpty(text) ? null : text;
     }
 
+    // Acornima-backed JavaScript analysis (real AST). Replaces routing JS
+    // through the TypeScript regex, which missed arrow-function exports,
+    // `export default`, and class methods entirely. Acornima parses ECMAScript +
+    // JSX but not TypeScript type syntax, so .ts stays on the heuristic path.
+    // (epic #243 / story #248)
+    internal static void AnalyzeJavaScript(string content, CodeAnalysisResult result)
+    {
+        Module program;
+        try
+        {
+            program = new Parser().ParseModule(content);
+        }
+        catch (Exception)
+        {
+            // Acornima throws on input it cannot parse (e.g. TS-flavored JS);
+            // fall back to the heuristic analyzer so we still extract something.
+            AnalyzeTypeScript(content, result);
+            return;
+        }
+
+        foreach (var stmt in program.Body)
+        {
+            switch (stmt)
+            {
+                case ExportNamedDeclaration { Declaration: { } named }:
+                    AddJsDeclaration(named, result, exported: true);
+                    break;
+                case ExportDefaultDeclaration def:
+                    AddJsDeclaration(def.Declaration, result, exported: true);
+                    break;
+                default:
+                    AddJsDeclaration(stmt, result, exported: false);
+                    break;
+            }
+        }
+    }
+
+    private static void AddJsDeclaration(Node node, CodeAnalysisResult result, bool exported)
+    {
+        switch (node)
+        {
+            case ClassDeclaration cls:
+                result.Classes.Add(BuildJsClass(cls));
+                break;
+            case FunctionDeclaration fn:
+                result.Functions.Add(new ApiFunction
+                {
+                    Name = fn.Id?.Name ?? "default",
+                    ReturnType = "any",
+                    IsExported = exported,
+                    IsAsync = fn.Async,
+                    Parameters = JsParameters(fn.Params)
+                });
+                break;
+            case VariableDeclaration vd:
+                foreach (var d in vd.Declarations)
+                {
+                    // export const foo = () => {} / = function () {}
+                    if (d.Init is IFunction fnExpr && d.Id is Identifier id)
+                    {
+                        result.Functions.Add(new ApiFunction
+                        {
+                            Name = id.Name,
+                            ReturnType = "any",
+                            IsExported = exported,
+                            IsAsync = fnExpr.Async,
+                            Parameters = JsParameters(fnExpr.Params)
+                        });
+                    }
+                }
+                break;
+        }
+    }
+
+    private static ApiClass BuildJsClass(ClassDeclaration cls)
+    {
+        var apiClass = new ApiClass { Name = cls.Id?.Name ?? "default" };
+        if (cls.SuperClass is Identifier super)
+            apiClass.BaseClass = super.Name;
+
+        foreach (var member in cls.Body.Body)
+        {
+            if (member is MethodDefinition { Key: Identifier key } md && md.Value is { } fn)
+            {
+                apiClass.Methods.Add(new ApiMethod
+                {
+                    Name = key.Name,
+                    ReturnType = "any",
+                    AccessModifier = "public",
+                    IsStatic = md.Static,
+                    IsAsync = fn.Async,
+                    Parameters = JsParameters(fn.Params)
+                });
+            }
+        }
+        return apiClass;
+    }
+
+    private static List<ApiParameter> JsParameters(in NodeList<Node> parameters)
+    {
+        var list = new List<ApiParameter>();
+        foreach (var p in parameters)
+        {
+            switch (p)
+            {
+                case Identifier id:
+                    list.Add(new ApiParameter { Name = id.Name, Type = "any" });
+                    break;
+                case AssignmentPattern { Left: Identifier lid } ap:
+                    list.Add(new ApiParameter { Name = lid.Name, Type = "any", DefaultValue = ap.Right.ToString() });
+                    break;
+                case RestElement { Argument: Identifier rid }:
+                    list.Add(new ApiParameter { Name = "..." + rid.Name, Type = "any" });
+                    break;
+            }
+        }
+        return list;
+    }
+
     internal static void AnalyzeTypeScript(string content, CodeAnalysisResult result)
     {
         // Exported classes
@@ -352,38 +475,200 @@ public class CodeAnalysisService : ICodeAnalysisService
                 .ToList();
             result.Enums.Add(new ApiEnum { Name = m.Groups[1].Value, Values = values });
         }
+
+        // Exported arrow-function consts: `export const f = (...) => ...` and
+        // `export const f = async (...) => ...`. Previously missed entirely
+        // despite being the dominant modern export style (story #248).
+        foreach (Match m in Regex.Matches(content,
+            @"export\s+const\s+(\w+)\s*(?::\s*[^=\n]+?)?=\s*(?:async\s+)?(?:\([^)]*\)|[\w$]+)[^=\n;{]*=>"))
+        {
+            if (result.Functions.Any(f => f.Name == m.Groups[1].Value)) continue;
+            result.Functions.Add(new ApiFunction { Name = m.Groups[1].Value, ReturnType = "any", IsExported = true });
+        }
+
+        // export default class / function
+        foreach (Match m in Regex.Matches(content,
+            @"export\s+default\s+(?:abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?"))
+        {
+            if (result.Classes.Any(c => c.Name == m.Groups[1].Value)) continue;
+            result.Classes.Add(new ApiClass { Name = m.Groups[1].Value, BaseClass = m.Groups[2].Success ? m.Groups[2].Value : null });
+        }
+        foreach (Match m in Regex.Matches(content,
+            @"export\s+default\s+(?:async\s+)?function\s+(\w+)"))
+        {
+            if (result.Functions.Any(f => f.Name == m.Groups[1].Value)) continue;
+            result.Functions.Add(new ApiFunction { Name = m.Groups[1].Value, ReturnType = "any", IsExported = true });
+        }
     }
 
+    // Indentation-aware Python analysis. The previous regex only matched
+    // column-0 `class`/`def`, so it dropped every method inside a class and
+    // every `async def`. This line scanner tracks the enclosing class by indent
+    // and understands async defs, decorators (@staticmethod/@classmethod →
+    // static, @property → property), and return annotations. (story #248)
     internal static void AnalyzePython(string content, CodeAnalysisResult result)
     {
-        // Classes
-        foreach (Match m in Regex.Matches(content,
-            @"^class\s+(\w+)(?:\(([^)]+)\))?:", RegexOptions.Multiline))
+        var lines = content.Replace("\r\n", "\n").Replace("\t", "    ").Split('\n');
+        ApiClass? currentClass = null;
+        var classIndent = -1;
+        var decorators = new List<string>();
+
+        foreach (var line in lines)
         {
-            var cls = new ApiClass { Name = m.Groups[1].Value };
-            if (m.Groups[2].Success)
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            var trimmed = line.Trim();
+            var indent = line.Length - line.TrimStart(' ').Length;
+
+            // Dedent past the class body closes the class (decorators belong to
+            // the member that follows, so they don't trigger a close).
+            if (currentClass is not null && indent <= classIndent && !trimmed.StartsWith('@'))
             {
-                var bases = m.Groups[2].Value.Split(',').Select(b => b.Trim()).ToList();
-                if (bases.Count > 0 && bases[0] != "object")
-                    cls.BaseClass = bases[0];
+                currentClass = null;
+                classIndent = -1;
             }
-            result.Classes.Add(cls);
-        }
 
-        // Functions (module-level)
-        foreach (Match m in Regex.Matches(content,
-            @"^def\s+(\w+)\s*\(([^)]*)\)(?:\s*->\s*([\w\[\],\s]+))?:", RegexOptions.Multiline))
-        {
-            var name = m.Groups[1].Value;
-            if (name.StartsWith('_')) continue; // Skip private
-
-            result.Functions.Add(new ApiFunction
+            if (trimmed.StartsWith('@'))
             {
-                Name = name,
-                ReturnType = m.Groups[3].Success ? m.Groups[3].Value.Trim() : "None",
-                IsExported = true
-            });
+                decorators.Add(trimmed.TrimStart('@'));
+                continue;
+            }
+
+            var classMatch = Regex.Match(trimmed, @"^class\s+(\w+)\s*(?:\(([^)]*)\))?\s*:");
+            if (classMatch.Success)
+            {
+                var cls = new ApiClass { Name = classMatch.Groups[1].Value };
+                if (classMatch.Groups[2].Success)
+                {
+                    var bases = classMatch.Groups[2].Value.Split(',')
+                        .Select(b => b.Trim()).Where(b => b.Length > 0).ToList();
+                    if (bases.Count > 0 && bases[0] != "object")
+                        cls.BaseClass = bases[0];
+                }
+                result.Classes.Add(cls);
+                currentClass = cls;
+                classIndent = indent;
+                decorators.Clear();
+                continue;
+            }
+
+            var defMatch = Regex.Match(trimmed, @"^(async\s+)?def\s+(\w+)\s*\((.*)\)\s*(?:->\s*(.+?))?\s*:");
+            if (defMatch.Success)
+            {
+                var isAsync = defMatch.Groups[1].Success;
+                var name = defMatch.Groups[2].Value;
+                var returnType = defMatch.Groups[4].Success ? defMatch.Groups[4].Value.Trim() : "None";
+                var isStatic = decorators.Any(d => d.StartsWith("staticmethod") || d.StartsWith("classmethod"));
+                var isProperty = decorators.Any(d => d.StartsWith("property"));
+
+                if (currentClass is not null && indent > classIndent)
+                {
+                    if (isProperty && IsPublicPy(name))
+                    {
+                        currentClass.Properties.Add(new ApiProperty
+                        {
+                            Name = name, Type = returnType, AccessModifier = "public",
+                            HasGetter = true, HasSetter = false
+                        });
+                    }
+                    else if (IncludePyMember(name) && !isProperty)
+                    {
+                        currentClass.Methods.Add(new ApiMethod
+                        {
+                            Name = name, ReturnType = returnType, AccessModifier = "public",
+                            IsAsync = isAsync, IsStatic = isStatic,
+                            Parameters = PyParameters(defMatch.Groups[3].Value, skipFirst: !isStatic)
+                        });
+                    }
+                }
+                else if (indent == 0 && !name.StartsWith('_'))
+                {
+                    result.Functions.Add(new ApiFunction
+                    {
+                        Name = name, ReturnType = returnType, IsExported = true, IsAsync = isAsync,
+                        Parameters = PyParameters(defMatch.Groups[3].Value, skipFirst: false)
+                    });
+                }
+
+                decorators.Clear();
+                continue;
+            }
+
+            decorators.Clear();
         }
+    }
+
+    // Include public methods and dunders (e.g. __init__); skip single-underscore
+    // "private" members.
+    private static bool IncludePyMember(string name) =>
+        !name.StartsWith('_') || (name.StartsWith("__") && name.EndsWith("__"));
+
+    private static bool IsPublicPy(string name) => !name.StartsWith('_');
+
+    private static List<ApiParameter> PyParameters(string paramString, bool skipFirst)
+    {
+        var list = new List<ApiParameter>();
+        var first = true;
+        foreach (var part in SplitTopLevel(paramString, ','))
+        {
+            var token = part.Trim();
+            if (token.Length == 0 || token is "*" or "/") continue;
+            if (skipFirst && first && (token == "self" || token == "cls"))
+            {
+                first = false;
+                continue;
+            }
+            first = false;
+
+            var name = token.TrimStart('*');
+            string? type = null;
+            string? def = null;
+
+            var eq = name.IndexOf('=');
+            if (eq >= 0)
+            {
+                def = name[(eq + 1)..].Trim();
+                name = name[..eq];
+            }
+            var colon = name.IndexOf(':');
+            if (colon >= 0)
+            {
+                type = name[(colon + 1)..].Trim();
+                name = name[..colon];
+            }
+            name = name.Trim();
+            if (name.Length == 0) continue;
+
+            list.Add(new ApiParameter { Name = name, Type = type ?? "Any", DefaultValue = def });
+        }
+        return list;
+    }
+
+    // Splits on a separator that is not nested inside (), [], {} or <>.
+    private static List<string> SplitTopLevel(string text, char sep)
+    {
+        var result = new List<string>();
+        var depth = 0;
+        var current = new StringBuilder();
+        foreach (var ch in text)
+        {
+            switch (ch)
+            {
+                case '(' or '[' or '{' or '<': depth++; break;
+                case ')' or ']' or '}' or '>': depth--; break;
+            }
+            if (ch == sep && depth <= 0)
+            {
+                result.Add(current.ToString());
+                current.Clear();
+            }
+            else
+            {
+                current.Append(ch);
+            }
+        }
+        if (current.Length > 0) result.Add(current.ToString());
+        return result;
     }
 
     internal static void AnalyzeGo(string content, CodeAnalysisResult result)
