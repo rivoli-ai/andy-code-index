@@ -1,4 +1,5 @@
-import { Component, OnInit, AfterViewChecked, ElementRef, NgZone, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewChecked, ElementRef, NgZone, ViewEncapsulation, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -1540,7 +1541,7 @@ interface CommitComparison {
     }
   `]
 })
-export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
+export class RepositoryDetailComponent implements OnInit, OnDestroy, AfterViewChecked {
   repo: Repository | null = null;
   loading = true;
   syncing = false;
@@ -1576,6 +1577,14 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
   insightsProgressMessage = '';
   Math = Math;
 
+  // Insights-generation polling timers, tracked so they can be torn down in
+  // ngOnDestroy. Previously these were locals on generateInsights(), so
+  // navigating away mid-generation leaked the 5s poll interval (and its HTTP
+  // requests) until the 5-minute safety timeout fired. (story #260)
+  private pollInterval?: ReturnType<typeof setInterval>;
+  private pollStartTimeout?: ReturnType<typeof setTimeout>;
+  private pollSafetyTimeout?: ReturnType<typeof setTimeout>;
+
   // Mermaid rendering tracking
   private mermaidLoaded = false;
   private mermaidModule: any = null;
@@ -1603,8 +1612,21 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
     private http: HttpClient,
     private sanitizer: DomSanitizer,
     private el: ElementRef,
-    private zone: NgZone
+    private zone: NgZone,
+    private destroyRef: DestroyRef
   ) {}
+
+  ngOnDestroy() {
+    // Stop insights polling and its timers so they don't keep firing (and making
+    // HTTP requests) after the component is destroyed. (story #260)
+    this.stopInsightsPolling();
+  }
+
+  private stopInsightsPolling() {
+    if (this.pollInterval) { clearInterval(this.pollInterval); this.pollInterval = undefined; }
+    if (this.pollStartTimeout) { clearTimeout(this.pollStartTimeout); this.pollStartTimeout = undefined; }
+    if (this.pollSafetyTimeout) { clearTimeout(this.pollSafetyTimeout); this.pollSafetyTimeout = undefined; }
+  }
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -1799,16 +1821,18 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
       next: (response) => {
         this.insightsTaskId = response.taskId;
         // Wait a few seconds for the handler to start, then poll both task progress and insights
-        setTimeout(() => {
-          const pollInterval = setInterval(() => {
+        this.pollStartTimeout = setTimeout(() => {
+          this.pollInterval = setInterval(() => {
             // Poll task progress for progress bar
             if (this.insightsTaskId) {
-              this.http.get<any>(`${environment.apiUrl}/queue/${this.insightsTaskId}`).subscribe({
+              this.http.get<any>(`${environment.apiUrl}/queue/${this.insightsTaskId}`)
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe({
                 next: (taskData) => {
                   this.insightsProgress = taskData.progress || 0;
                   this.insightsProgressMessage = taskData.progressMessage || '';
                   if (taskData.status === 'Completed' || taskData.status === 'Failed' || taskData.status === 'Cancelled') {
-                    clearInterval(pollInterval);
+                    this.stopInsightsPolling();
                     this.generatingInsights = false;
                     this.insightsTaskId = null;
                     this.insightsProgressMessage = '';
@@ -1819,7 +1843,9 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
               });
             }
             // Poll insights layers
-            this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo!.id}/insights`).subscribe({
+            this.http.get<any>(`${environment.apiUrl}/repositories/${this.repo!.id}/insights`)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
               next: (data) => {
                 const layers = data.layers ? Object.entries(data.layers).filter(([_, v]) => v !== null).map(([k, v]: any) => ({ subtype: k, ...v })) : [];
                 this.insightLayers = layers;
@@ -1830,7 +1856,7 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
                 this.insightHtmlCache.clear();
                 // Stop when all 11 layers are present
                 if (layers.length >= 11) {
-                  clearInterval(pollInterval);
+                  this.stopInsightsPolling();
                   this.generatingInsights = false;
                   this.insightsTaskId = null;
                   this.insightsProgressMessage = '';
@@ -1840,8 +1866,8 @@ export class RepositoryDetailComponent implements OnInit, AfterViewChecked {
             });
           }, 5000);
           // Safety timeout: stop polling after 5 minutes
-          setTimeout(() => {
-            clearInterval(pollInterval);
+          this.pollSafetyTimeout = setTimeout(() => {
+            this.stopInsightsPolling();
             this.generatingInsights = false;
             this.insightsTaskId = null;
             this.insightsProgressMessage = '';
