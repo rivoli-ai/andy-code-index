@@ -9,9 +9,10 @@ describe('EnrichmentBrowserComponent', () => {
   let apiServiceSpy: jasmine.SpyObj<ApiService>;
 
   beforeEach(async () => {
-    apiServiceSpy = jasmine.createSpyObj('ApiService', ['getEnrichments', 'getEnrichmentCounts']);
+    apiServiceSpy = jasmine.createSpyObj('ApiService', ['getEnrichments', 'getEnrichmentCounts', 'getGlobalStorage']);
     apiServiceSpy.getEnrichments.and.returnValue(of({ results: [], totalCount: 0, offset: 0, limit: 20 }));
     apiServiceSpy.getEnrichmentCounts.and.returnValue(of({}));
+    apiServiceSpy.getGlobalStorage.and.returnValue(of({} as any));
 
     await TestBed.configureTestingModule({
       imports: [EnrichmentBrowserComponent],

@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { RepositoryAddComponent } from './repository-add.component';
 import { ApiService } from '../../services/api.service';
 import { Router } from '@angular/router';
@@ -16,7 +18,9 @@ describe('RepositoryAddComponent', () => {
       imports: [RepositoryAddComponent],
       providers: [
         { provide: ApiService, useValue: apiServiceSpy },
-        { provide: Router, useValue: routerSpy }
+        { provide: Router, useValue: routerSpy },
+        provideHttpClient(),
+        provideHttpClientTesting()
       ]
     }).compileComponents();
   });
