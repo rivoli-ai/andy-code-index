@@ -94,8 +94,14 @@ public class EmbeddingService : IEmbeddingService
         var currentBatch = new List<string>();
         var currentChars = 0;
 
-        foreach (var text in texts)
+        foreach (var rawText in texts)
         {
+            // Bound a single oversized text. Previously a text longer than
+            // MaxBatchChars was placed in a batch alone and sent un-truncated,
+            // which exceeds the provider's token limit and fails the whole
+            // request (story #253). Truncate to the per-request char budget.
+            var text = TruncateToCharBudget(rawText);
+
             if (currentBatch.Count >= _options.MaxBatchSize ||
                 (currentChars + text.Length > _options.MaxBatchChars && currentBatch.Count > 0))
             {
@@ -112,5 +118,27 @@ public class EmbeddingService : IEmbeddingService
             batches.Add(currentBatch.ToArray());
 
         return batches;
+    }
+
+    /// <summary>
+    /// Truncates a single text to the per-request character budget so it cannot
+    /// exceed the embedding provider's token limit. Backs off one char if the cut
+    /// would split a UTF-16 surrogate pair.
+    /// </summary>
+    internal string TruncateToCharBudget(string text)
+    {
+        var max = _options.MaxBatchChars;
+        if (max <= 0 || text.Length <= max)
+            return text;
+
+        var cut = max;
+        if (char.IsHighSurrogate(text[cut - 1]))
+            cut--;
+
+        _logger.LogWarning(
+            "Embedding input of {Length} chars exceeds MaxBatchChars {Max}; truncating before send",
+            text.Length, max);
+
+        return text[..cut];
     }
 }
