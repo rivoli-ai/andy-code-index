@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Acornima" Version="1.6.2" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="8.0.11" />
     <!-- Pinned to 4.5.0 to match the version EF Core Design 8.0.11 transitively
          requires (Microsoft.CodeAnalysis.CSharp.Workspaces 4.5.0 → Common 4.5.0). -->
