@@ -19,32 +19,38 @@ interface HeatmapCell {
     <!-- Git Activity Heatmap -->
     <div class="card" style="margin-top:1.5rem;padding:1.25rem">
       <h3 style="font-size:1rem;margin-bottom:1rem">Git Activity</h3>
-
-      <div *ngIf="heatmapLoading" style="display:flex;justify-content:center;padding:2rem">
-        <div class="spinner"></div>
-      </div>
-
-      <div *ngIf="!heatmapLoading && heatmapCells.length > 0" class="heatmap-container">
-        <div class="heatmap-scroll">
-          <div class="day-labels">
-            <span></span>
-            <span>Mon</span>
-            <span></span>
-            <span>Wed</span>
-            <span></span>
-            <span>Fri</span>
-            <span></span>
-          </div>
-          <svg [attr.width]="heatmapWidth" [attr.height]="heatmapHeight"
-               style="display:block" role="img" aria-label="Contribution heatmap">
-            <!-- Month labels -->
-            <text *ngFor="let label of monthLabels"
+    
+      @if (heatmapLoading) {
+        <div style="display:flex;justify-content:center;padding:2rem">
+          <div class="spinner"></div>
+        </div>
+      }
+    
+      @if (!heatmapLoading && heatmapCells.length > 0) {
+        <div class="heatmap-container">
+          <div class="heatmap-scroll">
+            <div class="day-labels">
+              <span></span>
+              <span>Mon</span>
+              <span></span>
+              <span>Wed</span>
+              <span></span>
+              <span>Fri</span>
+              <span></span>
+            </div>
+            <svg [attr.width]="heatmapWidth" [attr.height]="heatmapHeight"
+              style="display:block" role="img" aria-label="Contribution heatmap">
+              <!-- Month labels -->
+              @for (label of monthLabels; track label) {
+                <text
                   [attr.x]="label.x" y="10"
                   fill="var(--text-muted)" font-size="10" font-family="inherit">
-              {{ label.text }}
-            </text>
-            <!-- Day cells -->
-            <rect *ngFor="let cell of heatmapCells"
+                  {{ label.text }}
+                </text>
+              }
+              <!-- Day cells -->
+              @for (cell of heatmapCells; track cell) {
+                <rect
                   [attr.x]="cell.col * (cellSize + cellGap)"
                   [attr.y]="18 + cell.row * (cellSize + cellGap)"
                   [attr.width]="cellSize"
@@ -52,112 +58,135 @@ interface HeatmapCell {
                   [attr.fill]="getHeatmapColor(cell.commitCount)"
                   rx="2"
                   style="cursor:default">
-              <title>{{ cell.date }}: {{ cell.commitCount }} commit{{ cell.commitCount !== 1 ? 's' : '' }}</title>
-            </rect>
-          </svg>
+                  <title>{{ cell.date }}: {{ cell.commitCount }} commit{{ cell.commitCount !== 1 ? 's' : '' }}</title>
+                </rect>
+              }
+            </svg>
+          </div>
+          <!-- Legend -->
+          <div class="heatmap-legend">
+            <span class="text-muted" style="font-size:0.75rem">Less</span>
+            <span class="legend-cell" [style.background]="'#ebedf0'"></span>
+            <span class="legend-cell" [style.background]="'#c6e48b'"></span>
+            <span class="legend-cell" [style.background]="'#7bc96f'"></span>
+            <span class="legend-cell" [style.background]="'#239a3b'"></span>
+            <span class="legend-cell" [style.background]="'#196127'"></span>
+            <span class="text-muted" style="font-size:0.75rem">More</span>
+          </div>
         </div>
-
-        <!-- Legend -->
-        <div class="heatmap-legend">
-          <span class="text-muted" style="font-size:0.75rem">Less</span>
-          <span class="legend-cell" [style.background]="'#ebedf0'"></span>
-          <span class="legend-cell" [style.background]="'#c6e48b'"></span>
-          <span class="legend-cell" [style.background]="'#7bc96f'"></span>
-          <span class="legend-cell" [style.background]="'#239a3b'"></span>
-          <span class="legend-cell" [style.background]="'#196127'"></span>
-          <span class="text-muted" style="font-size:0.75rem">More</span>
+      }
+    
+      @if (!heatmapLoading && heatmapCells.length === 0) {
+        <div class="text-muted" style="font-size:0.875rem">
+          No commit activity data available.
         </div>
-      </div>
-
-      <div *ngIf="!heatmapLoading && heatmapCells.length === 0" class="text-muted" style="font-size:0.875rem">
-        No commit activity data available.
-      </div>
-
+      }
+    
       <!-- Stats -->
-      <div *ngIf="heatmapStats" class="heatmap-stats">
-        <div class="stat-item">
-          <span class="stat-value">{{ heatmapStats.totalCommits }}</span>
-          <span class="stat-label">Total commits</span>
+      @if (heatmapStats) {
+        <div class="heatmap-stats">
+          <div class="stat-item">
+            <span class="stat-value">{{ heatmapStats.totalCommits }}</span>
+            <span class="stat-label">Total commits</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">{{ heatmapStats.uniqueAuthors }}</span>
+            <span class="stat-label">Contributors</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">{{ heatmapStats.avgPerDay | number:'1.1-1' }}</span>
+            <span class="stat-label">Avg/day</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">{{ heatmapStats.maxCommitsInDay }}</span>
+            <span class="stat-label">Max in a day</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">{{ heatmapStats.mostActiveDay }}</span>
+            <span class="stat-label">Most active day</span>
+          </div>
+          @if (heatmapStats.longestInactiveStreak > 0) {
+            <div class="stat-item">
+              <span class="stat-value">{{ heatmapStats.longestInactiveStreak }}d</span>
+              <span class="stat-label">Longest streak</span>
+            </div>
+          }
         </div>
-        <div class="stat-item">
-          <span class="stat-value">{{ heatmapStats.uniqueAuthors }}</span>
-          <span class="stat-label">Contributors</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-value">{{ heatmapStats.avgPerDay | number:'1.1-1' }}</span>
-          <span class="stat-label">Avg/day</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-value">{{ heatmapStats.maxCommitsInDay }}</span>
-          <span class="stat-label">Max in a day</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-value">{{ heatmapStats.mostActiveDay }}</span>
-          <span class="stat-label">Most active day</span>
-        </div>
-        <div class="stat-item" *ngIf="heatmapStats.longestInactiveStreak > 0">
-          <span class="stat-value">{{ heatmapStats.longestInactiveStreak }}d</span>
-          <span class="stat-label">Longest streak</span>
-        </div>
-      </div>
+      }
     </div>
-
+    
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem">
       <!-- Language Breakdown -->
-      <div class="card" *ngIf="languages.length > 0">
-        <h3 style="font-size:1rem;margin-bottom:1rem">Languages</h3>
-        <div class="bar-chart">
-          <div class="bar-row" *ngFor="let lang of languages">
-            <span class="bar-label">{{ lang.language }}</span>
-            <div class="bar-track">
-              <div class="bar-fill" [style.width.%]="(lang.count / maxLangCount) * 100"></div>
-            </div>
-            <span class="bar-value">{{ lang.count }}</span>
+      @if (languages.length > 0) {
+        <div class="card">
+          <h3 style="font-size:1rem;margin-bottom:1rem">Languages</h3>
+          <div class="bar-chart">
+            @for (lang of languages; track lang) {
+              <div class="bar-row">
+                <span class="bar-label">{{ lang.language }}</span>
+                <div class="bar-track">
+                  <div class="bar-fill" [style.width.%]="(lang.count / maxLangCount) * 100"></div>
+                </div>
+                <span class="bar-value">{{ lang.count }}</span>
+              </div>
+            }
           </div>
         </div>
-      </div>
-
+      }
+    
       <!-- File Types -->
-      <div class="card" *ngIf="fileTypes.length > 0">
-        <h3 style="font-size:1rem;margin-bottom:1rem">File Types</h3>
-        <div class="bar-chart">
-          <div class="bar-row" *ngFor="let ft of fileTypes.slice(0, 10)">
-            <span class="bar-label">{{ ft.extension }}</span>
-            <div class="bar-track">
-              <div class="bar-fill" [style.width.%]="(ft.count / maxFileTypeCount) * 100" style="background:var(--accent)"></div>
-            </div>
-            <span class="bar-value">{{ ft.count }}</span>
+      @if (fileTypes.length > 0) {
+        <div class="card">
+          <h3 style="font-size:1rem;margin-bottom:1rem">File Types</h3>
+          <div class="bar-chart">
+            @for (ft of fileTypes.slice(0, 10); track ft) {
+              <div class="bar-row">
+                <span class="bar-label">{{ ft.extension }}</span>
+                <div class="bar-track">
+                  <div class="bar-fill" [style.width.%]="(ft.count / maxFileTypeCount) * 100" style="background:var(--accent)"></div>
+                </div>
+                <span class="bar-value">{{ ft.count }}</span>
+              </div>
+            }
           </div>
         </div>
-      </div>
-
+      }
+    
       <!-- Top Terms -->
-      <div class="card" *ngIf="topTerms.length > 0">
-        <h3 style="font-size:1rem;margin-bottom:1rem">Top Terms</h3>
-        <div class="term-cloud">
-          <span *ngFor="let term of topTerms" class="term-tag"
+      @if (topTerms.length > 0) {
+        <div class="card">
+          <h3 style="font-size:1rem;margin-bottom:1rem">Top Terms</h3>
+          <div class="term-cloud">
+            @for (term of topTerms; track term) {
+              <span class="term-tag"
                 [style.fontSize.rem]="0.7 + (term.count / maxTermCount) * 0.8"
                 [style.opacity]="0.5 + (term.count / maxTermCount) * 0.5">
-            {{ term.term }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Complex Files -->
-      <div class="card" *ngIf="complexFiles.length > 0">
-        <h3 style="font-size:1rem;margin-bottom:1rem">Largest Files (by chunks)</h3>
-        <div class="bar-chart">
-          <div class="bar-row" *ngFor="let f of complexFiles">
-            <span class="bar-label" style="font-size:0.75rem" [title]="f.filePath">{{ shortPath(f.filePath) }}</span>
-            <div class="bar-track">
-              <div class="bar-fill" [style.width.%]="(f.chunkCount / maxChunkCount) * 100" style="background:var(--accent-secondary)"></div>
-            </div>
-            <span class="bar-value">{{ f.chunkCount }}</span>
+                {{ term.term }}
+              </span>
+            }
           </div>
         </div>
-      </div>
+      }
+    
+      <!-- Complex Files -->
+      @if (complexFiles.length > 0) {
+        <div class="card">
+          <h3 style="font-size:1rem;margin-bottom:1rem">Largest Files (by chunks)</h3>
+          <div class="bar-chart">
+            @for (f of complexFiles; track f) {
+              <div class="bar-row">
+                <span class="bar-label" style="font-size:0.75rem" [title]="f.filePath">{{ shortPath(f.filePath) }}</span>
+                <div class="bar-track">
+                  <div class="bar-fill" [style.width.%]="(f.chunkCount / maxChunkCount) * 100" style="background:var(--accent-secondary)"></div>
+                </div>
+                <span class="bar-value">{{ f.chunkCount }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
     </div>
-  `,
+    `,
   styles: [`
     .bar-chart { display: flex; flex-direction: column; gap: 0.5rem; }
     .bar-row { display: flex; align-items: center; gap: 0.5rem; }

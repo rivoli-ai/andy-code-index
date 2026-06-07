@@ -1,5 +1,5 @@
 import { Component, Input, OnChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { WeeklyActivity } from '../../models/repository.model';
 
 interface DayCell {
@@ -12,22 +12,28 @@ interface DayCell {
 @Component({
   selector: 'app-repository-sparkline',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
-    <svg [attr.width]="svgWidth" [attr.height]="svgHeight" *ngIf="cells.length > 0"
-         style="display:block" role="img" aria-label="Activity grid">
-      <rect *ngFor="let cell of cells"
+    @if (cells.length > 0) {
+      <svg [attr.width]="svgWidth" [attr.height]="svgHeight"
+        style="display:block" role="img" aria-label="Activity grid">
+        @for (cell of cells; track cell) {
+          <rect
             [attr.x]="cell.col * (cellSize + gap)"
             [attr.y]="cell.row * (cellSize + gap)"
             [attr.width]="cellSize"
             [attr.height]="cellSize"
             [attr.fill]="getColor(cell.commitCount)"
             [attr.rx]="1">
-        <title>{{ formatDate(cell.date) }}: {{ cell.commitCount }} commits</title>
-      </rect>
-    </svg>
-    <span *ngIf="cells.length === 0" class="text-muted" style="font-size:0.75rem">--</span>
-  `,
+            <title>{{ formatDate(cell.date) }}: {{ cell.commitCount }} commits</title>
+          </rect>
+        }
+      </svg>
+    }
+    @if (cells.length === 0) {
+      <span class="text-muted" style="font-size:0.75rem">--</span>
+    }
+    `,
   styles: [`
     :host { display: inline-block; }
   `]

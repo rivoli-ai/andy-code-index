@@ -1,13 +1,13 @@
 import { Component } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
+
 import { ApiService } from '../../services/api.service';
 
 @Component({
   selector: 'app-repository-add',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="page-header">
       <h1>Add Repository</h1>
@@ -17,20 +17,24 @@ import { ApiService } from '../../services/api.service';
         <div class="form-group">
           <label for="url">Repository URL *</label>
           <input id="url" class="form-control" [(ngModel)]="url" name="url"
-                 placeholder="https://github.com/owner/repo" required
-                 (ngModelChange)="onUrlChange()">
+            placeholder="https://github.com/owner/repo" required
+            (ngModelChange)="onUrlChange()">
         </div>
         <div class="form-group">
           <label for="pat">Personal Access Token (optional)</label>
           <input id="pat" type="password" class="form-control" [(ngModel)]="pat" name="pat"
-                 placeholder="For private repositories">
+            placeholder="For private repositories">
         </div>
-        <div class="duplicate-warning" *ngIf="duplicateRepoId">
-          <i class="bi bi-exclamation-triangle"></i>
-          This repository is already being tracked.
-          <a [routerLink]="['/repositories', duplicateRepoId]">View existing repository</a>
-        </div>
-        <div class="error-message" *ngIf="error">{{ error }}</div>
+        @if (duplicateRepoId) {
+          <div class="duplicate-warning">
+            <i class="bi bi-exclamation-triangle"></i>
+            This repository is already being tracked.
+            <a [routerLink]="['/repositories', duplicateRepoId]">View existing repository</a>
+          </div>
+        }
+        @if (error) {
+          <div class="error-message">{{ error }}</div>
+        }
         <div style="display:flex;gap:0.75rem;margin-top:1.5rem">
           <button type="submit" class="btn btn-primary" [disabled]="submitting || !url || !!duplicateRepoId">
             {{ submitting ? 'Adding...' : 'Add Repository' }}
@@ -39,7 +43,7 @@ import { ApiService } from '../../services/api.service';
         </div>
       </form>
     </div>
-  `,
+    `,
   styles: [`
     .error-message { color: var(--danger); margin-top: 0.5rem; padding: 0.75rem; background: rgba(220,53,69,0.1); border-radius: var(--radius); }
     .duplicate-warning { color: #856404; margin-top: 0.5rem; padding: 0.75rem; background: rgba(255,193,7,0.15); border: 1px solid rgba(255,193,7,0.3); border-radius: var(--radius); font-size: var(--font-sm); }

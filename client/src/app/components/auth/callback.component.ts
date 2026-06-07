@@ -1,26 +1,30 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-callback',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div style="display:flex;align-items:center;justify-content:center;min-height:100vh">
       <div style="text-align:center">
-        <div *ngIf="!error">
-          <div class="spinner" style="margin:0 auto 1rem"></div>
-          <p class="text-muted">Completing sign in...</p>
-        </div>
-        <div *ngIf="error">
-          <p style="color:var(--danger)">{{ error }}</p>
-          <button class="btn btn-primary" (click)="retry()">Try Again</button>
-        </div>
+        @if (!error) {
+          <div>
+            <div class="spinner" style="margin:0 auto 1rem"></div>
+            <p class="text-muted">Completing sign in...</p>
+          </div>
+        }
+        @if (error) {
+          <div>
+            <p style="color:var(--danger)">{{ error }}</p>
+            <button class="btn btn-primary" (click)="retry()">Try Again</button>
+          </div>
+        }
       </div>
     </div>
-  `
+    `
 })
 export class CallbackComponent implements OnInit {
   error = '';

@@ -1,13 +1,13 @@
 import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { CommonModule } from '@angular/common';
+
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, CommonModule],
+  imports: [RouterLink, RouterLinkActive],
   template: `
     <aside class="sidebar">
       <div class="sidebar-brand">
@@ -53,27 +53,33 @@ import { AuthService } from '../../services/auth.service';
         </div>
       </nav>
       <div class="sidebar-footer">
-        <div class="user-section" *ngIf="authService.authEnabled && authService.isAuthenticated()">
-          <div class="user-info">
-            <svg class="user-avatar" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-            </svg>
-            <div class="user-details">
-              <span class="user-name">{{ authService.getUserName() || 'User' }}</span>
-              <span class="user-email" *ngIf="authService.getUserEmail()">{{ authService.getUserEmail() }}</span>
+        @if (authService.authEnabled && authService.isAuthenticated()) {
+          <div class="user-section">
+            <div class="user-info">
+              <svg class="user-avatar" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+              </svg>
+              <div class="user-details">
+                <span class="user-name">{{ authService.getUserName() || 'User' }}</span>
+                @if (authService.getUserEmail()) {
+                  <span class="user-email">{{ authService.getUserEmail() }}</span>
+                }
+              </div>
             </div>
+            <button class="btn btn-sm btn-secondary sign-out-btn" (click)="signOut()">
+              <i class="bi bi-box-arrow-right"></i> Sign Out
+            </button>
           </div>
-          <button class="btn btn-sm btn-secondary sign-out-btn" (click)="signOut()">
-            <i class="bi bi-box-arrow-right"></i> Sign Out
-          </button>
-        </div>
-        <div class="dev-indicator" *ngIf="isDevMode && !authService.authEnabled">
-          <span class="dev-dot"></span>
-          <span>Development Mode</span>
-        </div>
+        }
+        @if (isDevMode && !authService.authEnabled) {
+          <div class="dev-indicator">
+            <span class="dev-dot"></span>
+            <span>Development Mode</span>
+          </div>
+        }
       </div>
     </aside>
-  `,
+    `,
   styles: [`
     .sidebar {
       position: fixed; left: 0; top: 0; bottom: 0;

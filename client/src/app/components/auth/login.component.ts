@@ -1,12 +1,12 @@
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="login-container">
       <div class="login-card">
@@ -15,26 +15,34 @@ import { AuthService } from '../../services/auth.service';
           <h1>Andy CodeIndex</h1>
         </div>
         <p>Semantic code indexing for the Andy ecosystem</p>
-
-        <div *ngIf="authEnabled && !authenticated">
-          <button class="btn btn-primary" (click)="signIn()" [disabled]="signingIn">
-            {{ signingIn ? 'Redirecting...' : 'Sign in with Andy Auth' }}
-          </button>
-          <div *ngIf="error" class="error-msg">{{ error }}</div>
-        </div>
-
-        <div *ngIf="authEnabled && authenticated">
-          <p><strong>Welcome back, {{ userName }}</strong></p>
-          <button class="btn btn-primary" (click)="goToApp()" style="margin-right:0.5rem">Go to Repositories</button>
-          <button class="btn btn-secondary" (click)="signOut()">Sign Out</button>
-        </div>
-
-        <p *ngIf="!authEnabled" class="text-muted">
-          Authentication not configured. Running in dev mode.
-        </p>
+    
+        @if (authEnabled && !authenticated) {
+          <div>
+            <button class="btn btn-primary" (click)="signIn()" [disabled]="signingIn">
+              {{ signingIn ? 'Redirecting...' : 'Sign in with Andy Auth' }}
+            </button>
+            @if (error) {
+              <div class="error-msg">{{ error }}</div>
+            }
+          </div>
+        }
+    
+        @if (authEnabled && authenticated) {
+          <div>
+            <p><strong>Welcome back, {{ userName }}</strong></p>
+            <button class="btn btn-primary" (click)="goToApp()" style="margin-right:0.5rem">Go to Repositories</button>
+            <button class="btn btn-secondary" (click)="signOut()">Sign Out</button>
+          </div>
+        }
+    
+        @if (!authEnabled) {
+          <p class="text-muted">
+            Authentication not configured. Running in dev mode.
+          </p>
+        }
       </div>
     </div>
-  `,
+    `,
   styles: [`
     .login-container {
       display: flex; align-items: center; justify-content: center;

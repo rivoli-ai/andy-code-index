@@ -34,872 +34,1033 @@ interface CommitComparison {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, RepositoryHistoryComponent, RepositoryAnalyticsComponent],
   template: `
-    <div *ngIf="loading" style="display:flex;justify-content:center;padding:3rem"><div class="spinner"></div></div>
-
-    <div *ngIf="!loading && repo">
-      <div class="page-header">
-        <div>
-          <h1>{{ repo.name }}</h1>
-          <div style="display:flex;gap:0.75rem;align-items:center;margin-top:0.25rem" *ngIf="repo.lastIndexedCommitSha || repo.defaultBranch">
-            <span *ngIf="repo.defaultBranch" class="badge badge-primary" style="font-size:0.75rem">
-              <i class="bi bi-diagram-2"></i> {{ repo.defaultBranch }}
-            </span>
-            <code *ngIf="repo.lastIndexedCommitSha" style="font-size:0.75rem;color:var(--text-muted)">
-              {{ repo.lastIndexedCommitSha.substring(0, 7) }}
-            </code>
+    @if (loading) {
+      <div style="display:flex;justify-content:center;padding:3rem"><div class="spinner"></div></div>
+    }
+    
+    @if (!loading && repo) {
+      <div>
+        <div class="page-header">
+          <div>
+            <h1>{{ repo.name }}</h1>
+            @if (repo.lastIndexedCommitSha || repo.defaultBranch) {
+              <div style="display:flex;gap:0.75rem;align-items:center;margin-top:0.25rem">
+                @if (repo.defaultBranch) {
+                  <span class="badge badge-primary" style="font-size:0.75rem">
+                    <i class="bi bi-diagram-2"></i> {{ repo.defaultBranch }}
+                  </span>
+                }
+                @if (repo.lastIndexedCommitSha) {
+                  <code style="font-size:0.75rem;color:var(--text-muted)">
+                    {{ repo.lastIndexedCommitSha.substring(0, 7) }}
+                  </code>
+                }
+              </div>
+            }
+          </div>
+          <div style="display:flex;gap:0.75rem">
+            <button class="btn btn-secondary" (click)="sync()" [disabled]="syncing">
+              <i class="bi bi-arrow-repeat"></i> {{ syncing ? 'Syncing...' : 'Sync' }}
+            </button>
+            @if (syncMessage) {
+              <span style="color:var(--success);font-size:0.85rem;align-self:center">{{ syncMessage }}</span>
+            }
+            @if (syncError) {
+              <span style="color:var(--danger);font-size:0.85rem;align-self:center">{{ syncError }}</span>
+            }
+            <button class="btn btn-secondary" style="color:var(--danger);border-color:var(--danger)" (click)="wipeEnrichments()">
+              <i class="bi bi-eraser"></i> Wipe Enrichments
+            </button>
+            <button class="btn btn-danger" (click)="confirmDelete()">
+              <i class="bi bi-trash"></i> Delete
+            </button>
           </div>
         </div>
-        <div style="display:flex;gap:0.75rem">
-          <button class="btn btn-secondary" (click)="sync()" [disabled]="syncing">
-            <i class="bi bi-arrow-repeat"></i> {{ syncing ? 'Syncing...' : 'Sync' }}
-          </button>
-          <span *ngIf="syncMessage" style="color:var(--success);font-size:0.85rem;align-self:center">{{ syncMessage }}</span>
-          <span *ngIf="syncError" style="color:var(--danger);font-size:0.85rem;align-self:center">{{ syncError }}</span>
-          <button class="btn btn-secondary" style="color:var(--danger);border-color:var(--danger)" (click)="wipeEnrichments()">
-            <i class="bi bi-eraser"></i> Wipe Enrichments
-          </button>
-          <button class="btn btn-danger" (click)="confirmDelete()">
-            <i class="bi bi-trash"></i> Delete
-          </button>
+        <!-- Tab Navigation -->
+        <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem;align-items:center">
+          @for (tab of ['Overview', 'Insights', 'Report', 'History', 'Analytics']; track tab) {
+            <button
+              (click)="activeTab = tab"
+              [style.border-bottom]="activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent'"
+              style="padding:0.75rem 1.25rem;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-size:var(--font-sm);font-weight:500;color:var(--text-muted);margin-bottom:-2px;transition:all 0.15s"
+              [style.color]="activeTab === tab ? 'var(--primary)' : 'var(--text-muted)'">
+              {{ tab }}
+            </button>
+          }
+          <div style="margin-left:auto;margin-bottom:-2px;padding:0.375rem 0">
+            <select [(ngModel)]="selectedRef" (ngModelChange)="onRefChange($event)"
+              style="padding:0.375rem 0.625rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:160px"
+              title="Filter by branch or tag">
+              <option value="">All branches</option>
+              @if (repo.branches && repo.branches.length > 0) {
+                <optgroup label="Branches">
+                  @for (b of repo.branches; track b) {
+                    <option [value]="b.name">{{ b.name }}{{ b.isDefault ? ' (default)' : '' }}</option>
+                  }
+                </optgroup>
+              }
+              @if (repo.tags && repo.tags.length > 0) {
+                <optgroup label="Tags">
+                  @for (t of repo.tags; track t) {
+                    <option [value]="t.name">{{ t.name }}</option>
+                  }
+                </optgroup>
+              }
+            </select>
+          </div>
         </div>
-      </div>
-
-      <!-- Tab Navigation -->
-      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem;align-items:center">
-        <button *ngFor="let tab of ['Overview', 'Insights', 'Report', 'History', 'Analytics']"
-                (click)="activeTab = tab"
-                [style.border-bottom]="activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent'"
-                style="padding:0.75rem 1.25rem;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-size:var(--font-sm);font-weight:500;color:var(--text-muted);margin-bottom:-2px;transition:all 0.15s"
-                [style.color]="activeTab === tab ? 'var(--primary)' : 'var(--text-muted)'">
-          {{ tab }}
-        </button>
-        <div style="margin-left:auto;margin-bottom:-2px;padding:0.375rem 0">
-          <select [(ngModel)]="selectedRef" (ngModelChange)="onRefChange($event)"
-                  style="padding:0.375rem 0.625rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:160px"
-                  title="Filter by branch or tag">
-            <option value="">All branches</option>
-            <optgroup label="Branches" *ngIf="repo.branches && repo.branches.length > 0">
-              <option *ngFor="let b of repo.branches" [value]="b.name">{{ b.name }}{{ b.isDefault ? ' (default)' : '' }}</option>
-            </optgroup>
-            <optgroup label="Tags" *ngIf="repo.tags && repo.tags.length > 0">
-              <option *ngFor="let t of repo.tags" [value]="t.name">{{ t.name }}</option>
-            </optgroup>
-          </select>
-        </div>
-      </div>
-
-      <!-- Overview Tab -->
-      <div *ngIf="activeTab === 'Overview'">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
-        <div class="card">
-          <h3 style="margin-bottom:1rem;font-size:1rem">Details</h3>
-          <div class="detail-row"><span class="label">URL</span><a [href]="repo.url" target="_blank">{{ repo.url }}</a></div>
-          <div class="detail-row"><span class="label">Provider</span><span class="badge badge-muted">{{ repo.provider }}</span></div>
-          <div class="detail-row"><span class="label">Status</span><span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span></div>
-          <div class="detail-row"><span class="label">Default Branch</span><span>{{ repo.defaultBranch || '—' }}</span></div>
-          <div class="detail-row"><span class="label">Last Synced</span><span>{{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'medium') : 'Never' }}</span></div>
-          <div class="detail-row">
-            <span class="label">Sync Interval</span>
-            <select [ngModel]="syncIntervalValue" (ngModelChange)="onSyncIntervalChange($event)"
+        <!-- Overview Tab -->
+        @if (activeTab === 'Overview') {
+          <div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+              <div class="card">
+                <h3 style="margin-bottom:1rem;font-size:1rem">Details</h3>
+                <div class="detail-row"><span class="label">URL</span><a [href]="repo.url" target="_blank">{{ repo.url }}</a></div>
+                <div class="detail-row"><span class="label">Provider</span><span class="badge badge-muted">{{ repo.provider }}</span></div>
+                <div class="detail-row"><span class="label">Status</span><span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span></div>
+                <div class="detail-row"><span class="label">Default Branch</span><span>{{ repo.defaultBranch || '—' }}</span></div>
+                <div class="detail-row"><span class="label">Last Synced</span><span>{{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'medium') : 'Never' }}</span></div>
+                <div class="detail-row">
+                  <span class="label">Sync Interval</span>
+                  <select [ngModel]="syncIntervalValue" (ngModelChange)="onSyncIntervalChange($event)"
                     style="padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem">
-              <option value="null">Default</option>
-              <option value="0">Manual Only</option>
-              <option value="15">15 min</option>
-              <option value="30">30 min</option>
-              <option value="60">1 hour</option>
-              <option value="120">2 hours</option>
-              <option value="360">6 hours</option>
-              <option value="720">12 hours</option>
-              <option value="1440">Daily</option>
-            </select>
-            <span *ngIf="syncIntervalSaving" style="margin-left:0.5rem;font-size:0.75rem;color:var(--text-muted)">Saving...</span>
-            <span *ngIf="syncIntervalSaved" style="margin-left:0.5rem;font-size:0.75rem;color:var(--success)">Saved</span>
-          </div>
-        </div>
-        <div class="card" *ngIf="repo.stats">
-          <h3 style="margin-bottom:1rem;font-size:1rem">Statistics</h3>
-          <div class="stat-grid">
-            <div class="stat"><div class="stat-value">{{ repo.stats.commitCount }}</div><div class="stat-label">Commits</div></div>
-            <div class="stat">
-              <div class="stat-value">{{ repo.stats.enrichmentCount }}</div>
-              <div class="stat-label">Enrichments</div>
-              <div class="stat-sub" *ngIf="repo.stats.storageSizeBytes > 0" style="font-size:var(--font-xs);color:var(--text-muted);margin-top:0.125rem">{{ formatBytes(repo.stats.storageSizeBytes) }}</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value" [style.color]="repo.stats.hasEmbeddings ? 'var(--primary)' : 'var(--text-muted)'">
-                {{ repo.stats.embeddingCount }}
-              </div>
-              <div class="stat-label">Embeddings</div>
-            </div>
-            <div class="stat"><div class="stat-value">{{ repo.stats.pendingTaskCount }}</div><div class="stat-label">Pending Tasks</div></div>
-          </div>
-          <div *ngIf="!repo.stats.hasEmbeddings && repo.status === 'indexed'"
-               style="margin-top:0.75rem;padding:0.5rem 0.75rem;background:rgba(255,193,7,0.08);border-radius:var(--radius);font-size:0.8125rem;color:#856404">
-            <i class="bi bi-info-circle"></i> No embeddings -- semantic search unavailable. Configure an embedding API key in Settings.
-          </div>
-        </div>
-      </div>
-
-      <!-- Summary stats from analytics endpoint -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem" *ngIf="summary">
-        <div class="card">
-          <h3 style="margin-bottom:1rem;font-size:1rem">Last Commit</h3>
-          <div *ngIf="summary.lastCommit">
-            <div style="font-weight:500;margin-bottom:0.25rem">{{ summary.lastCommit.authorName }}</div>
-            <div class="text-muted" style="font-size:0.8125rem;margin-bottom:0.5rem">{{ summary.lastCommit.authorEmail }}</div>
-            <div style="font-size:0.875rem;margin-bottom:0.5rem">{{ summary.lastCommit.message }}</div>
-            <div class="text-muted" style="font-size:0.8125rem">
-              <code>{{ summary.lastCommit.sha?.substring(0, 8) }}</code>
-              <span style="margin-left:0.5rem">{{ getRelativeTime(summary.lastCommit.committedAt) }}</span>
-            </div>
-          </div>
-          <div *ngIf="!summary.lastCommit" class="text-muted">No commits found</div>
-        </div>
-        <div class="card">
-          <h3 style="margin-bottom:1rem;font-size:1rem">File Breakdown</h3>
-          <div class="stat-grid" style="grid-template-columns:repeat(3, 1fr)">
-            <div class="stat"><div class="stat-value">{{ summary.stats.totalFiles }}</div><div class="stat-label">Total Files</div></div>
-            <div class="stat"><div class="stat-value">{{ summary.stats.testFiles }}</div><div class="stat-label">Test Files</div></div>
-            <div class="stat"><div class="stat-value">{{ summary.stats.apiDocs }}</div><div class="stat-label">API Docs</div></div>
-          </div>
-          <div *ngIf="summary.enrichmentsByType && summary.enrichmentsByType.length > 0" style="margin-top:1rem">
-            <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.5rem;font-weight:500;text-transform:uppercase;letter-spacing:0.05em">Enrichments by type</div>
-            <div style="display:flex;flex-wrap:wrap;gap:0.375rem">
-              <span *ngFor="let et of summary.enrichmentsByType" class="badge badge-muted">{{ et.subtype }} ({{ et.count }})</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card" *ngIf="repo.branches && repo.branches.length > 0">
-        <h3 style="margin-bottom:1rem;font-size:1rem">Branches</h3>
-        <div class="tag-list">
-          <span *ngFor="let branch of repo.branches" class="badge" [ngClass]="branch.isDefault ? 'badge-primary' : 'badge-muted'">
-            {{ branch.name }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Commit Comparison -->
-      <div class="card" style="margin-top:1.5rem" *ngIf="commits.length >= 2">
-        <h3 style="margin-bottom:1rem;font-size:1rem">Compare Commits</h3>
-        <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap">
-          <div>
-            <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem">From</label>
-            <select [(ngModel)]="compareFrom" style="padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:200px">
-              <option value="">Select commit...</option>
-              <option *ngFor="let c of commits" [value]="c.sha">{{ c.sha.substring(0, 7) }} - {{ c.message | slice:0:40 }}</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem">To</label>
-            <select [(ngModel)]="compareTo" style="padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:200px">
-              <option value="">Select commit...</option>
-              <option *ngFor="let c of commits" [value]="c.sha">{{ c.sha.substring(0, 7) }} - {{ c.message | slice:0:40 }}</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" (click)="compareCommits()" [disabled]="!compareFrom || !compareTo || comparing" style="font-size:0.8125rem">
-            <i class="bi bi-arrow-left-right"></i> Compare
-          </button>
-        </div>
-        <div *ngIf="compareError" style="margin-top:0.75rem;color:var(--danger);font-size:0.8125rem">{{ compareError }}</div>
-
-        <!-- Comparison Results -->
-        <div *ngIf="comparison" style="margin-top:1rem">
-          <div style="display:flex;gap:1rem;margin-bottom:1rem">
-            <span class="stat-badge added" style="cursor:pointer" (click)="toggleSection('added')">+ {{ comparison.added.length }} added</span>
-            <span class="stat-badge deleted" style="cursor:pointer" (click)="toggleSection('removed')">- {{ comparison.removed.length }} removed</span>
-            <span class="stat-badge updated" style="cursor:pointer" (click)="toggleSection('changed')">~ {{ comparison.changed.length }} changed</span>
-          </div>
-
-          <div *ngIf="expandedSection === 'added' && comparison.added.length > 0" style="margin-top:0.75rem">
-            <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--success)">Added Enrichments</h4>
-            <div *ngFor="let e of comparison.added" class="compare-item">
-              <div style="font-weight:500;font-size:0.8125rem">{{ e.filePath || '(no file)' }}</div>
-              <span class="badge badge-muted" style="font-size:0.6875rem">{{ e.subtype }}</span>
-              <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;white-space:pre-wrap;max-height:4rem;overflow:hidden">{{ e.content | slice:0:200 }}</div>
-            </div>
-          </div>
-
-          <div *ngIf="expandedSection === 'removed' && comparison.removed.length > 0" style="margin-top:0.75rem">
-            <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--danger)">Removed Enrichments</h4>
-            <div *ngFor="let e of comparison.removed" class="compare-item">
-              <div style="font-weight:500;font-size:0.8125rem">{{ e.filePath || '(no file)' }}</div>
-              <span class="badge badge-muted" style="font-size:0.6875rem">{{ e.subtype }}</span>
-              <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;white-space:pre-wrap;max-height:4rem;overflow:hidden">{{ e.content | slice:0:200 }}</div>
-            </div>
-          </div>
-
-          <div *ngIf="expandedSection === 'changed' && comparison.changed.length > 0" style="margin-top:0.75rem">
-            <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--accent)">Changed Enrichments</h4>
-            <div *ngFor="let c of comparison.changed" class="compare-item">
-              <div style="font-weight:500;font-size:0.8125rem">{{ c.to.filePath || '(no file)' }}</div>
-              <span class="badge badge-muted" style="font-size:0.6875rem">{{ c.to.subtype }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      </div><!-- End Overview Tab -->
-
-      <!-- Insights Tab -->
-      <div *ngIf="activeTab === 'Insights'" class="insights-tab">
-
-        <!-- Toolbar -->
-        <div class="insights-toolbar">
-          <div class="insights-toolbar-left">
-            <i class="bi bi-journal-richtext" style="font-size:1.125rem;color:var(--primary)"></i>
-            <span style="font-weight:600;font-size:var(--font-sm)">Repository Insights Report</span>
-            <span *ngIf="insightLayers.length > 0 && insightLayers[0].createdAt" class="text-muted" style="font-size:var(--font-xs);margin-left:0.75rem">
-              Generated {{ getRelativeTime(insightLayers[0].createdAt || insightLayers[0].CreatedAt) }}
-            </span>
-          </div>
-          <div class="insights-toolbar-right">
-            <button class="btn btn-secondary btn-sm" (click)="generateInsights()" [disabled]="generatingInsights">
-              <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating (' + insightLayers.length + '/11)...' : (insightLayers.length > 0 ? 'Regenerate' : 'Generate Insights') }}
-            </button>
-            <span *ngIf="generatingInsights && insightsProgressMessage" class="insights-progress-label" style="font-size:var(--font-xs);color:var(--text-light);margin-left:0.5rem;white-space:nowrap">
-              {{ insightsProgressMessage }}
-            </span>
-            <button class="btn btn-secondary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
-              <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
-            </button>
-            <button *ngIf="insightLayers.length > 0" (click)="exportHtml()" class="btn btn-secondary btn-sm">
-              <i class="bi bi-download"></i> Export HTML
-            </button>
-            <button *ngIf="insightLayers.length > 0" class="btn btn-secondary btn-sm" (click)="printReport()">
-              <i class="bi bi-printer"></i> Print
-            </button>
-          </div>
-        </div>
-
-        <!-- Progress Bar -->
-        <div *ngIf="generatingInsights" class="insights-progress-bar-container" style="padding:0 1rem 0.5rem 1rem">
-          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
-            <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
-              <div [style.width.%]="insightsProgress" style="height:100%;background:var(--primary);border-radius:3px;transition:width 0.5s ease"></div>
-            </div>
-            <span style="font-size:var(--font-xs);color:var(--text-light);min-width:2.5rem;text-align:right">{{ insightsProgress }}%</span>
-          </div>
-        </div>
-
-        <!-- Empty State -->
-        <div *ngIf="insightLayers.length === 0 && !generatingInsights" class="insights-empty card">
-          <i class="bi bi-lightbulb" style="font-size:2.5rem;color:var(--text-light);margin-bottom:1rem;display:block"></i>
-          <h3 style="font-size:var(--font-lg);margin-bottom:0.5rem">No insights yet</h3>
-          <p class="text-muted" style="font-size:var(--font-xs);margin-bottom:1.25rem">Click "Generate Insights" to analyze this repository and produce a comprehensive report.</p>
-          <button class="btn btn-primary" (click)="generateInsights()" [disabled]="generatingInsights">
-            <i class="bi bi-lightbulb"></i> Generate Insights
-          </button>
-        </div>
-
-        <!-- Report Document -->
-        <div *ngIf="insightLayers.length > 0" class="insights-document-wrapper" id="insightsDocumentWrapper">
-
-          <!-- TOC Sidebar -->
-          <nav class="insights-toc" id="insightsToc">
-            <div class="insights-toc-title">Contents</div>
-            <a *ngIf="reportData" class="insights-toc-item"
-               [class.active]="activeTocSection === 'report-summary'"
-               (click)="scrollToSection('report-summary', $event)">
-              <i class="bi bi-speedometer2"></i> Summary
-            </a>
-            <a *ngFor="let layer of insightLayers; let i = index"
-               class="insights-toc-item"
-               [class.active]="activeTocSection === 'layer-' + layer.subtype"
-               (click)="scrollToSection('layer-' + layer.subtype, $event)">
-              <span class="insights-toc-num">{{ i + 1 }}</span>
-              {{ getInsightLabel(layer.subtype) }}
-              <span *ngIf="getLayerRating(layer.subtype) as rating" class="insights-toc-rating">
-                {{ getStarRating(rating) }}
-              </span>
-            </a>
-            <a class="insights-toc-item"
-               [class.active]="activeTocSection === 'insights-methodology'"
-               (click)="scrollToSection('insights-methodology', $event)">
-              <i class="bi bi-info-circle"></i> Methodology
-            </a>
-          </nav>
-
-          <!-- Content Area -->
-          <div class="insights-content-area" id="insightsContentArea" (scroll)="onInsightsScroll($event)">
-
-            <!-- Tech Stack Summary Bar -->
-            <div *ngIf="techStackSummary?.length" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
-              <span *ngFor="let tech of techStackSummary" class="badge badge-primary" style="font-size:var(--font-xs)">{{ tech }}</span>
-            </div>
-
-            <!-- Health Score Header -->
-            <div class="insights-section" id="report-summary">
-
-              <!-- No report yet -->
-              <div *ngIf="!reportData" style="text-align:center;padding:1.5rem;background:var(--background-alt);border-radius:var(--radius-lg);margin-bottom:1.5rem">
-                <div style="font-size:var(--font-sm);color:var(--text-muted);margin-bottom:0.75rem">
-                  <i class="bi bi-bar-chart"></i> Health score and ratings available after generating a report.
+                    <option value="null">Default</option>
+                    <option value="0">Manual Only</option>
+                    <option value="15">15 min</option>
+                    <option value="30">30 min</option>
+                    <option value="60">1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="360">6 hours</option>
+                    <option value="720">12 hours</option>
+                    <option value="1440">Daily</option>
+                  </select>
+                  @if (syncIntervalSaving) {
+                    <span style="margin-left:0.5rem;font-size:0.75rem;color:var(--text-muted)">Saving...</span>
+                  }
+                  @if (syncIntervalSaved) {
+                    <span style="margin-left:0.5rem;font-size:0.75rem;color:var(--success)">Saved</span>
+                  }
                 </div>
-                <button class="btn btn-secondary btn-sm" (click)="activeTab = 'Report'" style="font-size:var(--font-xs)">
-                  Go to Report tab to generate
-                </button>
               </div>
-
-              <div *ngIf="reportData">
-              <div class="insights-health-header">
-                <div class="insights-health-score"
-                     [style.borderColor]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
-                  <div class="insights-health-number"
-                       [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
-                    {{ reportData.overallHealthScore }}
-                  </div>
-                  <div class="insights-health-label">Health Score</div>
-                  <div class="insights-health-stars" *ngIf="reportData.overallHealthScore != null">
-                    {{ getStarRating(Math.round(reportData.overallHealthScore / 20)) }}
-                  </div>
-                  <span class="report-info-icon report-info-below" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
-                </div>
-
-                <div class="insights-health-details">
-                  <!-- Star Ratings Summary -->
-                  <div class="insights-ratings-summary" *ngIf="reportData.layers?.length">
-                    <div *ngFor="let lr of reportData.layers" class="insights-rating-row">
-                      <span class="insights-rating-label">{{ getInsightLabel(lr.subtype) }}</span>
-                      <span class="insights-rating-stars">{{ getStarRating(lr.qualityRating) }}</span>
-                      <span class="insights-rating-value">{{ lr.qualityRating }}/5</span>
+              @if (repo.stats) {
+                <div class="card">
+                  <h3 style="margin-bottom:1rem;font-size:1rem">Statistics</h3>
+                  <div class="stat-grid">
+                    <div class="stat"><div class="stat-value">{{ repo.stats.commitCount }}</div><div class="stat-label">Commits</div></div>
+                    <div class="stat">
+                      <div class="stat-value">{{ repo.stats.enrichmentCount }}</div>
+                      <div class="stat-label">Enrichments</div>
+                      @if (repo.stats.storageSizeBytes > 0) {
+                        <div class="stat-sub" style="font-size:var(--font-xs);color:var(--text-muted);margin-top:0.125rem">{{ formatBytes(repo.stats.storageSizeBytes) }}</div>
+                      }
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Velocity Metrics -->
-              <div *ngIf="reportData.velocity" class="insights-velocity-row">
-                <div class="insights-velocity-item">
-                  <div class="insights-velocity-value">{{ reportData.velocity.commitsPerMonth }}</div>
-                  <div class="insights-velocity-label">Commits/Month</div>
-                  <span class="report-info-icon report-info-below" data-tooltip="Total commits divided by the repository's active period in months." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
-                </div>
-                <div class="insights-velocity-item">
-                  <div class="insights-velocity-value">{{ reportData.velocity.activeContributors }}</div>
-                  <div class="insights-velocity-label">Contributors</div>
-                  <span class="report-info-icon report-info-below" data-tooltip="Unique committer emails across all indexed commits." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
-                </div>
-                <div class="insights-velocity-item">
-                  <div class="insights-velocity-value" style="text-transform:capitalize">{{ reportData.velocity.trend }}</div>
-                  <div class="insights-velocity-label">Trend</div>
-                  <span class="report-info-icon report-info-below" data-tooltip="Compares commit rate in the second half vs first half. Increasing if >20% higher, decreasing if >20% lower." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
-                </div>
-              </div>
-
-              <!-- Top Contributors -->
-              <div *ngIf="reportData.velocity?.topContributors?.length" style="margin-bottom:1.5rem;padding:0 0.5rem">
-                <div style="font-weight:600;font-size:var(--font-xs);margin-bottom:0.5rem;color:var(--text-muted)">Top Contributors</div>
-                <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
-                  <span *ngFor="let c of reportData.velocity.topContributors" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:var(--background-alt);border-radius:100px;font-size:var(--font-xs)">
-                    <strong>{{ c.name }}</strong>
-                    <span class="text-muted" style="font-size:0.85em;opacity:0.7">{{ c.email }}</span>
-                    <span class="text-muted">{{ c.commits }}</span>
-                  </span>
-                </div>
-              </div>
-
-              <!-- Top 5 Improvements -->
-              <div *ngIf="reportData.top5Improvements?.length" class="insights-improvements">
-                <h3 class="insights-improvements-title">
-                  <i class="bi bi-arrow-up-circle"></i> Top Improvements
-                </h3>
-                <div *ngFor="let imp of reportData.top5Improvements; let i = index" class="insights-improvement-item">
-                  <span class="insights-improvement-num">{{ i + 1 }}</span>
-                  <div class="insights-improvement-body">
-                    <div class="insights-improvement-title">{{ imp.title }}</div>
-                    <div *ngIf="imp.description" class="insights-improvement-desc">{{ imp.description }}</div>
-                  </div>
-                  <span class="badge insights-impact-badge"
-                        [ngClass]="imp.impact === 'high' || imp.impact === 'critical' ? 'badge-danger' : imp.impact === 'medium' ? 'badge-warning' : 'badge-info'"
-                        style="font-size:0.6875rem;text-transform:capitalize">{{ imp.impact }}</span>
-                </div>
-              </div>
-            </div><!-- end *ngIf="reportData" -->
-            </div><!-- end insights-section report-summary -->
-
-            <!-- Each Insight Layer Section -->
-            <div *ngFor="let layer of insightLayers; let idx = index"
-                 class="insights-section insights-layer-section"
-                 [id]="'layer-' + layer.subtype">
-
-              <!-- Section Heading -->
-              <div class="insights-layer-heading">
-                <div class="insights-layer-heading-left">
-                  <span class="insights-layer-num">{{ idx + 1 }}</span>
-                  <h2 class="insights-layer-title">{{ getInsightLabel(layer.subtype) }}</h2>
-                </div>
-                <div class="insights-layer-stars" *ngIf="getLayerRating(layer.subtype) as rating">
-                  {{ getStarRating(rating) }}
-                </div>
-              </div>
-
-              <!-- Ratings Badges -->
-              <div *ngIf="getLayerReport(layer.subtype) as lr" class="insights-layer-badges">
-                <span class="badge insights-badge-maturity"
-                      [ngClass]="lr.maturityRating >= 4 ? 'badge-success' : lr.maturityRating >= 3 ? 'badge-warning' : 'badge-danger'">
-                  <i class="bi bi-bar-chart-fill"></i> Maturity {{ lr.maturityRating }}/5
-                  <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized"><i class="bi bi-info-circle"></i></span>
-                </span>
-                <span class="badge insights-badge-quality"
-                      [ngClass]="lr.qualityRating >= 4 ? 'badge-success' : lr.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'">
-                  <i class="bi bi-star-fill"></i> Quality {{ lr.qualityRating }}/5
-                  <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent"><i class="bi bi-info-circle"></i></span>
-                </span>
-                <span class="badge insights-badge-risk"
-                      [ngClass]="lr.riskRating <= 2 ? 'badge-success' : lr.riskRating <= 3 ? 'badge-warning' : 'badge-danger'">
-                  <i class="bi bi-shield-fill"></i> Risk {{ lr.riskRating }}/5
-                  <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical"><i class="bi bi-info-circle"></i></span>
-                </span>
-              </div>
-
-              <!-- Strengths / Weaknesses / Recommendations -->
-              <div *ngIf="getLayerReport(layer.subtype) as lr" class="insights-layer-meta">
-                <div class="insights-meta-block">
-                  <div class="insights-meta-title insights-meta-strengths"><i class="bi bi-check-circle-fill"></i> Strengths</div>
-                  <ul *ngIf="lr.strengths?.length" class="insights-meta-list">
-                    <li *ngFor="let s of lr.strengths" class="insights-strength-item">{{ s }}</li>
-                  </ul>
-                  <div *ngIf="!lr.strengths?.length" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see ratings</div>
-                </div>
-                <div class="insights-meta-block">
-                  <div class="insights-meta-title insights-meta-weaknesses"><i class="bi bi-exclamation-triangle-fill"></i> Weaknesses</div>
-                  <ul *ngIf="lr.weaknesses?.length" class="insights-meta-list">
-                    <li *ngFor="let w of lr.weaknesses" class="insights-weakness-item">{{ w }}</li>
-                  </ul>
-                  <div *ngIf="!lr.weaknesses?.length" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see ratings</div>
-                </div>
-                <div class="insights-meta-block">
-                  <div class="insights-meta-title insights-meta-recommendations"><i class="bi bi-arrow-right-circle-fill"></i> Recommendations</div>
-                  <ul *ngIf="lr.recommendations?.length" class="insights-meta-list">
-                    <li *ngFor="let r of lr.recommendations" class="insights-recommendation-item">{{ r }}</li>
-                  </ul>
-                  <div *ngIf="!lr.recommendations?.length" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see recommendations</div>
-                </div>
-              </div>
-
-              <!-- Rendered Markdown Content -->
-              <div class="insights-layer-content" [innerHTML]="renderInsightHtml(layer)"></div>
-            </div>
-
-            <!-- Methodology -->
-            <div class="insights-section report-methodology-section" id="insights-methodology" style="margin-top:2rem">
-              <h2 class="report-section-title">
-                <i class="bi bi-info-circle"></i> Methodology
-              </h2>
-              <div class="report-methodology-toggle" (click)="showInsightsMethodology = !showInsightsMethodology">
-                <i class="bi" [ngClass]="showInsightsMethodology ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-                {{ showInsightsMethodology ? 'Hide methodology details' : 'Show methodology details' }}
-              </div>
-              <div class="report-methodology-content" [class.report-methodology-expanded]="showInsightsMethodology">
-                <div class="report-methodology-grid">
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Health Score</div>
-                    <div class="report-methodology-def">Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Commits/Month</div>
-                    <div class="report-methodology-def">Total commits divided by the repository's active period in months.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Active Contributors</div>
-                    <div class="report-methodology-def">Unique committer emails across all indexed commits.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Trend</div>
-                    <div class="report-methodology-def">Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Maturity Rating</div>
-                    <div class="report-methodology-def">1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Quality Rating</div>
-                    <div class="report-methodology-def">1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Risk Rating</div>
-                    <div class="report-methodology-def">1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Impact / Effort</div>
-                    <div class="report-methodology-def">Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div><!-- End Content Area -->
-        </div><!-- End Document Wrapper -->
-
-      </div><!-- End Insights Tab -->
-
-      <!-- Report Tab -->
-      <div *ngIf="activeTab === 'Report'" class="report-tab">
-        <!-- Toolbar -->
-        <div class="report-toolbar">
-          <div class="report-toolbar-left">
-            <i class="bi bi-file-earmark-bar-graph" style="font-size:1.125rem;color:var(--primary)"></i>
-            <span style="font-weight:600;font-size:var(--font-sm)">Repository Report</span>
-          </div>
-          <div class="report-toolbar-right">
-            <button class="btn btn-primary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
-              <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : (reportData ? 'Regenerate Report' : 'Generate Report') }}
-            </button>
-            <button *ngIf="reportData" (click)="exportHtml()" class="btn btn-secondary btn-sm">
-              <i class="bi bi-download"></i> Export HTML
-            </button>
-            <button *ngIf="reportData" (click)="exportPdf()" class="btn btn-secondary btn-sm">
-              <i class="bi bi-file-earmark-pdf"></i> Save as PDF
-            </button>
-            <span *ngIf="!insightLayers.length" class="text-muted" style="font-size:var(--font-xs);align-self:center">Generate insights first.</span>
-          </div>
-        </div>
-
-        <!-- Empty state -->
-        <div *ngIf="!reportData && !generatingReport" class="report-empty card">
-          <i class="bi bi-file-earmark-bar-graph" style="font-size:2.5rem;color:var(--text-light);margin-bottom:1rem;display:block"></i>
-          <h3 style="font-size:var(--font-lg);margin-bottom:0.5rem">No report yet</h3>
-          <p class="text-muted" style="font-size:var(--font-xs);margin-bottom:1.25rem">Generate insights first, then click "Generate Report" to produce a comprehensive analysis.</p>
-          <div *ngIf="reportError" style="margin-bottom:1rem;padding:0.75rem 1rem;background:rgba(220,53,69,0.08);border:1px solid rgba(220,53,69,0.2);border-radius:var(--radius);color:var(--danger);font-size:var(--font-xs)">
-            <i class="bi bi-exclamation-triangle"></i> {{ reportError }}
-          </div>
-          <button class="btn btn-primary" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
-            <i class="bi bi-file-earmark-bar-graph"></i> Generate Report
-          </button>
-        </div>
-
-        <!-- Report document with TOC sidebar -->
-        <div *ngIf="reportData" class="report-document-wrapper" id="reportDocumentWrapper">
-
-          <!-- TOC Sidebar -->
-          <nav class="report-toc" id="reportToc">
-            <div class="report-toc-title">Contents</div>
-            <a class="report-toc-item"
-               [class.active]="activeReportSection === 'rpt-health'"
-               (click)="scrollToReportSection('rpt-health', $event)">
-              <span class="report-toc-score"
-                    [style.background]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
-                {{ reportData.overallHealthScore }}
-              </span>
-              Health Score
-            </a>
-            <a class="report-toc-item"
-               [class.active]="activeReportSection === 'rpt-velocity'"
-               (click)="scrollToReportSection('rpt-velocity', $event)">
-              <i class="bi bi-speedometer2"></i> Velocity
-            </a>
-            <a class="report-toc-item"
-               [class.active]="activeReportSection === 'rpt-layers-overview'"
-               (click)="scrollToReportSection('rpt-layers-overview', $event)">
-              <i class="bi bi-grid"></i> Layer Overview
-            </a>
-            <a *ngIf="reportData.top5Improvements?.length" class="report-toc-item"
-               [class.active]="activeReportSection === 'rpt-improvements'"
-               (click)="scrollToReportSection('rpt-improvements', $event)">
-              <i class="bi bi-arrow-up-circle"></i> Top Improvements
-            </a>
-            <div class="report-toc-divider"></div>
-            <a *ngFor="let layer of reportData.layers; let i = index" class="report-toc-item"
-               [class.active]="activeReportSection === 'rpt-layer-' + layer.subtype"
-               (click)="scrollToReportSection('rpt-layer-' + layer.subtype, $event)">
-              <span class="report-toc-num">{{ i + 1 }}</span>
-              {{ getInsightLabel(layer.subtype) || layer.name }}
-              <span class="report-toc-rating">{{ getStarRating(layer.qualityRating) }}</span>
-            </a>
-            <div class="report-toc-divider"></div>
-            <a class="report-toc-item"
-               [class.active]="activeReportSection === 'rpt-methodology'"
-               (click)="scrollToReportSection('rpt-methodology', $event)">
-              <i class="bi bi-info-circle"></i> Methodology
-            </a>
-          </nav>
-
-          <!-- Content Area (single scrollable document) -->
-          <div class="report-content-area" id="reportContentArea" (scroll)="onReportScroll($event)">
-
-            <!-- Tech Stack Summary Bar -->
-            <div *ngIf="techStackSummary?.length" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
-              <span *ngFor="let tech of techStackSummary" class="badge badge-primary" style="font-size:var(--font-xs)">{{ tech }}</span>
-            </div>
-
-            <!-- Section 1: Health Score -->
-            <section class="report-section" id="rpt-health">
-              <div class="report-health-header">
-                <div class="report-health-score-ring"
-                     [style.borderColor]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
-                  <div class="report-health-number"
-                       [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
-                    {{ reportData.overallHealthScore }}
-                  </div>
-                  <div class="report-health-of">/100</div>
-                  <div class="report-health-label">Health Score</div>
-                  <span class="report-info-icon" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.">
-                    <i class="bi bi-info-circle"></i>
-                  </span>
-                </div>
-                <div class="report-health-stars" *ngIf="reportData.overallHealthScore != null">
-                  {{ getStarRating(Math.round(reportData.overallHealthScore / 20)) }}
-                </div>
-              </div>
-
-              <!-- Ratings summary grid -->
-              <div class="report-ratings-grid" *ngIf="reportData.layers?.length">
-                <div *ngFor="let lr of reportData.layers" class="report-rating-row">
-                  <span class="report-rating-label">{{ getInsightLabel(lr.subtype) }}</span>
-                  <span class="report-rating-stars">{{ getStarRating(lr.qualityRating) }}</span>
-                  <span class="report-rating-value">{{ lr.qualityRating }}/5</span>
-                </div>
-              </div>
-            </section>
-
-            <!-- Section 2: Velocity Metrics -->
-            <section class="report-section" id="rpt-velocity" *ngIf="reportData.velocity">
-              <h2 class="report-section-title">
-                <i class="bi bi-speedometer2"></i> Velocity Metrics
-              </h2>
-              <div class="report-velocity-grid">
-                <div class="report-velocity-card">
-                  <div class="report-velocity-value">{{ reportData.velocity.commitsPerMonth }}</div>
-                  <div class="report-velocity-label">
-                    Commits/Month
-                    <span class="report-info-icon" data-tooltip="Total commits divided by the repository's active period in months.">
-                      <i class="bi bi-info-circle"></i>
-                    </span>
-                  </div>
-                </div>
-                <div class="report-velocity-card">
-                  <div class="report-velocity-value">{{ reportData.velocity.activeContributors }}</div>
-                  <div class="report-velocity-label">
-                    Active Contributors
-                    <span class="report-info-icon" data-tooltip="Unique committer emails across all indexed commits.">
-                      <i class="bi bi-info-circle"></i>
-                    </span>
-                  </div>
-                </div>
-                <div class="report-velocity-card">
-                  <div class="report-velocity-value report-velocity-trend" style="text-transform:capitalize">{{ reportData.velocity.trend }}</div>
-                  <div class="report-velocity-label">
-                    Trend
-                    <span class="report-info-icon" data-tooltip="Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.">
-                      <i class="bi bi-info-circle"></i>
-                    </span>
-                  </div>
-                </div>
-                <div class="report-velocity-card" *ngIf="reportData.velocity.averageCommitsPerDay != null">
-                  <div class="report-velocity-value">{{ reportData.velocity.averageCommitsPerDay | number:'1.1-1' }}</div>
-                  <div class="report-velocity-label">Commits/Day</div>
-                </div>
-                <div class="report-velocity-card" *ngIf="reportData.velocity.deployFrequency">
-                  <div class="report-velocity-value">{{ reportData.velocity.deployFrequency }}</div>
-                  <div class="report-velocity-label">Deploy Frequency</div>
-                </div>
-              </div>
-
-              <!-- Top Contributors -->
-              <div *ngIf="reportData.velocity?.topContributors?.length" style="margin-top:1.25rem">
-                <div style="font-weight:600;font-size:var(--font-xs);margin-bottom:0.5rem;color:var(--text-muted)">Top Contributors</div>
-                <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
-                  <span *ngFor="let c of reportData.velocity.topContributors" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:var(--background-alt);border-radius:100px;font-size:var(--font-xs)">
-                    <strong>{{ c.name }}</strong>
-                    <span class="text-muted" style="font-size:0.85em;opacity:0.7">{{ c.email }}</span>
-                    <span class="text-muted">{{ c.commits }}</span>
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            <!-- Section 3: Layer Overview Grid -->
-            <section class="report-section" id="rpt-layers-overview">
-              <h2 class="report-section-title">
-                <i class="bi bi-grid"></i> Layer Overview
-              </h2>
-              <div class="report-layer-overview-grid">
-                <div *ngFor="let layer of reportData.layers" class="report-layer-card"
-                     (click)="scrollToReportSection('rpt-layer-' + layer.subtype, $event)">
-                  <div class="report-layer-card-header">
-                    <span class="report-layer-card-name">{{ getInsightLabel(layer.subtype) || layer.name }}</span>
-                    <span class="report-layer-card-stars">{{ getStarRating(layer.qualityRating) }}</span>
-                  </div>
-                  <div class="report-layer-card-badges">
-                    <span class="report-mini-badge"
-                          [ngClass]="layer.maturityRating >= 4 ? 'mini-success' : layer.maturityRating >= 3 ? 'mini-warning' : 'mini-danger'">
-                      M:{{ layer.maturityRating }}
-                    </span>
-                    <span class="report-mini-badge"
-                          [ngClass]="layer.qualityRating >= 4 ? 'mini-success' : layer.qualityRating >= 3 ? 'mini-warning' : 'mini-danger'">
-                      Q:{{ layer.qualityRating }}
-                    </span>
-                    <span class="report-mini-badge"
-                          [ngClass]="layer.riskRating <= 2 ? 'mini-success' : layer.riskRating <= 3 ? 'mini-warning' : 'mini-danger'">
-                      R:{{ layer.riskRating }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <!-- Section 4: Top Improvements -->
-            <section class="report-section" id="rpt-improvements" *ngIf="reportData.top5Improvements?.length">
-              <h2 class="report-section-title">
-                <i class="bi bi-arrow-up-circle"></i> Top Improvements
-              </h2>
-              <div class="report-improvements-list">
-                <div *ngFor="let imp of reportData.top5Improvements; let i = index" class="report-improvement-item">
-                  <span class="report-improvement-num">{{ i + 1 }}</span>
-                  <div class="report-improvement-body">
-                    <div class="report-improvement-title">{{ imp.title }}</div>
-                    <div *ngIf="imp.description" class="report-improvement-desc">{{ imp.description }}</div>
-                    <div class="report-improvement-badges">
-                      <span class="badge"
-                            [ngClass]="imp.impact === 'high' || imp.impact === 'critical' ? 'badge-danger' : imp.impact === 'medium' ? 'badge-warning' : 'badge-muted'"
-                            style="font-size:0.6875rem;text-transform:capitalize">
-                        {{ imp.impact }} impact
-                        <span class="report-info-icon" data-tooltip="Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.">
-                          <i class="bi bi-info-circle"></i>
-                        </span>
-                      </span>
-                      <span class="badge badge-muted" style="font-size:0.6875rem;text-transform:capitalize">{{ imp.effort }} effort</span>
-                      <span *ngIf="imp.layer" class="badge badge-muted" style="font-size:0.6875rem">{{ getInsightLabel(imp.layer) || imp.layer }}</span>
+                    <div class="stat">
+                      <div class="stat-value" [style.color]="repo.stats.hasEmbeddings ? 'var(--primary)' : 'var(--text-muted)'">
+                        {{ repo.stats.embeddingCount }}
+                      </div>
+                      <div class="stat-label">Embeddings</div>
                     </div>
+                    <div class="stat"><div class="stat-value">{{ repo.stats.pendingTaskCount }}</div><div class="stat-label">Pending Tasks</div></div>
                   </div>
+                  @if (!repo.stats.hasEmbeddings && repo.status === 'indexed') {
+                    <div
+                      style="margin-top:0.75rem;padding:0.5rem 0.75rem;background:rgba(255,193,7,0.08);border-radius:var(--radius);font-size:0.8125rem;color:#856404">
+                      <i class="bi bi-info-circle"></i> No embeddings -- semantic search unavailable. Configure an embedding API key in Settings.
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            <!-- Summary stats from analytics endpoint -->
+            @if (summary) {
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+                <div class="card">
+                  <h3 style="margin-bottom:1rem;font-size:1rem">Last Commit</h3>
+                  @if (summary.lastCommit) {
+                    <div>
+                      <div style="font-weight:500;margin-bottom:0.25rem">{{ summary.lastCommit.authorName }}</div>
+                      <div class="text-muted" style="font-size:0.8125rem;margin-bottom:0.5rem">{{ summary.lastCommit.authorEmail }}</div>
+                      <div style="font-size:0.875rem;margin-bottom:0.5rem">{{ summary.lastCommit.message }}</div>
+                      <div class="text-muted" style="font-size:0.8125rem">
+                        <code>{{ summary.lastCommit.sha?.substring(0, 8) }}</code>
+                        <span style="margin-left:0.5rem">{{ getRelativeTime(summary.lastCommit.committedAt) }}</span>
+                      </div>
+                    </div>
+                  }
+                  @if (!summary.lastCommit) {
+                    <div class="text-muted">No commits found</div>
+                  }
+                </div>
+                <div class="card">
+                  <h3 style="margin-bottom:1rem;font-size:1rem">File Breakdown</h3>
+                  <div class="stat-grid" style="grid-template-columns:repeat(3, 1fr)">
+                    <div class="stat"><div class="stat-value">{{ summary.stats.totalFiles }}</div><div class="stat-label">Total Files</div></div>
+                    <div class="stat"><div class="stat-value">{{ summary.stats.testFiles }}</div><div class="stat-label">Test Files</div></div>
+                    <div class="stat"><div class="stat-value">{{ summary.stats.apiDocs }}</div><div class="stat-label">API Docs</div></div>
+                  </div>
+                  @if (summary.enrichmentsByType && summary.enrichmentsByType.length > 0) {
+                    <div style="margin-top:1rem">
+                      <div class="text-muted" style="font-size:0.75rem;margin-bottom:0.5rem;font-weight:500;text-transform:uppercase;letter-spacing:0.05em">Enrichments by type</div>
+                      <div style="display:flex;flex-wrap:wrap;gap:0.375rem">
+                        @for (et of summary.enrichmentsByType; track et) {
+                          <span class="badge badge-muted">{{ et.subtype }} ({{ et.count }})</span>
+                        }
+                      </div>
+                    </div>
+                  }
                 </div>
               </div>
-            </section>
-
-            <!-- Section 5+: Each Layer Section (all rendered, not toggled) -->
-            <section *ngFor="let layer of reportData.layers; let idx = index"
-                     class="report-section report-layer-section"
-                     [id]="'rpt-layer-' + layer.subtype">
-
-              <!-- Section Heading -->
-              <div class="report-layer-heading">
-                <div class="report-layer-heading-left">
-                  <span class="report-layer-num">{{ idx + 1 }}</span>
-                  <h2 class="report-layer-title">{{ getInsightLabel(layer.subtype) || layer.name }}</h2>
-                </div>
-                <div class="report-layer-heading-stars">
-                  {{ getStarRating(layer.qualityRating) }}
+            }
+            @if (repo.branches && repo.branches.length > 0) {
+              <div class="card">
+                <h3 style="margin-bottom:1rem;font-size:1rem">Branches</h3>
+                <div class="tag-list">
+                  @for (branch of repo.branches; track branch) {
+                    <span class="badge" [ngClass]="branch.isDefault ? 'badge-primary' : 'badge-muted'">
+                      {{ branch.name }}
+                    </span>
+                  }
                 </div>
               </div>
-
-              <!-- Rating Badges -->
-              <div class="report-layer-badges">
-                <span class="badge report-badge-maturity"
-                      [ngClass]="layer.maturityRating >= 4 ? 'badge-success' : layer.maturityRating >= 3 ? 'badge-warning' : 'badge-danger'">
-                  <i class="bi bi-bar-chart-fill"></i> Maturity {{ layer.maturityRating }}/5
-                  <span class="report-info-icon report-info-inline" data-tooltip="1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.">
-                    <i class="bi bi-info-circle"></i>
-                  </span>
-                </span>
-                <span class="badge report-badge-quality"
-                      [ngClass]="layer.qualityRating >= 4 ? 'badge-success' : layer.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'">
-                  <i class="bi bi-star-fill"></i> Quality {{ layer.qualityRating }}/5
-                  <span class="report-info-icon report-info-inline" data-tooltip="1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.">
-                    <i class="bi bi-info-circle"></i>
-                  </span>
-                </span>
-                <span class="badge report-badge-risk"
-                      [ngClass]="layer.riskRating <= 2 ? 'badge-success' : layer.riskRating <= 3 ? 'badge-warning' : 'badge-danger'">
-                  <i class="bi bi-shield-fill"></i> Risk {{ layer.riskRating }}/5
-                  <span class="report-info-icon report-info-inline" data-tooltip="1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.">
-                    <i class="bi bi-info-circle"></i>
-                  </span>
-                </span>
-              </div>
-
-              <!-- Strengths / Weaknesses / Recommendations -->
-              <div class="report-layer-meta">
-                <div *ngIf="layer.strengths?.length" class="report-meta-block">
-                  <div class="report-meta-title report-meta-strengths"><i class="bi bi-check-circle-fill"></i> Strengths</div>
-                  <ul class="report-meta-list">
-                    <li *ngFor="let s of layer.strengths" class="report-strength-item">{{ s }}</li>
-                  </ul>
+            }
+            <!-- Commit Comparison -->
+            @if (commits.length >= 2) {
+              <div class="card" style="margin-top:1.5rem">
+                <h3 style="margin-bottom:1rem;font-size:1rem">Compare Commits</h3>
+                <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap">
+                  <div>
+                    <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem">From</label>
+                    <select [(ngModel)]="compareFrom" style="padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:200px">
+                      <option value="">Select commit...</option>
+                      @for (c of commits; track c) {
+                        <option [value]="c.sha">{{ c.sha.substring(0, 7) }} - {{ c.message | slice:0:40 }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:0.25rem">To</label>
+                    <select [(ngModel)]="compareTo" style="padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:0.8125rem;min-width:200px">
+                      <option value="">Select commit...</option>
+                      @for (c of commits; track c) {
+                        <option [value]="c.sha">{{ c.sha.substring(0, 7) }} - {{ c.message | slice:0:40 }}</option>
+                      }
+                    </select>
+                  </div>
+                  <button class="btn btn-primary" (click)="compareCommits()" [disabled]="!compareFrom || !compareTo || comparing" style="font-size:0.8125rem">
+                    <i class="bi bi-arrow-left-right"></i> Compare
+                  </button>
                 </div>
-                <div *ngIf="layer.weaknesses?.length" class="report-meta-block">
-                  <div class="report-meta-title report-meta-weaknesses"><i class="bi bi-exclamation-triangle-fill"></i> Weaknesses</div>
-                  <ul class="report-meta-list">
-                    <li *ngFor="let w of layer.weaknesses" class="report-weakness-item">{{ w }}</li>
-                  </ul>
+                @if (compareError) {
+                  <div style="margin-top:0.75rem;color:var(--danger);font-size:0.8125rem">{{ compareError }}</div>
+                }
+                <!-- Comparison Results -->
+                @if (comparison) {
+                  <div style="margin-top:1rem">
+                    <div style="display:flex;gap:1rem;margin-bottom:1rem">
+                      <span class="stat-badge added" style="cursor:pointer" (click)="toggleSection('added')">+ {{ comparison.added.length }} added</span>
+                      <span class="stat-badge deleted" style="cursor:pointer" (click)="toggleSection('removed')">- {{ comparison.removed.length }} removed</span>
+                      <span class="stat-badge updated" style="cursor:pointer" (click)="toggleSection('changed')">~ {{ comparison.changed.length }} changed</span>
+                    </div>
+                    @if (expandedSection === 'added' && comparison.added.length > 0) {
+                      <div style="margin-top:0.75rem">
+                        <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--success)">Added Enrichments</h4>
+                        @for (e of comparison.added; track e) {
+                          <div class="compare-item">
+                            <div style="font-weight:500;font-size:0.8125rem">{{ e.filePath || '(no file)' }}</div>
+                            <span class="badge badge-muted" style="font-size:0.6875rem">{{ e.subtype }}</span>
+                            <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;white-space:pre-wrap;max-height:4rem;overflow:hidden">{{ e.content | slice:0:200 }}</div>
+                          </div>
+                        }
+                      </div>
+                    }
+                    @if (expandedSection === 'removed' && comparison.removed.length > 0) {
+                      <div style="margin-top:0.75rem">
+                        <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--danger)">Removed Enrichments</h4>
+                        @for (e of comparison.removed; track e) {
+                          <div class="compare-item">
+                            <div style="font-weight:500;font-size:0.8125rem">{{ e.filePath || '(no file)' }}</div>
+                            <span class="badge badge-muted" style="font-size:0.6875rem">{{ e.subtype }}</span>
+                            <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem;white-space:pre-wrap;max-height:4rem;overflow:hidden">{{ e.content | slice:0:200 }}</div>
+                          </div>
+                        }
+                      </div>
+                    }
+                    @if (expandedSection === 'changed' && comparison.changed.length > 0) {
+                      <div style="margin-top:0.75rem">
+                        <h4 style="font-size:0.875rem;margin-bottom:0.5rem;color:var(--accent)">Changed Enrichments</h4>
+                        @for (c of comparison.changed; track c) {
+                          <div class="compare-item">
+                            <div style="font-weight:500;font-size:0.8125rem">{{ c.to.filePath || '(no file)' }}</div>
+                            <span class="badge badge-muted" style="font-size:0.6875rem">{{ c.to.subtype }}</span>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+          }<!-- End Overview Tab -->
+          <!-- Insights Tab -->
+          @if (activeTab === 'Insights') {
+            <div class="insights-tab">
+              <!-- Toolbar -->
+              <div class="insights-toolbar">
+                <div class="insights-toolbar-left">
+                  <i class="bi bi-journal-richtext" style="font-size:1.125rem;color:var(--primary)"></i>
+                  <span style="font-weight:600;font-size:var(--font-sm)">Repository Insights Report</span>
+                  @if (insightLayers.length > 0 && insightLayers[0].createdAt) {
+                    <span class="text-muted" style="font-size:var(--font-xs);margin-left:0.75rem">
+                      Generated {{ getRelativeTime(insightLayers[0].createdAt || insightLayers[0].CreatedAt) }}
+                    </span>
+                  }
                 </div>
-                <div *ngIf="layer.recommendations?.length" class="report-meta-block report-meta-block-full">
-                  <div class="report-meta-title report-meta-recommendations"><i class="bi bi-arrow-right-circle-fill"></i> Recommendations</div>
-                  <ul class="report-meta-list">
-                    <li *ngFor="let r of layer.recommendations" class="report-recommendation-item">{{ r }}</li>
-                  </ul>
+                <div class="insights-toolbar-right">
+                  <button class="btn btn-secondary btn-sm" (click)="generateInsights()" [disabled]="generatingInsights">
+                    <i class="bi bi-lightbulb"></i> {{ generatingInsights ? 'Generating (' + insightLayers.length + '/11)...' : (insightLayers.length > 0 ? 'Regenerate' : 'Generate Insights') }}
+                  </button>
+                  @if (generatingInsights && insightsProgressMessage) {
+                    <span class="insights-progress-label" style="font-size:var(--font-xs);color:var(--text-light);margin-left:0.5rem;white-space:nowrap">
+                      {{ insightsProgressMessage }}
+                    </span>
+                  }
+                  <button class="btn btn-secondary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
+                    <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : 'Generate Report' }}
+                  </button>
+                  @if (insightLayers.length > 0) {
+                    <button (click)="exportHtml()" class="btn btn-secondary btn-sm">
+                      <i class="bi bi-download"></i> Export HTML
+                    </button>
+                  }
+                  @if (insightLayers.length > 0) {
+                    <button class="btn btn-secondary btn-sm" (click)="printReport()">
+                      <i class="bi bi-printer"></i> Print
+                    </button>
+                  }
                 </div>
               </div>
-            </section>
-
-            <!-- Methodology Section -->
-            <section class="report-section report-methodology-section" id="rpt-methodology">
-              <h2 class="report-section-title">
-                <i class="bi bi-info-circle"></i> Methodology
-              </h2>
-              <div class="report-methodology-toggle" (click)="showMethodology = !showMethodology">
-                <i class="bi" [ngClass]="showMethodology ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-                {{ showMethodology ? 'Hide methodology details' : 'Show methodology details' }}
-              </div>
-              <div class="report-methodology-content" [class.report-methodology-expanded]="showMethodology">
-                <div class="report-methodology-grid">
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Health Score</div>
-                    <div class="report-methodology-def">Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Commits/Month</div>
-                    <div class="report-methodology-def">Total commits divided by the repository's active period in months.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Active Contributors</div>
-                    <div class="report-methodology-def">Unique committer emails across all indexed commits.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Trend</div>
-                    <div class="report-methodology-def">Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Maturity Rating</div>
-                    <div class="report-methodology-def">1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Quality Rating</div>
-                    <div class="report-methodology-def">1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Risk Rating</div>
-                    <div class="report-methodology-def">1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.</div>
-                  </div>
-                  <div class="report-methodology-item">
-                    <div class="report-methodology-term">Impact / Effort</div>
-                    <div class="report-methodology-def">Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.</div>
+              <!-- Progress Bar -->
+              @if (generatingInsights) {
+                <div class="insights-progress-bar-container" style="padding:0 1rem 0.5rem 1rem">
+                  <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
+                    <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+                      <div [style.width.%]="insightsProgress" style="height:100%;background:var(--primary);border-radius:3px;transition:width 0.5s ease"></div>
+                    </div>
+                    <span style="font-size:var(--font-xs);color:var(--text-light);min-width:2.5rem;text-align:right">{{ insightsProgress }}%</span>
                   </div>
                 </div>
-              </div>
-            </section>
-
-          </div><!-- End Content Area -->
-        </div><!-- End Document Wrapper -->
-      </div><!-- End Report Tab -->
-
-      <!-- History Tab -->
-      <div *ngIf="activeTab === 'History'">
-        <app-repository-history [repositoryId]="repo.id" [ref]="selectedRef" style="display:block" />
-      </div>
-
-      <!-- Analytics Tab -->
-      <div *ngIf="activeTab === 'Analytics'">
-        <app-repository-analytics [repositoryId]="repo.id" />
-      </div>
-    </div>
-
-    <div *ngIf="!loading && !repo" class="empty-state card">
-      <i class="bi bi-exclamation-circle"></i>
-      <h3>Repository not found</h3>
-      <a routerLink="/repositories" class="btn btn-primary mt-2">Back to Repositories</a>
-    </div>
-  `,
+              }
+              <!-- Empty State -->
+              @if (insightLayers.length === 0 && !generatingInsights) {
+                <div class="insights-empty card">
+                  <i class="bi bi-lightbulb" style="font-size:2.5rem;color:var(--text-light);margin-bottom:1rem;display:block"></i>
+                  <h3 style="font-size:var(--font-lg);margin-bottom:0.5rem">No insights yet</h3>
+                  <p class="text-muted" style="font-size:var(--font-xs);margin-bottom:1.25rem">Click "Generate Insights" to analyze this repository and produce a comprehensive report.</p>
+                  <button class="btn btn-primary" (click)="generateInsights()" [disabled]="generatingInsights">
+                    <i class="bi bi-lightbulb"></i> Generate Insights
+                  </button>
+                </div>
+              }
+              <!-- Report Document -->
+              @if (insightLayers.length > 0) {
+                <div class="insights-document-wrapper" id="insightsDocumentWrapper">
+                  <!-- TOC Sidebar -->
+                  <nav class="insights-toc" id="insightsToc">
+                    <div class="insights-toc-title">Contents</div>
+                    @if (reportData) {
+                      <a class="insights-toc-item"
+                        [class.active]="activeTocSection === 'report-summary'"
+                        (click)="scrollToSection('report-summary', $event)">
+                        <i class="bi bi-speedometer2"></i> Summary
+                      </a>
+                    }
+                    @for (layer of insightLayers; track layer; let i = $index) {
+                      <a
+                        class="insights-toc-item"
+                        [class.active]="activeTocSection === 'layer-' + layer.subtype"
+                        (click)="scrollToSection('layer-' + layer.subtype, $event)">
+                        <span class="insights-toc-num">{{ i + 1 }}</span>
+                        {{ getInsightLabel(layer.subtype) }}
+                        @if (getLayerRating(layer.subtype); as rating) {
+                          <span class="insights-toc-rating">
+                            {{ getStarRating(rating) }}
+                          </span>
+                        }
+                      </a>
+                    }
+                    <a class="insights-toc-item"
+                      [class.active]="activeTocSection === 'insights-methodology'"
+                      (click)="scrollToSection('insights-methodology', $event)">
+                      <i class="bi bi-info-circle"></i> Methodology
+                    </a>
+                  </nav>
+                  <!-- Content Area -->
+                  <div class="insights-content-area" id="insightsContentArea" (scroll)="onInsightsScroll($event)">
+                    <!-- Tech Stack Summary Bar -->
+                    @if (techStackSummary?.length) {
+                      <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
+                        @for (tech of techStackSummary; track tech) {
+                          <span class="badge badge-primary" style="font-size:var(--font-xs)">{{ tech }}</span>
+                        }
+                      </div>
+                    }
+                    <!-- Health Score Header -->
+                    <div class="insights-section" id="report-summary">
+                      <!-- No report yet -->
+                      @if (!reportData) {
+                        <div style="text-align:center;padding:1.5rem;background:var(--background-alt);border-radius:var(--radius-lg);margin-bottom:1.5rem">
+                          <div style="font-size:var(--font-sm);color:var(--text-muted);margin-bottom:0.75rem">
+                            <i class="bi bi-bar-chart"></i> Health score and ratings available after generating a report.
+                          </div>
+                          <button class="btn btn-secondary btn-sm" (click)="activeTab = 'Report'" style="font-size:var(--font-xs)">
+                            Go to Report tab to generate
+                          </button>
+                        </div>
+                      }
+                      @if (reportData) {
+                        <div>
+                          <div class="insights-health-header">
+                            <div class="insights-health-score"
+                              [style.borderColor]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+                              <div class="insights-health-number"
+                                [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+                                {{ reportData.overallHealthScore }}
+                              </div>
+                              <div class="insights-health-label">Health Score</div>
+                              @if (reportData.overallHealthScore != null) {
+                                <div class="insights-health-stars">
+                                  {{ getStarRating(Math.round(reportData.overallHealthScore / 20)) }}
+                                </div>
+                              }
+                              <span class="report-info-icon report-info-below" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
+                            </div>
+                            <div class="insights-health-details">
+                              <!-- Star Ratings Summary -->
+                              @if (reportData.layers?.length) {
+                                <div class="insights-ratings-summary">
+                                  @for (lr of reportData.layers; track lr) {
+                                    <div class="insights-rating-row">
+                                      <span class="insights-rating-label">{{ getInsightLabel(lr.subtype) }}</span>
+                                      <span class="insights-rating-stars">{{ getStarRating(lr.qualityRating) }}</span>
+                                      <span class="insights-rating-value">{{ lr.qualityRating }}/5</span>
+                                    </div>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          </div>
+                          <!-- Velocity Metrics -->
+                          @if (reportData.velocity) {
+                            <div class="insights-velocity-row">
+                              <div class="insights-velocity-item">
+                                <div class="insights-velocity-value">{{ reportData.velocity.commitsPerMonth }}</div>
+                                <div class="insights-velocity-label">Commits/Month</div>
+                                <span class="report-info-icon report-info-below" data-tooltip="Total commits divided by the repository's active period in months." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
+                              </div>
+                              <div class="insights-velocity-item">
+                                <div class="insights-velocity-value">{{ reportData.velocity.activeContributors }}</div>
+                                <div class="insights-velocity-label">Contributors</div>
+                                <span class="report-info-icon report-info-below" data-tooltip="Unique committer emails across all indexed commits." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
+                              </div>
+                              <div class="insights-velocity-item">
+                                <div class="insights-velocity-value" style="text-transform:capitalize">{{ reportData.velocity.trend }}</div>
+                                <div class="insights-velocity-label">Trend</div>
+                                <span class="report-info-icon report-info-below" data-tooltip="Compares commit rate in the second half vs first half. Increasing if >20% higher, decreasing if >20% lower." style="margin-top:0.25rem"><i class="bi bi-info-circle"></i></span>
+                              </div>
+                            </div>
+                          }
+                          <!-- Top Contributors -->
+                          @if (reportData.velocity?.topContributors?.length) {
+                            <div style="margin-bottom:1.5rem;padding:0 0.5rem">
+                              <div style="font-weight:600;font-size:var(--font-xs);margin-bottom:0.5rem;color:var(--text-muted)">Top Contributors</div>
+                              <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+                                @for (c of reportData.velocity.topContributors; track c) {
+                                  <span style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:var(--background-alt);border-radius:100px;font-size:var(--font-xs)">
+                                    <strong>{{ c.name }}</strong>
+                                    <span class="text-muted" style="font-size:0.85em;opacity:0.7">{{ c.email }}</span>
+                                    <span class="text-muted">{{ c.commits }}</span>
+                                  </span>
+                                }
+                              </div>
+                            </div>
+                          }
+                          <!-- Top 5 Improvements -->
+                          @if (reportData.top5Improvements?.length) {
+                            <div class="insights-improvements">
+                              <h3 class="insights-improvements-title">
+                                <i class="bi bi-arrow-up-circle"></i> Top Improvements
+                              </h3>
+                              @for (imp of reportData.top5Improvements; track imp; let i = $index) {
+                                <div class="insights-improvement-item">
+                                  <span class="insights-improvement-num">{{ i + 1 }}</span>
+                                  <div class="insights-improvement-body">
+                                    <div class="insights-improvement-title">{{ imp.title }}</div>
+                                    @if (imp.description) {
+                                      <div class="insights-improvement-desc">{{ imp.description }}</div>
+                                    }
+                                  </div>
+                                  <span class="badge insights-impact-badge"
+                                    [ngClass]="imp.impact === 'high' || imp.impact === 'critical' ? 'badge-danger' : imp.impact === 'medium' ? 'badge-warning' : 'badge-info'"
+                                  style="font-size:0.6875rem;text-transform:capitalize">{{ imp.impact }}</span>
+                                </div>
+                              }
+                            </div>
+                          }
+                        </div>
+                        }<!-- end *ngIf="reportData" -->
+                      </div><!-- end insights-section report-summary -->
+                      <!-- Each Insight Layer Section -->
+                      @for (layer of insightLayers; track layer; let idx = $index) {
+                        <div
+                          class="insights-section insights-layer-section"
+                          [id]="'layer-' + layer.subtype">
+                          <!-- Section Heading -->
+                          <div class="insights-layer-heading">
+                            <div class="insights-layer-heading-left">
+                              <span class="insights-layer-num">{{ idx + 1 }}</span>
+                              <h2 class="insights-layer-title">{{ getInsightLabel(layer.subtype) }}</h2>
+                            </div>
+                            @if (getLayerRating(layer.subtype); as rating) {
+                              <div class="insights-layer-stars">
+                                {{ getStarRating(rating) }}
+                              </div>
+                            }
+                          </div>
+                          <!-- Ratings Badges -->
+                          @if (getLayerReport(layer.subtype); as lr) {
+                            <div class="insights-layer-badges">
+                              <span class="badge insights-badge-maturity"
+                                [ngClass]="lr.maturityRating >= 4 ? 'badge-success' : lr.maturityRating >= 3 ? 'badge-warning' : 'badge-danger'">
+                                <i class="bi bi-bar-chart-fill"></i> Maturity {{ lr.maturityRating }}/5
+                                <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized"><i class="bi bi-info-circle"></i></span>
+                              </span>
+                              <span class="badge insights-badge-quality"
+                                [ngClass]="lr.qualityRating >= 4 ? 'badge-success' : lr.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'">
+                                <i class="bi bi-star-fill"></i> Quality {{ lr.qualityRating }}/5
+                                <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent"><i class="bi bi-info-circle"></i></span>
+                              </span>
+                              <span class="badge insights-badge-risk"
+                                [ngClass]="lr.riskRating <= 2 ? 'badge-success' : lr.riskRating <= 3 ? 'badge-warning' : 'badge-danger'">
+                                <i class="bi bi-shield-fill"></i> Risk {{ lr.riskRating }}/5
+                                <span class="report-info-icon report-info-inline report-info-below" data-tooltip="1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical"><i class="bi bi-info-circle"></i></span>
+                              </span>
+                            </div>
+                          }
+                          <!-- Strengths / Weaknesses / Recommendations -->
+                          @if (getLayerReport(layer.subtype); as lr) {
+                            <div class="insights-layer-meta">
+                              <div class="insights-meta-block">
+                                <div class="insights-meta-title insights-meta-strengths"><i class="bi bi-check-circle-fill"></i> Strengths</div>
+                                @if (lr.strengths?.length) {
+                                  <ul class="insights-meta-list">
+                                    @for (s of lr.strengths; track s) {
+                                      <li class="insights-strength-item">{{ s }}</li>
+                                    }
+                                  </ul>
+                                }
+                                @if (!lr.strengths?.length) {
+                                  <div class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see ratings</div>
+                                }
+                              </div>
+                              <div class="insights-meta-block">
+                                <div class="insights-meta-title insights-meta-weaknesses"><i class="bi bi-exclamation-triangle-fill"></i> Weaknesses</div>
+                                @if (lr.weaknesses?.length) {
+                                  <ul class="insights-meta-list">
+                                    @for (w of lr.weaknesses; track w) {
+                                      <li class="insights-weakness-item">{{ w }}</li>
+                                    }
+                                  </ul>
+                                }
+                                @if (!lr.weaknesses?.length) {
+                                  <div class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see ratings</div>
+                                }
+                              </div>
+                              <div class="insights-meta-block">
+                                <div class="insights-meta-title insights-meta-recommendations"><i class="bi bi-arrow-right-circle-fill"></i> Recommendations</div>
+                                @if (lr.recommendations?.length) {
+                                  <ul class="insights-meta-list">
+                                    @for (r of lr.recommendations; track r) {
+                                      <li class="insights-recommendation-item">{{ r }}</li>
+                                    }
+                                  </ul>
+                                }
+                                @if (!lr.recommendations?.length) {
+                                  <div class="text-muted" style="font-size:var(--font-xs);padding:0.25rem 0">Generate report to see recommendations</div>
+                                }
+                              </div>
+                            </div>
+                          }
+                          <!-- Rendered Markdown Content -->
+                          <div class="insights-layer-content" [innerHTML]="renderInsightHtml(layer)"></div>
+                        </div>
+                      }
+                      <!-- Methodology -->
+                      <div class="insights-section report-methodology-section" id="insights-methodology" style="margin-top:2rem">
+                        <h2 class="report-section-title">
+                          <i class="bi bi-info-circle"></i> Methodology
+                        </h2>
+                        <div class="report-methodology-toggle" (click)="showInsightsMethodology = !showInsightsMethodology">
+                          <i class="bi" [ngClass]="showInsightsMethodology ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                          {{ showInsightsMethodology ? 'Hide methodology details' : 'Show methodology details' }}
+                        </div>
+                        <div class="report-methodology-content" [class.report-methodology-expanded]="showInsightsMethodology">
+                          <div class="report-methodology-grid">
+                            <div class="report-methodology-item">
+                              <div class="report-methodology-term">Health Score</div>
+                              <div class="report-methodology-def">Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.</div>
+                            </div>
+                            <div class="report-methodology-item">
+                              <div class="report-methodology-term">Commits/Month</div>
+                              <div class="report-methodology-def">Total commits divided by the repository's active period in months.</div>
+                            </div>
+                            <div class="report-methodology-item">
+                              <div class="report-methodology-term">Active Contributors</div>
+                              <div class="report-methodology-def">Unique committer emails across all indexed commits.</div>
+                            </div>
+                            <div class="report-methodology-item">
+                              <div class="report-methodology-term">Trend</div>
+                              <div class="report-methodology-def">Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.</div>
+                            </div>
+                            <div class="report-methodology-item">
+                              <div class="report-methodology-term">Maturity Rating</div>
+                              <div class="report-methodology-def">1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.</div>
+                            </div>
+                            <div class="report-methodology-item">
+                              <div class="report-methodology-term">Quality Rating</div>
+                              <div class="report-methodology-def">1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.</div>
+                            </div>
+                            <div class="report-methodology-item">
+                              <div class="report-methodology-term">Risk Rating</div>
+                              <div class="report-methodology-def">1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.</div>
+                            </div>
+                            <div class="report-methodology-item">
+                              <div class="report-methodology-term">Impact / Effort</div>
+                              <div class="report-methodology-def">Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div><!-- End Content Area -->
+                  </div>
+                  }<!-- End Document Wrapper -->
+                </div>
+                }<!-- End Insights Tab -->
+                <!-- Report Tab -->
+                @if (activeTab === 'Report') {
+                  <div class="report-tab">
+                    <!-- Toolbar -->
+                    <div class="report-toolbar">
+                      <div class="report-toolbar-left">
+                        <i class="bi bi-file-earmark-bar-graph" style="font-size:1.125rem;color:var(--primary)"></i>
+                        <span style="font-weight:600;font-size:var(--font-sm)">Repository Report</span>
+                      </div>
+                      <div class="report-toolbar-right">
+                        <button class="btn btn-primary btn-sm" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
+                          <i class="bi bi-file-earmark-bar-graph"></i> {{ generatingReport ? 'Generating...' : (reportData ? 'Regenerate Report' : 'Generate Report') }}
+                        </button>
+                        @if (reportData) {
+                          <button (click)="exportHtml()" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-download"></i> Export HTML
+                          </button>
+                        }
+                        @if (reportData) {
+                          <button (click)="exportPdf()" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-file-earmark-pdf"></i> Save as PDF
+                          </button>
+                        }
+                        @if (!insightLayers.length) {
+                          <span class="text-muted" style="font-size:var(--font-xs);align-self:center">Generate insights first.</span>
+                        }
+                      </div>
+                    </div>
+                    <!-- Empty state -->
+                    @if (!reportData && !generatingReport) {
+                      <div class="report-empty card">
+                        <i class="bi bi-file-earmark-bar-graph" style="font-size:2.5rem;color:var(--text-light);margin-bottom:1rem;display:block"></i>
+                        <h3 style="font-size:var(--font-lg);margin-bottom:0.5rem">No report yet</h3>
+                        <p class="text-muted" style="font-size:var(--font-xs);margin-bottom:1.25rem">Generate insights first, then click "Generate Report" to produce a comprehensive analysis.</p>
+                        @if (reportError) {
+                          <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:rgba(220,53,69,0.08);border:1px solid rgba(220,53,69,0.2);border-radius:var(--radius);color:var(--danger);font-size:var(--font-xs)">
+                            <i class="bi bi-exclamation-triangle"></i> {{ reportError }}
+                          </div>
+                        }
+                        <button class="btn btn-primary" (click)="generateReport()" [disabled]="generatingReport || !insightLayers.length">
+                          <i class="bi bi-file-earmark-bar-graph"></i> Generate Report
+                        </button>
+                      </div>
+                    }
+                    <!-- Report document with TOC sidebar -->
+                    @if (reportData) {
+                      <div class="report-document-wrapper" id="reportDocumentWrapper">
+                        <!-- TOC Sidebar -->
+                        <nav class="report-toc" id="reportToc">
+                          <div class="report-toc-title">Contents</div>
+                          <a class="report-toc-item"
+                            [class.active]="activeReportSection === 'rpt-health'"
+                            (click)="scrollToReportSection('rpt-health', $event)">
+                            <span class="report-toc-score"
+                              [style.background]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+                              {{ reportData.overallHealthScore }}
+                            </span>
+                            Health Score
+                          </a>
+                          <a class="report-toc-item"
+                            [class.active]="activeReportSection === 'rpt-velocity'"
+                            (click)="scrollToReportSection('rpt-velocity', $event)">
+                            <i class="bi bi-speedometer2"></i> Velocity
+                          </a>
+                          <a class="report-toc-item"
+                            [class.active]="activeReportSection === 'rpt-layers-overview'"
+                            (click)="scrollToReportSection('rpt-layers-overview', $event)">
+                            <i class="bi bi-grid"></i> Layer Overview
+                          </a>
+                          @if (reportData.top5Improvements?.length) {
+                            <a class="report-toc-item"
+                              [class.active]="activeReportSection === 'rpt-improvements'"
+                              (click)="scrollToReportSection('rpt-improvements', $event)">
+                              <i class="bi bi-arrow-up-circle"></i> Top Improvements
+                            </a>
+                          }
+                          <div class="report-toc-divider"></div>
+                          @for (layer of reportData.layers; track layer; let i = $index) {
+                            <a class="report-toc-item"
+                              [class.active]="activeReportSection === 'rpt-layer-' + layer.subtype"
+                              (click)="scrollToReportSection('rpt-layer-' + layer.subtype, $event)">
+                              <span class="report-toc-num">{{ i + 1 }}</span>
+                              {{ getInsightLabel(layer.subtype) || layer.name }}
+                              <span class="report-toc-rating">{{ getStarRating(layer.qualityRating) }}</span>
+                            </a>
+                          }
+                          <div class="report-toc-divider"></div>
+                          <a class="report-toc-item"
+                            [class.active]="activeReportSection === 'rpt-methodology'"
+                            (click)="scrollToReportSection('rpt-methodology', $event)">
+                            <i class="bi bi-info-circle"></i> Methodology
+                          </a>
+                        </nav>
+                        <!-- Content Area (single scrollable document) -->
+                        <div class="report-content-area" id="reportContentArea" (scroll)="onReportScroll($event)">
+                          <!-- Tech Stack Summary Bar -->
+                          @if (techStackSummary?.length) {
+                            <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
+                              @for (tech of techStackSummary; track tech) {
+                                <span class="badge badge-primary" style="font-size:var(--font-xs)">{{ tech }}</span>
+                              }
+                            </div>
+                          }
+                          <!-- Section 1: Health Score -->
+                          <section class="report-section" id="rpt-health">
+                            <div class="report-health-header">
+                              <div class="report-health-score-ring"
+                                [style.borderColor]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+                                <div class="report-health-number"
+                                  [style.color]="reportData.overallHealthScore >= 70 ? 'var(--success)' : reportData.overallHealthScore >= 40 ? '#e6a700' : 'var(--danger)'">
+                                  {{ reportData.overallHealthScore }}
+                                </div>
+                                <div class="report-health-of">/100</div>
+                                <div class="report-health-label">Health Score</div>
+                                <span class="report-info-icon" data-tooltip="Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.">
+                                  <i class="bi bi-info-circle"></i>
+                                </span>
+                              </div>
+                              @if (reportData.overallHealthScore != null) {
+                                <div class="report-health-stars">
+                                  {{ getStarRating(Math.round(reportData.overallHealthScore / 20)) }}
+                                </div>
+                              }
+                            </div>
+                            <!-- Ratings summary grid -->
+                            @if (reportData.layers?.length) {
+                              <div class="report-ratings-grid">
+                                @for (lr of reportData.layers; track lr) {
+                                  <div class="report-rating-row">
+                                    <span class="report-rating-label">{{ getInsightLabel(lr.subtype) }}</span>
+                                    <span class="report-rating-stars">{{ getStarRating(lr.qualityRating) }}</span>
+                                    <span class="report-rating-value">{{ lr.qualityRating }}/5</span>
+                                  </div>
+                                }
+                              </div>
+                            }
+                          </section>
+                          <!-- Section 2: Velocity Metrics -->
+                          @if (reportData.velocity) {
+                            <section class="report-section" id="rpt-velocity">
+                              <h2 class="report-section-title">
+                                <i class="bi bi-speedometer2"></i> Velocity Metrics
+                              </h2>
+                              <div class="report-velocity-grid">
+                                <div class="report-velocity-card">
+                                  <div class="report-velocity-value">{{ reportData.velocity.commitsPerMonth }}</div>
+                                  <div class="report-velocity-label">
+                                    Commits/Month
+                                    <span class="report-info-icon" data-tooltip="Total commits divided by the repository's active period in months.">
+                                      <i class="bi bi-info-circle"></i>
+                                    </span>
+                                  </div>
+                                </div>
+                                <div class="report-velocity-card">
+                                  <div class="report-velocity-value">{{ reportData.velocity.activeContributors }}</div>
+                                  <div class="report-velocity-label">
+                                    Active Contributors
+                                    <span class="report-info-icon" data-tooltip="Unique committer emails across all indexed commits.">
+                                      <i class="bi bi-info-circle"></i>
+                                    </span>
+                                  </div>
+                                </div>
+                                <div class="report-velocity-card">
+                                  <div class="report-velocity-value report-velocity-trend" style="text-transform:capitalize">{{ reportData.velocity.trend }}</div>
+                                  <div class="report-velocity-label">
+                                    Trend
+                                    <span class="report-info-icon" data-tooltip="Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.">
+                                      <i class="bi bi-info-circle"></i>
+                                    </span>
+                                  </div>
+                                </div>
+                                @if (reportData.velocity.averageCommitsPerDay != null) {
+                                  <div class="report-velocity-card">
+                                    <div class="report-velocity-value">{{ reportData.velocity.averageCommitsPerDay | number:'1.1-1' }}</div>
+                                    <div class="report-velocity-label">Commits/Day</div>
+                                  </div>
+                                }
+                                @if (reportData.velocity.deployFrequency) {
+                                  <div class="report-velocity-card">
+                                    <div class="report-velocity-value">{{ reportData.velocity.deployFrequency }}</div>
+                                    <div class="report-velocity-label">Deploy Frequency</div>
+                                  </div>
+                                }
+                              </div>
+                              <!-- Top Contributors -->
+                              @if (reportData.velocity?.topContributors?.length) {
+                                <div style="margin-top:1.25rem">
+                                  <div style="font-weight:600;font-size:var(--font-xs);margin-bottom:0.5rem;color:var(--text-muted)">Top Contributors</div>
+                                  <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+                                    @for (c of reportData.velocity.topContributors; track c) {
+                                      <span style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.25rem 0.625rem;background:var(--background-alt);border-radius:100px;font-size:var(--font-xs)">
+                                        <strong>{{ c.name }}</strong>
+                                        <span class="text-muted" style="font-size:0.85em;opacity:0.7">{{ c.email }}</span>
+                                        <span class="text-muted">{{ c.commits }}</span>
+                                      </span>
+                                    }
+                                  </div>
+                                </div>
+                              }
+                            </section>
+                          }
+                          <!-- Section 3: Layer Overview Grid -->
+                          <section class="report-section" id="rpt-layers-overview">
+                            <h2 class="report-section-title">
+                              <i class="bi bi-grid"></i> Layer Overview
+                            </h2>
+                            <div class="report-layer-overview-grid">
+                              @for (layer of reportData.layers; track layer) {
+                                <div class="report-layer-card"
+                                  (click)="scrollToReportSection('rpt-layer-' + layer.subtype, $event)">
+                                  <div class="report-layer-card-header">
+                                    <span class="report-layer-card-name">{{ getInsightLabel(layer.subtype) || layer.name }}</span>
+                                    <span class="report-layer-card-stars">{{ getStarRating(layer.qualityRating) }}</span>
+                                  </div>
+                                  <div class="report-layer-card-badges">
+                                    <span class="report-mini-badge"
+                                      [ngClass]="layer.maturityRating >= 4 ? 'mini-success' : layer.maturityRating >= 3 ? 'mini-warning' : 'mini-danger'">
+                                      M:{{ layer.maturityRating }}
+                                    </span>
+                                    <span class="report-mini-badge"
+                                      [ngClass]="layer.qualityRating >= 4 ? 'mini-success' : layer.qualityRating >= 3 ? 'mini-warning' : 'mini-danger'">
+                                      Q:{{ layer.qualityRating }}
+                                    </span>
+                                    <span class="report-mini-badge"
+                                      [ngClass]="layer.riskRating <= 2 ? 'mini-success' : layer.riskRating <= 3 ? 'mini-warning' : 'mini-danger'">
+                                      R:{{ layer.riskRating }}
+                                    </span>
+                                  </div>
+                                </div>
+                              }
+                            </div>
+                          </section>
+                          <!-- Section 4: Top Improvements -->
+                          @if (reportData.top5Improvements?.length) {
+                            <section class="report-section" id="rpt-improvements">
+                              <h2 class="report-section-title">
+                                <i class="bi bi-arrow-up-circle"></i> Top Improvements
+                              </h2>
+                              <div class="report-improvements-list">
+                                @for (imp of reportData.top5Improvements; track imp; let i = $index) {
+                                  <div class="report-improvement-item">
+                                    <span class="report-improvement-num">{{ i + 1 }}</span>
+                                    <div class="report-improvement-body">
+                                      <div class="report-improvement-title">{{ imp.title }}</div>
+                                      @if (imp.description) {
+                                        <div class="report-improvement-desc">{{ imp.description }}</div>
+                                      }
+                                      <div class="report-improvement-badges">
+                                        <span class="badge"
+                                          [ngClass]="imp.impact === 'high' || imp.impact === 'critical' ? 'badge-danger' : imp.impact === 'medium' ? 'badge-warning' : 'badge-muted'"
+                                          style="font-size:0.6875rem;text-transform:capitalize">
+                                          {{ imp.impact }} impact
+                                          <span class="report-info-icon" data-tooltip="Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.">
+                                            <i class="bi bi-info-circle"></i>
+                                          </span>
+                                        </span>
+                                        <span class="badge badge-muted" style="font-size:0.6875rem;text-transform:capitalize">{{ imp.effort }} effort</span>
+                                        @if (imp.layer) {
+                                          <span class="badge badge-muted" style="font-size:0.6875rem">{{ getInsightLabel(imp.layer) || imp.layer }}</span>
+                                        }
+                                      </div>
+                                    </div>
+                                  </div>
+                                }
+                              </div>
+                            </section>
+                          }
+                          <!-- Section 5+: Each Layer Section (all rendered, not toggled) -->
+                          @for (layer of reportData.layers; track layer; let idx = $index) {
+                            <section
+                              class="report-section report-layer-section"
+                              [id]="'rpt-layer-' + layer.subtype">
+                              <!-- Section Heading -->
+                              <div class="report-layer-heading">
+                                <div class="report-layer-heading-left">
+                                  <span class="report-layer-num">{{ idx + 1 }}</span>
+                                  <h2 class="report-layer-title">{{ getInsightLabel(layer.subtype) || layer.name }}</h2>
+                                </div>
+                                <div class="report-layer-heading-stars">
+                                  {{ getStarRating(layer.qualityRating) }}
+                                </div>
+                              </div>
+                              <!-- Rating Badges -->
+                              <div class="report-layer-badges">
+                                <span class="badge report-badge-maturity"
+                                  [ngClass]="layer.maturityRating >= 4 ? 'badge-success' : layer.maturityRating >= 3 ? 'badge-warning' : 'badge-danger'">
+                                  <i class="bi bi-bar-chart-fill"></i> Maturity {{ layer.maturityRating }}/5
+                                  <span class="report-info-icon report-info-inline" data-tooltip="1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.">
+                                    <i class="bi bi-info-circle"></i>
+                                  </span>
+                                </span>
+                                <span class="badge report-badge-quality"
+                                  [ngClass]="layer.qualityRating >= 4 ? 'badge-success' : layer.qualityRating >= 3 ? 'badge-warning' : 'badge-danger'">
+                                  <i class="bi bi-star-fill"></i> Quality {{ layer.qualityRating }}/5
+                                  <span class="report-info-icon report-info-inline" data-tooltip="1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.">
+                                    <i class="bi bi-info-circle"></i>
+                                  </span>
+                                </span>
+                                <span class="badge report-badge-risk"
+                                  [ngClass]="layer.riskRating <= 2 ? 'badge-success' : layer.riskRating <= 3 ? 'badge-warning' : 'badge-danger'">
+                                  <i class="bi bi-shield-fill"></i> Risk {{ layer.riskRating }}/5
+                                  <span class="report-info-icon report-info-inline" data-tooltip="1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.">
+                                    <i class="bi bi-info-circle"></i>
+                                  </span>
+                                </span>
+                              </div>
+                              <!-- Strengths / Weaknesses / Recommendations -->
+                              <div class="report-layer-meta">
+                                @if (layer.strengths?.length) {
+                                  <div class="report-meta-block">
+                                    <div class="report-meta-title report-meta-strengths"><i class="bi bi-check-circle-fill"></i> Strengths</div>
+                                    <ul class="report-meta-list">
+                                      @for (s of layer.strengths; track s) {
+                                        <li class="report-strength-item">{{ s }}</li>
+                                      }
+                                    </ul>
+                                  </div>
+                                }
+                                @if (layer.weaknesses?.length) {
+                                  <div class="report-meta-block">
+                                    <div class="report-meta-title report-meta-weaknesses"><i class="bi bi-exclamation-triangle-fill"></i> Weaknesses</div>
+                                    <ul class="report-meta-list">
+                                      @for (w of layer.weaknesses; track w) {
+                                        <li class="report-weakness-item">{{ w }}</li>
+                                      }
+                                    </ul>
+                                  </div>
+                                }
+                                @if (layer.recommendations?.length) {
+                                  <div class="report-meta-block report-meta-block-full">
+                                    <div class="report-meta-title report-meta-recommendations"><i class="bi bi-arrow-right-circle-fill"></i> Recommendations</div>
+                                    <ul class="report-meta-list">
+                                      @for (r of layer.recommendations; track r) {
+                                        <li class="report-recommendation-item">{{ r }}</li>
+                                      }
+                                    </ul>
+                                  </div>
+                                }
+                              </div>
+                            </section>
+                          }
+                          <!-- Methodology Section -->
+                          <section class="report-section report-methodology-section" id="rpt-methodology">
+                            <h2 class="report-section-title">
+                              <i class="bi bi-info-circle"></i> Methodology
+                            </h2>
+                            <div class="report-methodology-toggle" (click)="showMethodology = !showMethodology">
+                              <i class="bi" [ngClass]="showMethodology ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                              {{ showMethodology ? 'Hide methodology details' : 'Show methodology details' }}
+                            </div>
+                            <div class="report-methodology-content" [class.report-methodology-expanded]="showMethodology">
+                              <div class="report-methodology-grid">
+                                <div class="report-methodology-item">
+                                  <div class="report-methodology-term">Health Score</div>
+                                  <div class="report-methodology-def">Weighted average: Maturity (40%) + Quality (40%) + (5 - Risk)/5 (20%). Scale 0-100.</div>
+                                </div>
+                                <div class="report-methodology-item">
+                                  <div class="report-methodology-term">Commits/Month</div>
+                                  <div class="report-methodology-def">Total commits divided by the repository's active period in months.</div>
+                                </div>
+                                <div class="report-methodology-item">
+                                  <div class="report-methodology-term">Active Contributors</div>
+                                  <div class="report-methodology-def">Unique committer emails across all indexed commits.</div>
+                                </div>
+                                <div class="report-methodology-item">
+                                  <div class="report-methodology-term">Trend</div>
+                                  <div class="report-methodology-def">Compares commit rate in the second half of the repo's history vs the first half. Increasing if >20% higher, decreasing if >20% lower.</div>
+                                </div>
+                                <div class="report-methodology-item">
+                                  <div class="report-methodology-term">Maturity Rating</div>
+                                  <div class="report-methodology-def">1=Initial, 2=Developing, 3=Defined, 4=Managed, 5=Optimized.</div>
+                                </div>
+                                <div class="report-methodology-item">
+                                  <div class="report-methodology-term">Quality Rating</div>
+                                  <div class="report-methodology-def">1=Poor, 2=Fair, 3=Good, 4=Very Good, 5=Excellent.</div>
+                                </div>
+                                <div class="report-methodology-item">
+                                  <div class="report-methodology-term">Risk Rating</div>
+                                  <div class="report-methodology-def">1=Low, 2=Minor, 3=Moderate, 4=Significant, 5=Critical.</div>
+                                </div>
+                                <div class="report-methodology-item">
+                                  <div class="report-methodology-term">Impact / Effort</div>
+                                  <div class="report-methodology-def">Impact: expected improvement. Effort: implementation cost. Both rated high/medium/low.</div>
+                                </div>
+                              </div>
+                            </div>
+                          </section>
+                        </div><!-- End Content Area -->
+                      </div>
+                      }<!-- End Document Wrapper -->
+                    </div>
+                    }<!-- End Report Tab -->
+                    <!-- History Tab -->
+                    @if (activeTab === 'History') {
+                      <div>
+                        <app-repository-history [repositoryId]="repo.id" [ref]="selectedRef" style="display:block" />
+                      </div>
+                    }
+                    <!-- Analytics Tab -->
+                    @if (activeTab === 'Analytics') {
+                      <div>
+                        <app-repository-analytics [repositoryId]="repo.id" />
+                      </div>
+                    }
+                  </div>
+                }
+    
+                @if (!loading && !repo) {
+                  <div class="empty-state card">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <h3>Repository not found</h3>
+                    <a routerLink="/repositories" class="btn btn-primary mt-2">Back to Repositories</a>
+                  </div>
+                }
+    `,
   encapsulation: ViewEncapsulation.None,
   styles: [`
     .detail-row { display: flex; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
