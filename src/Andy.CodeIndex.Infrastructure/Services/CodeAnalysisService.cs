@@ -1,6 +1,9 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Andy.CodeIndex.Application.Interfaces;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Andy.CodeIndex.Infrastructure.Services;
 
@@ -51,6 +54,8 @@ public class CodeAnalysisService : ICodeAnalysisService
         foreach (var cls in result.Classes)
         {
             sb.AppendLine($"## Class: `{cls.Name}`");
+            if (cls.Summary is not null)
+                sb.AppendLine($"_{cls.Summary}_  ");
             if (cls.BaseClass is not null)
                 sb.AppendLine($"**Extends:** `{cls.BaseClass}`  ");
             if (cls.ImplementedInterfaces.Count > 0)
@@ -74,7 +79,8 @@ public class CodeAnalysisService : ICodeAnalysisService
                         p.DefaultValue is not null ? $"{p.Type} {p.Name} = {p.DefaultValue}" : $"{p.Type} {p.Name}"));
                     var prefix = method.IsAsync ? "async " : "";
                     var staticMod = method.IsStatic ? "static " : "";
-                    sb.AppendLine($"- `{prefix}{staticMod}{method.ReturnType} {method.Name}({paramStr})`");
+                    sb.AppendLine($"- `{prefix}{staticMod}{method.ReturnType} {method.Name}({paramStr})`"
+                        + (method.Summary is not null ? $" — {method.Summary}" : ""));
                 }
                 sb.AppendLine();
             }
@@ -114,94 +120,194 @@ public class CodeAnalysisService : ICodeAnalysisService
         return sb.ToString();
     }
 
+    // Roslyn-backed C# analysis. Replaces the previous regex engine, which
+    // missed records/structs, mis-attributed methods in nested/multi-class
+    // files (it appended every method to the most-recent class), missed
+    // expression-bodied members, and could not read XML doc comments. The
+    // syntax tree owns each member under its declaring type, so attribution is
+    // exact. (epic #243 / story #247)
     internal static void AnalyzeCSharp(string content, CodeAnalysisResult result)
     {
-        // Classes
-        foreach (Match m in Regex.Matches(content,
-            @"(public|internal)\s+(abstract\s+|static\s+|sealed\s+)*class\s+(\w+)(?:\s*:\s*([^{]+))?"))
+        var root = CSharpSyntaxTree.ParseText(content).GetRoot();
+
+        // DescendantNodes yields nested types too; each type's Members contains
+        // only its *direct* members, so nested-type members are attributed to
+        // the nested type rather than leaking to the outer one.
+        foreach (var node in root.DescendantNodes())
         {
-            var cls = new ApiClass { Name = m.Groups[3].Value };
-            if (m.Groups[4].Success)
+            switch (node)
             {
-                var bases = m.Groups[4].Value.Split(',').Select(b => b.Trim()).ToList();
-                if (bases.Count > 0 && !bases[0].StartsWith("I"))
-                    cls.BaseClass = bases[0];
-                cls.ImplementedInterfaces = bases.Where(b => b.StartsWith("I") && b.Length > 1 && char.IsUpper(b[1])).ToList();
+                case InterfaceDeclarationSyntax iface:
+                    result.Interfaces.Add(BuildInterface(iface));
+                    break;
+                // RecordDeclarationSyntax covers both `record` and `record struct`.
+                case RecordDeclarationSyntax rec:
+                    result.Classes.Add(BuildClass(rec, rec.ParameterList));
+                    break;
+                case ClassDeclarationSyntax cls:
+                    result.Classes.Add(BuildClass(cls, parameterList: null));
+                    break;
+                case StructDeclarationSyntax st:
+                    result.Classes.Add(BuildClass(st, parameterList: null));
+                    break;
+                case EnumDeclarationSyntax en:
+                    result.Enums.Add(BuildEnum(en));
+                    break;
             }
-            result.Classes.Add(cls);
         }
+    }
 
-        // Interfaces
-        foreach (Match m in Regex.Matches(content,
-            @"(public|internal)\s+interface\s+(I\w+)"))
+    private static ApiClass BuildClass(TypeDeclarationSyntax type, ParameterListSyntax? parameterList)
+    {
+        var cls = new ApiClass { Name = type.Identifier.Text, Summary = GetSummary(type) };
+        SplitBaseList(type.BaseList, b => cls.BaseClass = b, cls.ImplementedInterfaces);
+
+        // Positional record parameters become public init-only properties.
+        if (parameterList is not null)
         {
-            result.Interfaces.Add(new ApiInterface { Name = m.Groups[2].Value });
-        }
-
-        // Public methods
-        foreach (Match m in Regex.Matches(content,
-            @"(public|protected|internal)\s+(static\s+)?(async\s+)?([\w<>\[\],\s\?]+?)\s+(\w+)\s*\(([^)]*)\)"))
-        {
-            var method = new ApiMethod
+            foreach (var p in parameterList.Parameters)
             {
-                Name = m.Groups[5].Value,
-                ReturnType = m.Groups[4].Value.Trim(),
-                AccessModifier = m.Groups[1].Value,
-                IsStatic = m.Groups[2].Success,
-                IsAsync = m.Groups[3].Success
-            };
-
-            if (m.Groups[6].Success && !string.IsNullOrWhiteSpace(m.Groups[6].Value))
-            {
-                foreach (var param in SplitParameters(m.Groups[6].Value))
+                cls.Properties.Add(new ApiProperty
                 {
-                    var parts = param.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 2)
+                    Name = p.Identifier.Text,
+                    Type = p.Type?.ToString() ?? "var",
+                    AccessModifier = "public",
+                    HasGetter = true,
+                    HasSetter = false
+                });
+            }
+        }
+
+        AddMembers(type.Members, cls.Methods, cls.Properties, interfaceDefaults: false);
+        return cls;
+    }
+
+    private static ApiInterface BuildInterface(InterfaceDeclarationSyntax type)
+    {
+        var iface = new ApiInterface { Name = type.Identifier.Text, Summary = GetSummary(type) };
+        AddMembers(type.Members, iface.Methods, iface.Properties, interfaceDefaults: true);
+        return iface;
+    }
+
+    private static ApiEnum BuildEnum(EnumDeclarationSyntax type) => new()
+    {
+        Name = type.Identifier.Text,
+        Summary = GetSummary(type),
+        Values = type.Members.Select(m => m.Identifier.Text).ToList()
+    };
+
+    private static void AddMembers(
+        SyntaxList<MemberDeclarationSyntax> members,
+        List<ApiMethod> methods, List<ApiProperty> properties, bool interfaceDefaults)
+    {
+        foreach (var member in members)
+        {
+            switch (member)
+            {
+                case MethodDeclarationSyntax m:
+                {
+                    var access = Accessibility(m.Modifiers, interfaceDefaults);
+                    if (IsPrivate(access)) break;
+                    var method = new ApiMethod
+                    {
+                        Name = m.Identifier.Text,
+                        ReturnType = m.ReturnType.ToString(),
+                        AccessModifier = access,
+                        IsStatic = m.Modifiers.Any(SyntaxKind.StaticKeyword),
+                        IsAsync = m.Modifiers.Any(SyntaxKind.AsyncKeyword),
+                        Summary = GetSummary(m)
+                    };
+                    foreach (var p in m.ParameterList.Parameters)
                     {
                         method.Parameters.Add(new ApiParameter
                         {
-                            Type = string.Join(" ", parts[..^1]),
-                            Name = parts[^1].TrimEnd(',')
+                            Name = p.Identifier.Text,
+                            Type = p.Type?.ToString() ?? "var",
+                            DefaultValue = p.Default?.Value.ToString()
                         });
                     }
+                    methods.Add(method);
+                    break;
+                }
+                case PropertyDeclarationSyntax p:
+                {
+                    var access = Accessibility(p.Modifiers, interfaceDefaults);
+                    if (IsPrivate(access)) break;
+                    // Expression-bodied properties (`=> ...`) are getter-only.
+                    var hasSetter = p.ExpressionBody is null &&
+                        (p.AccessorList?.Accessors.Any(a => a.IsKind(SyntaxKind.SetAccessorDeclaration)
+                            || a.IsKind(SyntaxKind.InitAccessorDeclaration)) ?? false);
+                    properties.Add(new ApiProperty
+                    {
+                        Name = p.Identifier.Text,
+                        Type = p.Type.ToString(),
+                        AccessModifier = access,
+                        HasGetter = true,
+                        HasSetter = hasSetter,
+                        Summary = GetSummary(p)
+                    });
+                    break;
                 }
             }
-
-            // Attach to most recent class if any
-            if (result.Classes.Count > 0)
-                result.Classes[^1].Methods.Add(method);
         }
+    }
 
-        // Public properties
-        foreach (Match m in Regex.Matches(content,
-            @"(public|protected|internal)\s+(required\s+)?([\w<>\[\],\?\s]+?)\s+(\w+)\s*\{"))
+    // Splits a base list into the base class (first non-interface entry) and
+    // interfaces. Without a full semantic model a single file cannot resolve
+    // whether a base type is a class or interface, so we use the .NET naming
+    // convention (interfaces are `I` + UpperCamelCase). C# also requires the
+    // base class, if present, to appear first.
+    private static void SplitBaseList(BaseListSyntax? baseList, Action<string> setBaseClass, List<string> interfaces)
+    {
+        if (baseList is null) return;
+        foreach (var entry in baseList.Types)
         {
-            var name = m.Groups[4].Value;
-            if (name is "class" or "interface" or "enum" or "struct" or "void") continue;
-
-            var prop = new ApiProperty
-            {
-                Name = name,
-                Type = m.Groups[3].Value.Trim(),
-                AccessModifier = m.Groups[1].Value,
-                HasGetter = true,
-                HasSetter = true
-            };
-
-            if (result.Classes.Count > 0)
-                result.Classes[^1].Properties.Add(prop);
+            var name = entry.Type.ToString();
+            if (LooksLikeInterface(name))
+                interfaces.Add(name);
+            else
+                setBaseClass(name);
         }
+    }
 
-        // Enums
-        foreach (Match m in Regex.Matches(content,
-            @"(public|internal)\s+enum\s+(\w+)\s*\{([^}]+)\}"))
-        {
-            var values = m.Groups[3].Value.Split(',')
-                .Select(v => v.Trim().Split('=')[0].Trim())
-                .Where(v => !string.IsNullOrWhiteSpace(v))
-                .ToList();
-            result.Enums.Add(new ApiEnum { Name = m.Groups[2].Value, Values = values });
-        }
+    private static bool LooksLikeInterface(string name) =>
+        name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]);
+
+    private static string Accessibility(SyntaxTokenList modifiers, bool interfaceDefaults)
+    {
+        var isPublic = modifiers.Any(SyntaxKind.PublicKeyword);
+        var isProtected = modifiers.Any(SyntaxKind.ProtectedKeyword);
+        var isInternal = modifiers.Any(SyntaxKind.InternalKeyword);
+        var isPrivate = modifiers.Any(SyntaxKind.PrivateKeyword);
+
+        if (isProtected && isInternal) return "protected internal";
+        if (isPrivate && isProtected) return "private protected";
+        if (isPublic) return "public";
+        if (isProtected) return "protected";
+        if (isInternal) return "internal";
+        if (isPrivate) return "private";
+        // No explicit modifier: interface members are public, type members private.
+        return interfaceDefaults ? "public" : "private";
+    }
+
+    private static bool IsPrivate(string access) => access is "private" or "private protected";
+
+    private static string? GetSummary(SyntaxNode node)
+    {
+        var doc = node.GetLeadingTrivia()
+            .Select(t => t.GetStructure())
+            .OfType<DocumentationCommentTriviaSyntax>()
+            .FirstOrDefault();
+
+        var summary = doc?.Content.OfType<XmlElementSyntax>()
+            .FirstOrDefault(e => e.StartTag.Name.LocalName.Text == "summary");
+        if (summary is null) return null;
+
+        // Strip `///` exteriors and collapse whitespace into a single line.
+        var text = summary.Content.ToFullString();
+        text = Regex.Replace(text, @"///", " ");
+        text = Regex.Replace(text, @"\s+", " ").Trim();
+        return string.IsNullOrEmpty(text) ? null : text;
     }
 
     internal static void AnalyzeTypeScript(string content, CodeAnalysisResult result)
@@ -344,34 +450,5 @@ public class CodeAnalysisService : ICodeAnalysisService
                 .ToList();
             result.Enums.Add(new ApiEnum { Name = m.Groups[1].Value, Values = values });
         }
-    }
-
-    private static List<string> SplitParameters(string paramString)
-    {
-        // Simple split handling generic types like List<string>
-        var result = new List<string>();
-        var depth = 0;
-        var current = new StringBuilder();
-
-        foreach (var ch in paramString)
-        {
-            if (ch == '<') depth++;
-            else if (ch == '>') depth--;
-
-            if (ch == ',' && depth == 0)
-            {
-                result.Add(current.ToString());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(ch);
-            }
-        }
-
-        if (current.Length > 0)
-            result.Add(current.ToString());
-
-        return result;
     }
 }
