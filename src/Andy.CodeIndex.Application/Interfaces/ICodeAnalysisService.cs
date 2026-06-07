@@ -5,7 +5,18 @@ public interface ICodeAnalysisService
     CodeAnalysisResult Analyze(string content, string filePath, string language);
     string GenerateApiDocs(CodeAnalysisResult result);
     bool SupportsLanguage(string language);
+
+    /// <summary>
+    /// Returns the 1-based source line at which each top-level type/method/function
+    /// declaration begins, with a short context label (e.g. "Type.Method"). Used by
+    /// the chunker to align chunk boundaries to declarations instead of arbitrary
+    /// size cuts. Returns an empty list for languages without a structural parser.
+    /// </summary>
+    IReadOnlyList<StructuralBoundary> GetStructuralBoundaries(string content, string language);
 }
+
+/// <summary>A declaration boundary: the line it starts on and an enclosing-context label.</summary>
+public readonly record struct StructuralBoundary(int Line, string Context);
 
 public class CodeAnalysisResult
 {

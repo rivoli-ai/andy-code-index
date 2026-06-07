@@ -18,6 +18,99 @@ public class CodeAnalysisService : ICodeAnalysisService
 
     public bool SupportsLanguage(string language) => SupportedLanguages.Contains(language);
 
+    public IReadOnlyList<StructuralBoundary> GetStructuralBoundaries(string content, string language) =>
+        language.ToLowerInvariant() switch
+        {
+            "csharp" => CSharpBoundaries(content),
+            "javascript" => JavaScriptBoundaries(content),
+            _ => []
+        };
+
+    private static List<StructuralBoundary> CSharpBoundaries(string content)
+    {
+        var root = CSharpSyntaxTree.ParseText(content).GetRoot();
+        var list = new List<StructuralBoundary>();
+
+        foreach (var node in root.DescendantNodes())
+        {
+            switch (node)
+            {
+                case BaseTypeDeclarationSyntax t:
+                    list.Add(new StructuralBoundary(StartLine(t), TypeContext(t)));
+                    break;
+                case MethodDeclarationSyntax m:
+                    list.Add(new StructuralBoundary(StartLine(m), MemberContext(m, m.Identifier.Text)));
+                    break;
+                case ConstructorDeclarationSyntax c:
+                    list.Add(new StructuralBoundary(StartLine(c), MemberContext(c, c.Identifier.Text)));
+                    break;
+            }
+        }
+        return NormalizeBoundaries(list);
+
+        static int StartLine(SyntaxNode n) => n.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+
+        static string TypeContext(BaseTypeDeclarationSyntax t)
+        {
+            var ns = t.Ancestors().OfType<BaseNamespaceDeclarationSyntax>().FirstOrDefault()?.Name.ToString();
+            return ns is null ? t.Identifier.Text : $"{ns}.{t.Identifier.Text}";
+        }
+
+        static string MemberContext(SyntaxNode member, string name)
+        {
+            var type = member.Ancestors().OfType<BaseTypeDeclarationSyntax>().FirstOrDefault()?.Identifier.Text;
+            return type is null ? name : $"{type}.{name}";
+        }
+    }
+
+    private static List<StructuralBoundary> JavaScriptBoundaries(string content)
+    {
+        Module program;
+        try { program = new Parser().ParseModule(content); }
+        catch (Exception) { return []; }
+
+        var list = new List<StructuralBoundary>();
+        foreach (var stmt in program.Body)
+        {
+            var decl = stmt switch
+            {
+                ExportNamedDeclaration { Declaration: { } d } => d,
+                ExportDefaultDeclaration def => def.Declaration,
+                _ => (Node)stmt
+            };
+
+            switch (decl)
+            {
+                case ClassDeclaration cls:
+                    var name = cls.Id?.Name ?? "default";
+                    list.Add(new StructuralBoundary(cls.Location.Start.Line, name));
+                    foreach (var member in cls.Body.Body)
+                        if (member is MethodDefinition { Key: Identifier key } md)
+                            list.Add(new StructuralBoundary(md.Location.Start.Line, $"{name}.{key.Name}"));
+                    break;
+                case FunctionDeclaration fn:
+                    list.Add(new StructuralBoundary(fn.Location.Start.Line, fn.Id?.Name ?? "default"));
+                    break;
+                case VariableDeclaration vd:
+                    foreach (var v in vd.Declarations)
+                        if (v.Init is IFunction && v.Id is Identifier id)
+                            list.Add(new StructuralBoundary(v.Location.Start.Line, id.Name));
+                    break;
+            }
+        }
+        return NormalizeBoundaries(list);
+    }
+
+    // Sort by line, drop duplicates and any non-positive lines.
+    private static List<StructuralBoundary> NormalizeBoundaries(List<StructuralBoundary> list)
+    {
+        var seen = new HashSet<int>();
+        return list
+            .Where(b => b.Line > 0 && seen.Add(b.Line))
+            .OrderBy(b => b.Line)
+            .ToList();
+    }
+
     public CodeAnalysisResult Analyze(string content, string filePath, string language)
     {
         var result = new CodeAnalysisResult { FilePath = filePath, Language = language };
