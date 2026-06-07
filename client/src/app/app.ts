@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { SidebarComponent } from './components/layout/sidebar.component';
@@ -62,13 +62,15 @@ import { filter } from 'rxjs/operators';
   `]
 })
 export class AppComponent implements OnInit, OnDestroy {
+  private api = inject(ApiService);
+  private auth = inject(AuthService);
+  private router = inject(Router);
+
   llmWarning: string | null = null;
   embeddingWarning: string | null = null;
   showChrome = false;
   private healthTimer: any;
   private readonly chromeExcludedRoutes = ['/login', '/callback'];
-
-  constructor(private api: ApiService, private auth: AuthService, private router: Router) {}
 
   ngOnInit() {
     this.router.events.pipe(

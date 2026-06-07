@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { environment } from '../../../environments/environment';
@@ -171,9 +171,9 @@ import { AuthService } from '../../services/auth.service';
   `]
 })
 export class SidebarComponent {
-  isDevMode = !environment.production;
+  authService = inject(AuthService);
 
-  constructor(public authService: AuthService) {}
+  isDevMode = !environment.production;
 
   signOut() {
     this.authService.signOut();

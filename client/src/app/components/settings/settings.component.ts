@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -248,6 +248,8 @@ import { environment } from '../../../environments/environment';
   `]
 })
 export class SettingsComponent implements OnInit {
+  private http = inject(HttpClient);
+
   embeddingKey = '';
   embeddingModel = '';
   embeddingBaseUrl = '';
@@ -265,8 +267,6 @@ export class SettingsComponent implements OnInit {
   embedTestResult: any = null;
   llmTestResult: any = null;
   health: any = null;
-
-  constructor(private http: HttpClient) {}
 
   ngOnInit() {
     this.embedMessage = '';

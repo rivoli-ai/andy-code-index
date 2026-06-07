@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { HttpClient } from '@angular/common/http';
@@ -167,6 +167,8 @@ interface DiscoveredRepo {
   `]
 })
 export class DiscoveryComponent {
+  private http = inject(HttpClient);
+
   provider = 'github';
   org = '';
   project = '';
@@ -181,8 +183,6 @@ export class DiscoveryComponent {
   hideTracked = false;
   sortBy = 'name';
   languageFilter = '';
-
-  constructor(private http: HttpClient) {}
 
   get selectedCount(): number {
     return this.repos.filter(r => r.selected && !r.alreadyTracked).length;

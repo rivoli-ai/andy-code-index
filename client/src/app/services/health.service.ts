@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Subscription, timer, of } from 'rxjs';
 import { catchError, timeout, map, switchMap } from 'rxjs/operators';
@@ -6,6 +6,8 @@ import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class HealthService implements OnDestroy {
+  private http = inject(HttpClient);
+
   private readonly POLL_INTERVAL = 30_000;
   private readonly TIMEOUT = 5_000;
   private readonly healthUrl = '/health';
@@ -13,7 +15,7 @@ export class HealthService implements OnDestroy {
   isConnected$ = new BehaviorSubject<boolean>(true);
   private pollSubscription?: Subscription;
 
-  constructor(private http: HttpClient) {
+  constructor() {
     this.startPolling();
   }
 

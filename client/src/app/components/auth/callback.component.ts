@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -27,13 +27,11 @@ import { AuthService } from '../../services/auth.service';
     `
 })
 export class CallbackComponent implements OnInit {
-  error = '';
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private auth = inject(AuthService);
 
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private auth: AuthService
-  ) {}
+  error = '';
 
   async ngOnInit() {
     const code = this.route.snapshot.queryParamMap.get('code');

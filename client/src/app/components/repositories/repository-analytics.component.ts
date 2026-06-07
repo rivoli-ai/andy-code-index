@@ -1,4 +1,4 @@
-import { Component, OnInit, input } from '@angular/core';
+import { Component, OnInit, input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -210,6 +210,8 @@ interface HeatmapCell {
   `]
 })
 export class RepositoryAnalyticsComponent implements OnInit {
+  private http = inject(HttpClient);
+
   readonly repositoryId = input.required<string>();
   languages: any[] = [];
   fileTypes: any[] = [];
@@ -241,8 +243,6 @@ export class RepositoryAnalyticsComponent implements OnInit {
   }
 
   private maxCommitsInDay = 1;
-
-  constructor(private http: HttpClient) {}
 
   ngOnInit() {
     const base = `${environment.apiUrl}/repositories/${this.repositoryId()}/analytics`;

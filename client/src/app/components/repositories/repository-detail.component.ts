@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, AfterViewChecked, ElementRef, NgZone, ViewEncapsulation, DestroyRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewChecked, ElementRef, NgZone, ViewEncapsulation, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -1703,6 +1703,15 @@ interface CommitComparison {
   `]
 })
 export class RepositoryDetailComponent implements OnInit, OnDestroy, AfterViewChecked {
+  private api = inject(ApiService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private http = inject(HttpClient);
+  private sanitizer = inject(DomSanitizer);
+  private el = inject(ElementRef);
+  private zone = inject(NgZone);
+  private destroyRef = inject(DestroyRef);
+
   repo: Repository | null = null;
   loading = true;
   syncing = false;
@@ -1765,17 +1774,6 @@ export class RepositoryDetailComponent implements OnInit, OnDestroy, AfterViewCh
     'testanalysis': 'Testing', 'securityanalysis': 'Security', 'deploymentanalysis': 'Deployment',
     'operationsanalysis': 'Operations', 'localsetupguide': 'Local Setup', 'techstack': 'Tech Stack'
   };
-
-  constructor(
-    private api: ApiService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private http: HttpClient,
-    private sanitizer: DomSanitizer,
-    private el: ElementRef,
-    private zone: NgZone,
-    private destroyRef: DestroyRef
-  ) {}
 
   ngOnDestroy() {
     // Stop insights polling and its timers so they don't keep firing (and making

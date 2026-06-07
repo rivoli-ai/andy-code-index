@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable, firstValueFrom } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -28,6 +28,9 @@ interface IdTokenClaims {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private http = inject(HttpClient);
+  private router = inject(Router);
+
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(false);
   public isAuthenticated$: Observable<boolean> = this.isAuthenticatedSubject.asObservable();
 
@@ -46,7 +49,7 @@ export class AuthService {
     return !!environment.auth.authority;
   }
 
-  constructor(private http: HttpClient, private router: Router) {
+  constructor() {
     this.checkAuthState();
     if (this.authEnabled) {
       this.loadDiscoveryDocument();

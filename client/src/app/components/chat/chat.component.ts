@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked, ViewEncapsulation, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -385,6 +385,8 @@ interface ConversationGroup {
   `]
 })
 export class ChatComponent implements OnInit, AfterViewChecked {
+  private http = inject(HttpClient);
+
   @ViewChild('messagesContainer') messagesContainer!: ElementRef;
 
   messages: ChatMessage[] = [];
@@ -428,8 +430,6 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     'ops': ['operations', 'monitoring', 'alerting', 'logging'],
     'doc': ['documentation', 'readme', 'wiki', 'guide'],
   };
-
-  constructor(private http: HttpClient) {}
 
   ngOnInit() {
     this.http.get<Repository[]>(`${environment.apiUrl}/repositories`).subscribe({

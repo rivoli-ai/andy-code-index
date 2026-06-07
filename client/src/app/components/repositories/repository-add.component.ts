@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
@@ -51,14 +51,15 @@ import { ApiService } from '../../services/api.service';
   `]
 })
 export class RepositoryAddComponent {
+  private api = inject(ApiService);
+  private router = inject(Router);
+
   url = '';
   pat = '';
   submitting = false;
   error = '';
   duplicateRepoId: string | null = null;
   private checkTimeout: any;
-
-  constructor(private api: ApiService, private router: Router) {}
 
   onUrlChange() {
     this.duplicateRepoId = null;

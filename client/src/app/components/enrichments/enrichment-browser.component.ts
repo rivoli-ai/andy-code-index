@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -162,6 +162,9 @@ import { environment } from '../../../environments/environment';
     `
 })
 export class EnrichmentBrowserComponent implements OnInit {
+  private api = inject(ApiService);
+  private http = inject(HttpClient);
+
   enrichments: Enrichment[] = [];
   totalCount = 0;
   loading = true;
@@ -281,8 +284,6 @@ export class EnrichmentBrowserComponent implements OnInit {
     }
     this.loadEnrichments();
   }
-
-  constructor(private api: ApiService, private http: HttpClient) {}
 
   ngOnInit() {
     this.http.get<any[]>(`${environment.apiUrl}/repositories`).subscribe({

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -314,6 +314,9 @@ interface DocPage {
   `]
 })
 export class DocsComponent implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private http = inject(HttpClient);
+
   pages: DocPage[] = [
     { slug: 'getting-started', title: 'Getting Started', icon: 'bi-rocket-takeoff' },
     { slug: 'repositories', title: 'Repositories', icon: 'bi-folder2-open' },
@@ -332,11 +335,6 @@ export class DocsComponent implements OnInit, OnDestroy {
   loading = false;
   error = '';
   private routeSub!: Subscription;
-
-  constructor(
-    private route: ActivatedRoute,
-    private http: HttpClient
-  ) {}
 
   ngOnInit(): void {
     this.routeSub = this.route.paramMap.subscribe(params => {

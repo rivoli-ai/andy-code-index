@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -181,6 +181,10 @@ import { RepositorySparklineComponent } from './repository-sparkline.component';
   `]
 })
 export class RepositoryListComponent implements OnInit {
+  private api = inject(ApiService);
+  healthService = inject(HealthService);
+  pinService = inject(PinService);
+
   repositories: Repository[] = [];
   loading = true;
   error = '';
@@ -193,8 +197,6 @@ export class RepositoryListComponent implements OnInit {
   orgFilter = '';
   sortBy = 'name';
   organizations: { name: string; count: number }[] = [];
-
-  constructor(private api: ApiService, public healthService: HealthService, public pinService: PinService) {}
 
   ngOnInit() {
     this.loadRepositories();

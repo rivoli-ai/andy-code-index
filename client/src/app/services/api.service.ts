@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Repository, CreateRepositoryRequest, SparklineData, ActivityHeatmap, StorageStats } from '../models/repository.model';
@@ -9,9 +9,9 @@ import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private baseUrl = environment.apiUrl;
+  private http = inject(HttpClient);
 
-  constructor(private http: HttpClient) {}
+  private baseUrl = environment.apiUrl;
 
   // Repositories
   getRepositories(): Observable<Repository[]> {
