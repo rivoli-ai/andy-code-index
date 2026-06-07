@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { ApiService } from '../../services/api.service';
@@ -100,6 +100,9 @@ import { environment } from '../../../environments/environment';
     `
 })
 export class TaskDashboardComponent implements OnInit, OnDestroy {
+  private api = inject(ApiService);
+  private http = inject(HttpClient);
+
   tasks: IndexingTask[] = [];
   repos: { id: string; name: string }[] = [];
   loading = true;
@@ -132,8 +135,6 @@ export class TaskDashboardComponent implements OnInit, OnDestroy {
   };
 
   private baseUrl = environment.apiUrl;
-
-  constructor(private api: ApiService, private http: HttpClient) {}
 
   ngOnInit() {
     this.loadTasks();

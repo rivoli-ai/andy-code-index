@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -178,17 +178,15 @@ import { RepositorySparklineComponent } from '../repositories/repository-sparkli
   `]
 })
 export class DashboardComponent implements OnInit {
+  private api = inject(ApiService);
+  private pinService = inject(PinService);
+  healthService = inject(HealthService);
+
   pinnedRepos: Repository[] = [];
   sparklines: Map<string, SparklineData> = new Map();
   loading = true;
   error = '';
   syncing: Record<string, boolean> = {};
-
-  constructor(
-    private api: ApiService,
-    private pinService: PinService,
-    public healthService: HealthService
-  ) {}
 
   ngOnInit() {
     this.loadPinnedRepos();

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -54,9 +54,9 @@ interface SyncStatus {
     `
 })
 export class SyncStatusComponent implements OnInit {
-  status: SyncStatus | null = null;
+  private http = inject(HttpClient);
 
-  constructor(private http: HttpClient) {}
+  status: SyncStatus | null = null;
 
   ngOnInit() {
     this.http.get<SyncStatus>(`${environment.apiUrl}/sync/status`).subscribe({

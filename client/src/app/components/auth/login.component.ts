@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -62,13 +62,18 @@ import { AuthService } from '../../services/auth.service';
   `]
 })
 export class LoginComponent {
+  private auth = inject(AuthService);
+  private router = inject(Router);
+
   authEnabled: boolean;
   authenticated: boolean;
   userName: string | null;
   signingIn = false;
   error = '';
 
-  constructor(private auth: AuthService, private router: Router) {
+  constructor() {
+    const auth = this.auth;
+
     this.authEnabled = auth.authEnabled;
     this.authenticated = auth.isAuthenticated();
     this.userName = auth.getUserName();

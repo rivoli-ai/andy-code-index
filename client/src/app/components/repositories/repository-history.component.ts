@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnChanges, SimpleChanges, input } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges, input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -145,6 +145,8 @@ interface GitLogCommit {
   `]
 })
 export class RepositoryHistoryComponent implements OnInit, OnChanges {
+  private http = inject(HttpClient);
+
   readonly repositoryId = input.required<string>();
   @Input() ref = '';
   runs: IndexingRun[] = [];
@@ -153,8 +155,6 @@ export class RepositoryHistoryComponent implements OnInit, OnChanges {
   loadingCommits = false;
   hasMoreCommits = false;
   private nextCursor: string | null = null;
-
-  constructor(private http: HttpClient) {}
 
   ngOnInit() {
     this.http.get<IndexingRun[]>(`${environment.apiUrl}/repositories/${this.repositoryId()}/history`)

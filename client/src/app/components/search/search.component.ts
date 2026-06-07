@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { RouterLink } from '@angular/router';
@@ -160,6 +160,9 @@ interface FilterOptions {
   `]
 })
 export class SearchComponent implements OnInit {
+  private api = inject(ApiService);
+  private http = inject(HttpClient);
+
   query = '';
   mode = 'hybrid';
   selectedRepo = '';
@@ -170,8 +173,6 @@ export class SearchComponent implements OnInit {
   offset = 0;
   pageSize = 10;
   Math = Math;
-
-  constructor(private api: ApiService, private http: HttpClient) {}
 
   ngOnInit() {
     this.http.get<FilterOptions>(`${environment.apiUrl}/search/filters`).subscribe({
