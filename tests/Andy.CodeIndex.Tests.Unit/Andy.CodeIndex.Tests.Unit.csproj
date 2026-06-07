@@ -31,6 +31,11 @@
     <None Include="..\..\src\Andy.CodeIndex.Api\Data\question-ontology.json" Link="Data\question-ontology.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Sample sources are test data, not part of the test assembly. -->
+    <Compile Remove="Fixtures\**\*.cs" />
+    <Content Include="Fixtures\CodeSamples\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
