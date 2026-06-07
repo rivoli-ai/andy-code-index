@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Andy.CodeIndex.Application.DTOs;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Entities;
@@ -53,17 +54,48 @@ public class SearchService : ISearchService
 
         var vectorStr = "[" + string.Join(",", queryEmbedding[0]) + "]";
 
+        // Build a parameterized WHERE so the SearchFilter (language/repo/path)
+        // constrains the semantic arm too. Without this, a language/repo filter
+        // silently leaked cross-language/cross-repo results through the vector
+        // query while only the keyword arm was filtered (epic #244 / story #251,
+        // related security finding #226). {0} is the query vector; filter values
+        // and the limit are appended as positional parameters.
+        var parameters = new List<object> { vectorStr };
+        var where = new StringBuilder();
+
+        if (filter?.Languages is { Count: > 0 })
+        {
+            where.Append($@" AND e.""Language"" = ANY({{{parameters.Count}}})");
+            parameters.Add(filter.Languages.ToArray());
+        }
+        if (filter?.RepositoryIds is { Count: > 0 })
+        {
+            where.Append($@" AND e.""RepositoryId"" = ANY({{{parameters.Count}}})");
+            parameters.Add(filter.RepositoryIds.ToArray());
+        }
+        if (!string.IsNullOrEmpty(filter?.FilePath))
+        {
+            where.Append($@" AND e.""FilePath"" IS NOT NULL AND strpos(e.""FilePath"", {{{parameters.Count}}}) > 0");
+            parameters.Add(filter.FilePath);
+        }
+
+        var limitIndex = parameters.Count;
+        parameters.Add(limit);
+
         // Use raw SQL for pgvector cosine distance operator
-        var results = await _context.Database
-            .SqlQuery<SemanticSearchRow>($@"
+        var sql = $@"
                 SELECT ce.""EnrichmentId"", e.""Content"", e.""FilePath"", e.""StartLine"", e.""EndLine"",
                        e.""Language"", e.""RepositoryId"", r.""Name"" AS ""RepositoryName"",
-                       1.0 - (ce.""EmbeddingVector"" <=> {vectorStr}::vector) AS ""Score""
+                       1.0 - (ce.""EmbeddingVector"" <=> {{0}}::vector) AS ""Score""
                 FROM ""ContentEmbeddings"" ce
                 JOIN ""Enrichments"" e ON ce.""EnrichmentId"" = e.""Id""
                 JOIN ""Repositories"" r ON e.""RepositoryId"" = r.""Id""
-                ORDER BY ce.""EmbeddingVector"" <=> {vectorStr}::vector
-                LIMIT {limit}")
+                WHERE 1=1{where}
+                ORDER BY ce.""EmbeddingVector"" <=> {{0}}::vector
+                LIMIT {{{limitIndex}}}";
+
+        var results = await _context.Database
+            .SqlQueryRaw<SemanticSearchRow>(sql, parameters.ToArray())
             .ToListAsync(ct);
 
         return new SearchResultsDto
@@ -115,16 +147,23 @@ public class SearchService : ISearchService
         List<SearchResultItem> results;
         if (_context.Database.IsNpgsql())
         {
-            var tsQuery = string.Join(" & ", keywords.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            // Use websearch_to_tsquery instead of to_tsquery: it never throws on
+            // user input containing tsquery syntax characters (':', '(', '!', '&')
+            // and tokenizes the raw phrase itself, so we no longer hand-join terms
+            // with '&' (story #252). Config stays 'english' to match the stored
+            // tsvector computed column (CodeIndexDbContext: to_tsvector('english',...));
+            // moving to the 'simple' config for code identifiers requires
+            // regenerating that column via migration (tracked separately).
+            var tsQuery = keywords;
             results = await enrichmentQuery
-                .Where(e => e.SearchVector!.Matches(EF.Functions.ToTsQuery("english", tsQuery)))
-                .OrderByDescending(e => e.SearchVector!.Rank(EF.Functions.ToTsQuery("english", tsQuery)))
+                .Where(e => e.SearchVector!.Matches(EF.Functions.WebSearchToTsQuery("english", tsQuery)))
+                .OrderByDescending(e => e.SearchVector!.Rank(EF.Functions.WebSearchToTsQuery("english", tsQuery)))
                 .Take(limit)
                 .Select(e => new SearchResultItem
                 {
                     EnrichmentId = e.Id,
                     Content = e.Content,
-                    Score = e.SearchVector!.Rank(EF.Functions.ToTsQuery("english", tsQuery)),
+                    Score = e.SearchVector!.Rank(EF.Functions.WebSearchToTsQuery("english", tsQuery)),
                     FilePath = e.FilePath,
                     StartLine = e.StartLine,
                     EndLine = e.EndLine,
@@ -191,14 +230,15 @@ public class SearchService : ISearchService
 
         var sw = Stopwatch.StartNew();
 
-        // Run semantic and keyword searches concurrently
-        var semanticTask = SemanticSearchAsync(query, filter, limit * 2, ct);
-        var keywordTask = KeywordSearchAsync(query, filter, limit * 2, ct);
-
-        await Task.WhenAll(semanticTask, keywordTask);
-
-        var semanticResults = semanticTask.Result;
-        var keywordResults = keywordTask.Result;
+        // Run the arms sequentially: both share the request-scoped DbContext,
+        // which is not thread-safe. Running them via Task.WhenAll triggers EF
+        // Core's "a second operation was started on this context" error whenever
+        // the two queries overlap — previously masked in production only by the
+        // embedding network call delaying the semantic query past the keyword
+        // query (epic #244). The DB queries are fast; the dominant cost is the
+        // one-time embedding generation, so the latency impact is negligible.
+        var semanticResults = await SemanticSearchAsync(query, filter, limit * 2, ct);
+        var keywordResults = await KeywordSearchAsync(query, filter, limit * 2, ct);
 
         // Convert to ranked result sets for RRF
         var inputs = new List<RankedResultSet>();
@@ -279,20 +319,6 @@ public class SearchService : ISearchService
             new KeyValuePair<string, object?>("andy.code_index.query.mode", "hybrid"),
             new KeyValuePair<string, object?>("mode", "hybrid")); // deprecated; removed in 0.3.0
         return result;
-    }
-
-    private static IQueryable<ContentEmbedding> ApplyEmbeddingFilters(IQueryable<ContentEmbedding> query, SearchFilter? filter)
-    {
-        if (filter is null) return query;
-
-        if (filter.Languages is { Count: > 0 })
-            query = query.Where(e => filter.Languages.Contains(e.Enrichment.Language!));
-        if (filter.RepositoryIds is { Count: > 0 })
-            query = query.Where(e => filter.RepositoryIds.Contains(e.Enrichment.RepositoryId));
-        if (filter.FilePath is not null)
-            query = query.Where(e => e.Enrichment.FilePath != null && e.Enrichment.FilePath.Contains(filter.FilePath));
-
-        return query;
     }
 
     private static IQueryable<Enrichment> ApplyEnrichmentFilters(IQueryable<Enrichment> query, SearchFilter? filter)
