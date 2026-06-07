@@ -42,4 +42,16 @@ public class BinaryDetectionService : IBinaryDetectionService
 
         return (false, null);
     }
+
+    // Content-based detection for files that slip past the extension allowlist
+    // (renamed or extensionless binaries). A NUL byte in the leading bytes is the
+    // same heuristic git uses to classify a blob as binary. (story #258)
+    internal static bool ContentLooksBinary(string content)
+    {
+        var limit = Math.Min(content.Length, 8000);
+        for (var i = 0; i < limit; i++)
+            if (content[i] == '\0')
+                return true;
+        return false;
+    }
 }

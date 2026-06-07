@@ -135,6 +135,15 @@ public class ExtractSnippetsHandler : ITaskHandler
             var content = await _gitService.ReadFileAsync(cloneDir, commitSha, file.Path, ct);
             if (content is null || content.Length == 0) continue;
 
+            // Skip files that are binary by content even though they passed the
+            // extension filter (renamed/extensionless binaries), so raw bytes do
+            // not pollute the snippet/embedding index. (story #258)
+            if (Services.BinaryDetectionService.ContentLooksBinary(content))
+            {
+                _logger.LogDebug("Skipping {File}: content looks binary (NUL byte)", file.Path);
+                continue;
+            }
+
             var chunks = _chunkingService.ChunkText(content, file.Path);
             foreach (var chunk in chunks)
             {

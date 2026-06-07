@@ -15,8 +15,8 @@ public class GitService : IGitService
     private static readonly Dictionary<string, string> LanguageMap = new(StringComparer.OrdinalIgnoreCase)
     {
         [".cs"] = "csharp", [".csx"] = "csharp",
-        [".ts"] = "typescript", [".tsx"] = "typescript",
-        [".js"] = "javascript", [".jsx"] = "javascript", [".mjs"] = "javascript",
+        [".ts"] = "typescript", [".tsx"] = "typescript", [".cts"] = "typescript", [".mts"] = "typescript",
+        [".js"] = "javascript", [".jsx"] = "javascript", [".mjs"] = "javascript", [".cjs"] = "javascript",
         [".py"] = "python", [".pyi"] = "python",
         [".go"] = "go",
         [".java"] = "java",
@@ -49,6 +49,13 @@ public class GitService : IGitService
         [".vue"] = "vue",
         [".svelte"] = "svelte",
     };
+
+    /// <summary>Maps a file path to a language by extension, or null if unknown.</summary>
+    internal static string? DetectLanguage(string path)
+    {
+        var ext = Path.GetExtension(path);
+        return ext.Length > 0 && LanguageMap.TryGetValue(ext, out var lang) ? lang : null;
+    }
 
     public GitService(ILogger<GitService> logger)
     {
@@ -258,13 +265,12 @@ public class GitService : IGitService
                 continue;
 
             long.TryParse(meta[3], out var size);
-            var ext = Path.GetExtension(path);
 
             files.Add(new GitFileInfo
             {
                 Path = path,
                 Size = size,
-                Language = ext.Length > 0 && LanguageMap.TryGetValue(ext, out var lang) ? lang : null,
+                Language = DetectLanguage(path),
                 Hash = meta[2]
             });
         }
@@ -328,11 +334,7 @@ public class GitService : IGitService
 
             string? language = null;
             if (type == "blob")
-            {
-                var ext = Path.GetExtension(entryPath);
-                if (ext.Length > 0 && LanguageMap.TryGetValue(ext, out var lang))
-                    language = lang;
-            }
+                language = DetectLanguage(entryPath);
 
             entries.Add(new GitTreeEntry
             {
