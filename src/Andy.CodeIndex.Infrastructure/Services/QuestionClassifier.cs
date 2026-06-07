@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace Andy.CodeIndex.Infrastructure.Services;
 
@@ -11,9 +12,19 @@ public class QuestionClassifier : IQuestionClassifier
     private readonly List<OntologyDimension> _dimensions;
     private readonly EnrichmentSubtype[] _allNonChunkSubtypes;
 
-    public QuestionClassifier()
+    public QuestionClassifier(ILogger<QuestionClassifier>? logger = null)
     {
         _dimensions = LoadOntology();
+        if (_dimensions.Count == 0)
+        {
+            // Without the ontology every query silently falls back to "general"
+            // (all enrichments), disabling intent routing. Surface it loudly
+            // instead of failing quietly. (story #259)
+            logger?.LogError(
+                "Question ontology could not be loaded (Data/question-ontology.json missing or empty); " +
+                "intent classification is disabled and all queries fall back to 'general'.");
+        }
+
         _allNonChunkSubtypes = Enum.GetValues<EnrichmentSubtype>()
             .Where(s => s != EnrichmentSubtype.Chunk)
             .ToArray();
@@ -38,10 +49,7 @@ public class QuestionClassifier : IQuestionClassifier
             foreach (var q in dim.Questions)
             {
                 if (q.Keywords.Count == 0) continue;
-                var matched = q.Keywords.Count(k => words.Any(w =>
-                    w.Equals(k, StringComparison.OrdinalIgnoreCase) ||
-                    w.Contains(k, StringComparison.OrdinalIgnoreCase) ||
-                    k.Contains(w, StringComparison.OrdinalIgnoreCase)));
+                var matched = q.Keywords.Count(k => words.Any(w => KeywordMatches(w, k)));
                 var qScore = (double)matched / q.Keywords.Count;
                 if (qScore > dimBestScore)
                 {
@@ -94,6 +102,24 @@ public class QuestionClassifier : IQuestionClassifier
         RequiredEnrichments = _allNonChunkSubtypes,
         FallbackEnrichments = []
     };
+
+    // Matches a message word against an ontology keyword. Exact match, or a prefix
+    // match guarded by a minimum length so short tokens don't spuriously match
+    // (the old bidirectional Contains made "go" match "google" and "ci" match
+    // "specific", conflating unrelated dimensions). (story #259)
+    internal static bool KeywordMatches(string word, string keyword)
+    {
+        if (word.Equals(keyword, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        const int minPrefix = 4;
+        if (keyword.Length >= minPrefix && word.StartsWith(keyword, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (word.Length >= minPrefix && keyword.StartsWith(word, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
 
     private static List<string> Tokenize(string message)
     {
