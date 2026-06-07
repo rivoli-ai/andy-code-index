@@ -77,29 +77,35 @@ interface ConversationGroup {
         <div class="sidebar-section">
           <h3 class="sidebar-title">Quick Questions</h3>
           <input class="form-control sidebar-search" [(ngModel)]="searchQuery"
-                 placeholder="Search questions..." (input)="filterQuestions()">
+            placeholder="Search questions..." (input)="filterQuestions()">
         </div>
-
+    
         <div class="sidebar-section">
           <div class="category-grid">
-            <button *ngFor="let cat of allCategories" class="category-tile"
-                    [class.active]="activeCategory === cat.name"
-                    (click)="selectCategory(cat.name)">
-              <span class="category-name">{{ cat.name }}</span>
-              <span class="category-count">{{ cat.questions.length }}</span>
-            </button>
+            @for (cat of allCategories; track cat) {
+              <button class="category-tile"
+                [class.active]="activeCategory === cat.name"
+                (click)="selectCategory(cat.name)">
+                <span class="category-name">{{ cat.name }}</span>
+                <span class="category-count">{{ cat.questions.length }}</span>
+              </button>
+            }
           </div>
         </div>
-
+    
         <div class="sidebar-section question-list">
-          <button *ngFor="let q of visibleQuestions" class="question-item" (click)="askSuggestion(q)">
-            {{ q }}
-          </button>
-          <div *ngIf="visibleQuestions.length === 0" class="text-muted" style="padding:0.5rem;font-size:var(--font-xs)">
-            No matching questions.
-          </div>
+          @for (q of visibleQuestions; track q) {
+            <button class="question-item" (click)="askSuggestion(q)">
+              {{ q }}
+            </button>
+          }
+          @if (visibleQuestions.length === 0) {
+            <div class="text-muted" style="padding:0.5rem;font-size:var(--font-xs)">
+              No matching questions.
+            </div>
+          }
         </div>
-
+    
         <div class="sidebar-section conversations-section">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
             <h3 class="sidebar-title" style="margin:0">Conversations</h3>
@@ -108,43 +114,53 @@ interface ConversationGroup {
             </button>
           </div>
           <input class="form-control sidebar-search" [(ngModel)]="convSearchQuery"
-                 placeholder="Search conversations..." (input)="onConvSearchInput()"
-                 style="margin-bottom:0.5rem">
+            placeholder="Search conversations..." (input)="onConvSearchInput()"
+            style="margin-bottom:0.5rem">
           <div class="conversation-list">
-            <ng-container *ngFor="let group of groupedConversations">
-              <div class="conv-group-header" *ngIf="group.conversations.length > 0">{{ group.label }}</div>
-              <div *ngFor="let conv of group.conversations" class="conversation-item"
-                   [class.active]="conversationId === conv.id"
-                   (click)="resumeConversation(conv.id)">
-                <div class="conv-title-row">
-                  <div class="conv-title" *ngIf="editingConvId !== conv.id"
-                       (dblclick)="startRename(conv, $event)">{{ conv.title }}</div>
-                  <input *ngIf="editingConvId === conv.id" class="conv-title-input"
-                         [(ngModel)]="editingTitle"
-                         (keydown.enter)="saveRename(conv)"
-                         (keydown.escape)="cancelRename()"
-                         (blur)="saveRename(conv)"
-                         (click)="$event.stopPropagation()">
-                  <button class="btn-icon-sm" (click)="togglePin(conv, $event)"
-                          [title]="conv.isPinned ? 'Unpin' : 'Pin'">
-                    <i class="bi" [ngClass]="conv.isPinned ? 'bi-pin-fill' : 'bi-pin'"></i>
-                  </button>
+            @for (group of groupedConversations; track group) {
+              @if (group.conversations.length > 0) {
+                <div class="conv-group-header">{{ group.label }}</div>
+              }
+              @for (conv of group.conversations; track conv) {
+                <div class="conversation-item"
+                  [class.active]="conversationId === conv.id"
+                  (click)="resumeConversation(conv.id)">
+                  <div class="conv-title-row">
+                    @if (editingConvId !== conv.id) {
+                      <div class="conv-title"
+                      (dblclick)="startRename(conv, $event)">{{ conv.title }}</div>
+                    }
+                    @if (editingConvId === conv.id) {
+                      <input class="conv-title-input"
+                        [(ngModel)]="editingTitle"
+                        (keydown.enter)="saveRename(conv)"
+                        (keydown.escape)="cancelRename()"
+                        (blur)="saveRename(conv)"
+                        (click)="$event.stopPropagation()">
+                    }
+                    <button class="btn-icon-sm" (click)="togglePin(conv, $event)"
+                      [title]="conv.isPinned ? 'Unpin' : 'Pin'">
+                      <i class="bi" [ngClass]="conv.isPinned ? 'bi-pin-fill' : 'bi-pin'"></i>
+                    </button>
+                  </div>
+                  <div class="conv-meta">
+                    <span>{{ formatTimeAgo(conv.updatedAt) }}</span>
+                    <button class="btn-icon-sm" (click)="deleteConversation(conv.id, $event)" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
                 </div>
-                <div class="conv-meta">
-                  <span>{{ formatTimeAgo(conv.updatedAt) }}</span>
-                  <button class="btn-icon-sm" (click)="deleteConversation(conv.id, $event)" title="Delete">
-                    <i class="bi bi-trash3"></i>
-                  </button>
-                </div>
+              }
+            }
+            @if (conversations.length === 0) {
+              <div class="text-muted" style="font-size:var(--font-xs);padding:0.25rem">
+                No conversations yet.
               </div>
-            </ng-container>
-            <div *ngIf="conversations.length === 0" class="text-muted" style="font-size:var(--font-xs);padding:0.25rem">
-              No conversations yet.
-            </div>
+            }
           </div>
         </div>
       </aside>
-
+    
       <!-- Right Panel: Chat -->
       <main class="chat-main">
         <div class="chat-header">
@@ -152,62 +168,90 @@ interface ConversationGroup {
           <div style="display:flex;gap:0.75rem;align-items:center">
             <select class="form-control" [(ngModel)]="selectedRepo" (ngModelChange)="onRepoChange($event)" style="width:180px">
               <option value="">All Repositories</option>
-              <option *ngFor="let r of repos" [value]="r.id">{{ r.name }}</option>
+              @for (r of repos; track r) {
+                <option [value]="r.id">{{ r.name }}</option>
+              }
             </select>
-            <select *ngIf="selectedRepo && (repoBranches.length > 0 || repoTags.length > 0)" class="form-control" [(ngModel)]="selectedRef" style="width:160px">
-              <option value="">All branches</option>
-              <optgroup label="Branches" *ngIf="repoBranches.length > 0">
-                <option *ngFor="let b of repoBranches" [value]="b.name">{{ b.name }}{{ b.isDefault ? ' (default)' : '' }}</option>
-              </optgroup>
-              <optgroup label="Tags" *ngIf="repoTags.length > 0">
-                <option *ngFor="let t of repoTags" [value]="t.name">{{ t.name }}</option>
-              </optgroup>
-            </select>
-            <span class="badge badge-muted" *ngIf="!chatAvailable">LLM not configured</span>
+            @if (selectedRepo && (repoBranches.length > 0 || repoTags.length > 0)) {
+              <select class="form-control" [(ngModel)]="selectedRef" style="width:160px">
+                <option value="">All branches</option>
+                @if (repoBranches.length > 0) {
+                  <optgroup label="Branches">
+                    @for (b of repoBranches; track b) {
+                      <option [value]="b.name">{{ b.name }}{{ b.isDefault ? ' (default)' : '' }}</option>
+                    }
+                  </optgroup>
+                }
+                @if (repoTags.length > 0) {
+                  <optgroup label="Tags">
+                    @for (t of repoTags; track t) {
+                      <option [value]="t.name">{{ t.name }}</option>
+                    }
+                  </optgroup>
+                }
+              </select>
+            }
+            @if (!chatAvailable) {
+              <span class="badge badge-muted">LLM not configured</span>
+            }
           </div>
         </div>
-
+    
         <div class="chat-messages" #messagesContainer>
-          <div *ngIf="messages.length === 0" class="empty-chat">
-            <i class="bi bi-chat-dots"></i>
-            <h3>Ask about your codebase</h3>
-            <p class="text-muted">Select a question from the left panel, or type your own below.</p>
-          </div>
-
-          <div *ngFor="let msg of messages" class="message" [ngClass]="msg.role">
-            <div class="message-bubble">
-              <div class="message-content" [innerHTML]="formatContent(msg.content)"></div>
-              <div *ngIf="msg.sources && msg.sources.length > 0" class="sources-toggle">
-                <button class="btn btn-sm btn-secondary" (click)="msg.showSources = !msg.showSources" style="font-size:var(--font-xs)">
-                  <i class="bi" [ngClass]="msg.showSources ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-                  {{ msg.sources.length }} sources
-                </button>
-                <div *ngIf="msg.showSources" class="sources-list">
-                  <div *ngFor="let s of msg.sources" class="source-item">
-                    <code>{{ s.repositoryName }}/{{ s.filePath }}</code>
-                    <span class="text-muted" *ngIf="s.startLine"> :{{ s.startLine }}</span>
+          @if (messages.length === 0) {
+            <div class="empty-chat">
+              <i class="bi bi-chat-dots"></i>
+              <h3>Ask about your codebase</h3>
+              <p class="text-muted">Select a question from the left panel, or type your own below.</p>
+            </div>
+          }
+    
+          @for (msg of messages; track msg) {
+            <div class="message" [ngClass]="msg.role">
+              <div class="message-bubble">
+                <div class="message-content" [innerHTML]="formatContent(msg.content)"></div>
+                @if (msg.sources && msg.sources.length > 0) {
+                  <div class="sources-toggle">
+                    <button class="btn btn-sm btn-secondary" (click)="msg.showSources = !msg.showSources" style="font-size:var(--font-xs)">
+                      <i class="bi" [ngClass]="msg.showSources ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                      {{ msg.sources.length }} sources
+                    </button>
+                    @if (msg.showSources) {
+                      <div class="sources-list">
+                        @for (s of msg.sources; track s) {
+                          <div class="source-item">
+                            <code>{{ s.repositoryName }}/{{ s.filePath }}</code>
+                            @if (s.startLine) {
+                              <span class="text-muted"> :{{ s.startLine }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
                   </div>
-                </div>
+                }
               </div>
             </div>
-          </div>
-
-          <div *ngIf="sending" class="message assistant">
-            <div class="message-bubble"><div class="spinner" style="width:1.5rem;height:1.5rem"></div></div>
-          </div>
+          }
+    
+          @if (sending) {
+            <div class="message assistant">
+              <div class="message-bubble"><div class="spinner" style="width:1.5rem;height:1.5rem"></div></div>
+            </div>
+          }
         </div>
-
+    
         <div class="chat-input">
           <textarea class="form-control" [(ngModel)]="input" placeholder="Ask about your code..."
-                    (keydown.enter)="onEnter($event)" rows="1"
-                    [disabled]="sending"></textarea>
+            (keydown.enter)="onEnter($event)" rows="1"
+          [disabled]="sending"></textarea>
           <button class="btn btn-primary" (click)="send()" [disabled]="sending || !input.trim()">
             <i class="bi bi-send"></i>
           </button>
         </div>
       </main>
     </div>
-  `,
+    `,
   styles: [`
     /* --- Two-panel layout --- */
     .chat-layout { display: flex; height: calc(100vh - 4rem); gap: 0; }

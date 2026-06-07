@@ -35,68 +35,102 @@ interface GitLogCommit {
   imports: [CommonModule],
   template: `
     <!-- Git Commits (filtered by branch) -->
-    <div class="card" *ngIf="gitCommits.length > 0" style="margin-bottom:1.5rem">
-      <h3 style="margin-bottom:1rem;font-size:1rem">
-        Commits
-        <span *ngIf="ref" class="badge badge-primary" style="font-size:0.75rem;margin-left:0.5rem">{{ ref }}</span>
-      </h3>
-      <div class="commit-item" *ngFor="let commit of gitCommits">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
-              <code style="font-size:0.75rem;color:var(--primary);flex-shrink:0">{{ commit.abbreviatedSha }}</code>
-              <span *ngIf="commit.isIndexed" class="badge badge-success" style="font-size:0.625rem;flex-shrink:0">indexed</span>
-              <span *ngIf="commit.enrichmentCount > 0" class="badge badge-muted" style="font-size:0.625rem;flex-shrink:0">{{ commit.enrichmentCount }} enrichments</span>
-            </div>
-            <div style="font-size:0.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ commit.message }}</div>
-            <div class="text-muted" style="font-size:0.75rem;margin-top:0.125rem">
-              {{ commit.authorName }} &middot; {{ commit.committedAt | date:'short' }}
+    @if (gitCommits.length > 0) {
+      <div class="card" style="margin-bottom:1.5rem">
+        <h3 style="margin-bottom:1rem;font-size:1rem">
+          Commits
+          @if (ref) {
+            <span class="badge badge-primary" style="font-size:0.75rem;margin-left:0.5rem">{{ ref }}</span>
+          }
+        </h3>
+        @for (commit of gitCommits; track commit) {
+          <div class="commit-item">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
+                  <code style="font-size:0.75rem;color:var(--primary);flex-shrink:0">{{ commit.abbreviatedSha }}</code>
+                  @if (commit.isIndexed) {
+                    <span class="badge badge-success" style="font-size:0.625rem;flex-shrink:0">indexed</span>
+                  }
+                  @if (commit.enrichmentCount > 0) {
+                    <span class="badge badge-muted" style="font-size:0.625rem;flex-shrink:0">{{ commit.enrichmentCount }} enrichments</span>
+                  }
+                </div>
+                <div style="font-size:0.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ commit.message }}</div>
+                <div class="text-muted" style="font-size:0.75rem;margin-top:0.125rem">
+                  {{ commit.authorName }} &middot; {{ commit.committedAt | date:'short' }}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        }
+        @if (hasMoreCommits) {
+          <div style="text-align:center;padding:0.75rem 0">
+            <button class="btn btn-secondary btn-sm" (click)="loadMoreCommits()" [disabled]="loadingCommits" style="font-size:0.75rem">
+              {{ loadingCommits ? 'Loading...' : 'Load more' }}
+            </button>
+          </div>
+        }
       </div>
-      <div *ngIf="hasMoreCommits" style="text-align:center;padding:0.75rem 0">
-        <button class="btn btn-secondary btn-sm" (click)="loadMoreCommits()" [disabled]="loadingCommits" style="font-size:0.75rem">
-          {{ loadingCommits ? 'Loading...' : 'Load more' }}
-        </button>
+    }
+    @if (gitCommits.length === 0 && !loadingCommits && ref) {
+      <div class="card" style="margin-bottom:1.5rem">
+        <p class="text-muted" style="font-size:0.8125rem">No commits found for branch "{{ ref }}"</p>
       </div>
-    </div>
-    <div *ngIf="gitCommits.length === 0 && !loadingCommits && ref" class="card" style="margin-bottom:1.5rem">
-      <p class="text-muted" style="font-size:0.8125rem">No commits found for branch "{{ ref }}"</p>
-    </div>
-
+    }
+    
     <!-- Indexing History -->
-    <div class="card" *ngIf="runs.length > 0">
-      <h3 style="margin-bottom:1rem;font-size:1rem">Indexing History</h3>
-      <div class="run-item" *ngFor="let run of runs">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <span class="badge" [ngClass]="run.status === 'completed' ? 'badge-success' : run.status === 'failed' ? 'badge-danger' : 'badge-info'">
-              {{ run.status }}
-            </span>
-            <span class="text-muted" style="margin-left:0.75rem;font-size:0.8125rem">
-              {{ run.startedAt | date:'short' }}
-            </span>
-            <span class="text-muted" style="margin-left:0.5rem;font-size:0.75rem" *ngIf="run.durationSeconds">
-              ({{ run.durationSeconds | number:'1.1-1' }}s)
-            </span>
+    @if (runs.length > 0) {
+      <div class="card">
+        <h3 style="margin-bottom:1rem;font-size:1rem">Indexing History</h3>
+        @for (run of runs; track run) {
+          <div class="run-item">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <span class="badge" [ngClass]="run.status === 'completed' ? 'badge-success' : run.status === 'failed' ? 'badge-danger' : 'badge-info'">
+                  {{ run.status }}
+                </span>
+                <span class="text-muted" style="margin-left:0.75rem;font-size:0.8125rem">
+                  {{ run.startedAt | date:'short' }}
+                </span>
+                @if (run.durationSeconds) {
+                  <span class="text-muted" style="margin-left:0.5rem;font-size:0.75rem">
+                    ({{ run.durationSeconds | number:'1.1-1' }}s)
+                  </span>
+                }
+              </div>
+              @if (run.status === 'completed') {
+                <div class="stats">
+                  @if (run.snippetsAdded) {
+                    <span class="stat-badge added">+{{ run.snippetsAdded }}</span>
+                  }
+                  @if (run.snippetsUpdated) {
+                    <span class="stat-badge updated">~{{ run.snippetsUpdated }}</span>
+                  }
+                  @if (run.snippetsDeleted) {
+                    <span class="stat-badge deleted">-{{ run.snippetsDeleted }}</span>
+                  }
+                  @if (run.snippetsUnchanged) {
+                    <span class="stat-badge unchanged">={{ run.snippetsUnchanged }}</span>
+                  }
+                </div>
+              }
+            </div>
+            @if (run.errorMessage) {
+              <div style="color:var(--danger);font-size:0.8125rem;margin-top:0.25rem">
+                {{ run.errorMessage }}
+              </div>
+            }
           </div>
-          <div class="stats" *ngIf="run.status === 'completed'">
-            <span class="stat-badge added" *ngIf="run.snippetsAdded">+{{ run.snippetsAdded }}</span>
-            <span class="stat-badge updated" *ngIf="run.snippetsUpdated">~{{ run.snippetsUpdated }}</span>
-            <span class="stat-badge deleted" *ngIf="run.snippetsDeleted">-{{ run.snippetsDeleted }}</span>
-            <span class="stat-badge unchanged" *ngIf="run.snippetsUnchanged">={{ run.snippetsUnchanged }}</span>
-          </div>
-        </div>
-        <div *ngIf="run.errorMessage" style="color:var(--danger);font-size:0.8125rem;margin-top:0.25rem">
-          {{ run.errorMessage }}
-        </div>
+        }
       </div>
-    </div>
-    <div class="empty-state card" *ngIf="runs.length === 0 && gitCommits.length === 0 && !loading && !loadingCommits">
-      <p class="text-muted">No history yet</p>
-    </div>
-  `,
+    }
+    @if (runs.length === 0 && gitCommits.length === 0 && !loading && !loadingCommits) {
+      <div class="empty-state card">
+        <p class="text-muted">No history yet</p>
+      </div>
+    }
+    `,
   styles: [`
     .run-item { padding: 0.625rem 0; border-bottom: 1px solid var(--border); }
     .run-item:last-child { border-bottom: none; }

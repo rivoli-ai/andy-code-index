@@ -14,7 +14,7 @@ import { environment } from '../../../environments/environment';
     <div class="page-header">
       <h1>Enrichments</h1>
     </div>
-
+    
     <div class="card mb-2">
       <h3 style="font-size:var(--font-sm);margin-bottom:0.5rem">What are enrichments?</h3>
       <p class="text-muted" style="font-size:var(--font-xs);margin-bottom:0.75rem">
@@ -55,77 +55,111 @@ import { environment } from '../../../environments/environment';
         <div><strong>Tech Stack</strong> -- Technology stack detection: backend/frontend frameworks, databases, infrastructure, and language breakdown</div>
       </div>
     </div>
-
+    
     <!-- Summary bar -->
-    <div class="card mb-2" *ngIf="!loading && typeCounts.length > 0" style="padding:0.75rem 1rem">
-      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;font-size:var(--font-xs)">
-        <span style="font-weight:600">{{ totalCount }} enrichments<span *ngIf="globalStorageSizeBytes > 0"> &middot; {{ formatBytes(globalStorageSizeBytes) }}</span></span>
-        <span *ngFor="let tc of typeCounts" style="display:inline-flex;align-items:center;gap:0.25rem">
-          <span class="badge badge-muted">{{ getSubtypeLabel(tc.subtype) }}</span>
-          <span>{{ tc.count }}</span>
-        </span>
+    @if (!loading && typeCounts.length > 0) {
+      <div class="card mb-2" style="padding:0.75rem 1rem">
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;font-size:var(--font-xs)">
+          <span style="font-weight:600">{{ totalCount }} enrichments@if (globalStorageSizeBytes > 0) {
+            <span> &middot; {{ formatBytes(globalStorageSizeBytes) }}</span>
+          }</span>
+          @for (tc of typeCounts; track tc) {
+            <span style="display:inline-flex;align-items:center;gap:0.25rem">
+              <span class="badge badge-muted">{{ getSubtypeLabel(tc.subtype) }}</span>
+              <span>{{ tc.count }}</span>
+            </span>
+          }
+        </div>
       </div>
-    </div>
-
+    }
+    
     <!-- Filters -->
     <div class="card mb-2">
       <div style="display:flex;gap:1rem;flex-wrap:wrap">
         <div class="form-group" style="margin-bottom:0">
           <select class="form-control" [(ngModel)]="typeFilter" (change)="onTypeChange()" style="width:180px">
             <option value="">All Types</option>
-            <option *ngFor="let t of typeOptions" [value]="t">{{ t }}</option>
+            @for (t of typeOptions; track t) {
+              <option [value]="t">{{ t }}</option>
+            }
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
           <select class="form-control" [(ngModel)]="subtypeFilter" (change)="loadEnrichments()" style="width:180px">
             <option value="">All Subtypes</option>
-            <option *ngFor="let st of availableSubtypes" [value]="st.value">{{ st.label }}</option>
+            @for (st of availableSubtypes; track st) {
+              <option [value]="st.value">{{ st.label }}</option>
+            }
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
           <select class="form-control" [(ngModel)]="repoFilter" (change)="loadEnrichments()" style="width:200px">
             <option value="">All Repositories</option>
-            <option *ngFor="let r of repos" [value]="r.id">{{ r.name }}</option>
+            @for (r of repos; track r) {
+              <option [value]="r.id">{{ r.name }}</option>
+            }
           </select>
         </div>
       </div>
     </div>
-
-    <div *ngIf="loading" style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
-
-    <div *ngIf="!loading && enrichments.length > 0">
-      <div class="card" *ngFor="let e of enrichments" style="margin-bottom:1rem;cursor:pointer" (click)="toggleExpand(e.id)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div style="margin-bottom:0.375rem">
-              <span class="badge badge-primary">{{ getTypeLabel(e.type) }}</span>
-              <span class="badge badge-muted" style="margin-left:0.25rem">{{ getSubtypeLabel(e.subtype) }}</span>
-              <span class="badge badge-muted" style="margin-left:0.25rem" *ngIf="e.language">{{ e.language }}</span>
-              <span class="badge" style="margin-left:0.25rem" [ngClass]="qualityClass(e.quality)">{{ qualityLabel(e.quality) }}</span>
+    
+    @if (loading) {
+      <div style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
+    }
+    
+    @if (!loading && enrichments.length > 0) {
+      <div>
+        @for (e of enrichments; track e) {
+          <div class="card" style="margin-bottom:1rem;cursor:pointer" (click)="toggleExpand(e.id)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div style="margin-bottom:0.375rem">
+                  <span class="badge badge-primary">{{ getTypeLabel(e.type) }}</span>
+                  <span class="badge badge-muted" style="margin-left:0.25rem">{{ getSubtypeLabel(e.subtype) }}</span>
+                  @if (e.language) {
+                    <span class="badge badge-muted" style="margin-left:0.25rem">{{ e.language }}</span>
+                  }
+                  <span class="badge" style="margin-left:0.25rem" [ngClass]="qualityClass(e.quality)">{{ qualityLabel(e.quality) }}</span>
+                </div>
+                <strong>{{ e.title || e.filePath || 'Untitled' }}</strong>
+                @if (e.filePath || getRepoName(e.repositoryId)) {
+                  <div class="text-muted" style="font-size:var(--font-xs);margin-top:0.25rem">
+                    @if (getRepoName(e.repositoryId)) {
+                      <span>{{ getRepoName(e.repositoryId) }}</span>
+                    }
+                    @if (getRepoName(e.repositoryId) && e.filePath) {
+                      <span> / </span>
+                    }
+                    @if (e.filePath) {
+                      <code>{{ e.filePath }}</code>
+                    }
+                  </div>
+                }
+              </div>
             </div>
-            <strong>{{ e.title || e.filePath || 'Untitled' }}</strong>
-            <div class="text-muted" style="font-size:var(--font-xs);margin-top:0.25rem" *ngIf="e.filePath || getRepoName(e.repositoryId)">
-              <span *ngIf="getRepoName(e.repositoryId)">{{ getRepoName(e.repositoryId) }}</span>
-              <span *ngIf="getRepoName(e.repositoryId) && e.filePath"> / </span>
-              <code *ngIf="e.filePath">{{ e.filePath }}</code>
-            </div>
+            @if (expandedId === e.id) {
+              <div style="margin-top:1rem">
+                <pre><code>{{ e.content }}</code></pre>
+              </div>
+            }
           </div>
-        </div>
-        <div *ngIf="expandedId === e.id" style="margin-top:1rem">
-          <pre><code>{{ e.content }}</code></pre>
-        </div>
+        }
+        @if (totalCount > enrichments.length) {
+          <div style="display:flex;justify-content:center;gap:0.75rem;margin-top:1rem">
+            <button class="btn btn-secondary" (click)="loadMore()">Load More</button>
+          </div>
+        }
       </div>
-      <div style="display:flex;justify-content:center;gap:0.75rem;margin-top:1rem" *ngIf="totalCount > enrichments.length">
-        <button class="btn btn-secondary" (click)="loadMore()">Load More</button>
+    }
+    
+    @if (!loading && enrichments.length === 0) {
+      <div class="empty-state card">
+        <i class="bi bi-file-earmark-text"></i>
+        <h3>No enrichments found</h3>
+        <p>Index a repository to generate enrichments.</p>
       </div>
-    </div>
-
-    <div *ngIf="!loading && enrichments.length === 0" class="empty-state card">
-      <i class="bi bi-file-earmark-text"></i>
-      <h3>No enrichments found</h3>
-      <p>Index a repository to generate enrichments.</p>
-    </div>
-  `
+    }
+    `
 })
 export class EnrichmentBrowserComponent implements OnInit {
   enrichments: Enrichment[] = [];

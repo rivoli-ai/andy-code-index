@@ -14,70 +14,90 @@ import { environment } from '../../../environments/environment';
     <div class="page-header">
       <h1>Task Queue</h1>
     </div>
-
+    
     <app-sync-status />
-
-    <div *ngIf="loading" style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
-
-    <div *ngIf="!loading">
-      <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem">
-        <button class="btn" [ngClass]="tab === 'active' ? 'btn-primary' : 'btn-secondary'" (click)="tab='active'">
-          Active ({{ activeTasks.length }})
-        </button>
-        <button class="btn" [ngClass]="tab === 'pending' ? 'btn-primary' : 'btn-secondary'" (click)="tab='pending'">
-          Pending ({{ pendingTasks.length }})
-        </button>
-        <button class="btn" [ngClass]="tab === 'completed' ? 'btn-primary' : 'btn-secondary'" (click)="tab='completed'">
-          Completed ({{ completedTasks.length }})
-        </button>
-        <button class="btn" [ngClass]="tab === 'failed' ? 'btn-primary' : 'btn-secondary'" (click)="tab='failed'">
-          Failed ({{ failedTasks.length }})
-        </button>
-      </div>
-
-      <div class="card" *ngFor="let task of currentTasks" style="margin-bottom:0.75rem">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <span class="badge" [ngClass]="statusClass(task.status)">{{ task.status }}</span>
-            <strong style="margin-left:0.75rem">{{ operationLabel(task.operation) }}</strong>
-            <span class="text-muted" style="margin-left:0.5rem;font-size:0.8125rem" *ngIf="getRepoName(task.repositoryId)">
-              on {{ getRepoName(task.repositoryId) }}
-            </span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.75rem">
-            <span class="text-muted" style="font-size:0.8125rem">{{ task.createdAt | date:'short' }}</span>
-            <span *ngIf="task.startedAt && task.completedAt" class="text-muted" style="font-size:0.75rem">
-              {{ getDuration(task.startedAt, task.completedAt) }}
-            </span>
-            <button *ngIf="task.status === 'Pending'" class="btn btn-sm" style="font-size:0.75rem;padding:0.25rem 0.5rem;color:var(--danger);border:1px solid var(--danger);background:none" (click)="cancelTask(task.id)">
-              Cancel
-            </button>
-            <button *ngIf="task.status === 'Running'" class="btn btn-sm" style="font-size:0.75rem;padding:0.25rem 0.5rem;color:var(--danger);border:1px solid var(--danger);background:none" (click)="forceCancelTask(task.id)">
-              Force Cancel
-            </button>
-          </div>
+    
+    @if (loading) {
+      <div style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
+    }
+    
+    @if (!loading) {
+      <div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem">
+          <button class="btn" [ngClass]="tab === 'active' ? 'btn-primary' : 'btn-secondary'" (click)="tab='active'">
+            Active ({{ activeTasks.length }})
+          </button>
+          <button class="btn" [ngClass]="tab === 'pending' ? 'btn-primary' : 'btn-secondary'" (click)="tab='pending'">
+            Pending ({{ pendingTasks.length }})
+          </button>
+          <button class="btn" [ngClass]="tab === 'completed' ? 'btn-primary' : 'btn-secondary'" (click)="tab='completed'">
+            Completed ({{ completedTasks.length }})
+          </button>
+          <button class="btn" [ngClass]="tab === 'failed' ? 'btn-primary' : 'btn-secondary'" (click)="tab='failed'">
+            Failed ({{ failedTasks.length }})
+          </button>
         </div>
-        <div *ngIf="task.status === 'Running' && (task.progress > 0 || task.progressMessage)" style="margin-top:0.75rem">
-          <div class="progress"><div class="progress-bar" [style.width.%]="task.progress || 2"></div></div>
-          <div style="display:flex;justify-content:space-between;margin-top:0.25rem">
-            <span class="text-muted" style="font-size:0.75rem">{{ task.progressMessage || '' }}</span>
-            <span class="text-muted" style="font-size:0.75rem">{{ task.progress }}%</span>
+        @for (task of currentTasks; track task) {
+          <div class="card" style="margin-bottom:0.75rem">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <span class="badge" [ngClass]="statusClass(task.status)">{{ task.status }}</span>
+                <strong style="margin-left:0.75rem">{{ operationLabel(task.operation) }}</strong>
+                @if (getRepoName(task.repositoryId)) {
+                  <span class="text-muted" style="margin-left:0.5rem;font-size:0.8125rem">
+                    on {{ getRepoName(task.repositoryId) }}
+                  </span>
+                }
+              </div>
+              <div style="display:flex;align-items:center;gap:0.75rem">
+                <span class="text-muted" style="font-size:0.8125rem">{{ task.createdAt | date:'short' }}</span>
+                @if (task.startedAt && task.completedAt) {
+                  <span class="text-muted" style="font-size:0.75rem">
+                    {{ getDuration(task.startedAt, task.completedAt) }}
+                  </span>
+                }
+                @if (task.status === 'Pending') {
+                  <button class="btn btn-sm" style="font-size:0.75rem;padding:0.25rem 0.5rem;color:var(--danger);border:1px solid var(--danger);background:none" (click)="cancelTask(task.id)">
+                    Cancel
+                  </button>
+                }
+                @if (task.status === 'Running') {
+                  <button class="btn btn-sm" style="font-size:0.75rem;padding:0.25rem 0.5rem;color:var(--danger);border:1px solid var(--danger);background:none" (click)="forceCancelTask(task.id)">
+                    Force Cancel
+                  </button>
+                }
+              </div>
+            </div>
+            @if (task.status === 'Running' && (task.progress > 0 || task.progressMessage)) {
+              <div style="margin-top:0.75rem">
+                <div class="progress"><div class="progress-bar" [style.width.%]="task.progress || 2"></div></div>
+                <div style="display:flex;justify-content:space-between;margin-top:0.25rem">
+                  <span class="text-muted" style="font-size:0.75rem">{{ task.progressMessage || '' }}</span>
+                  <span class="text-muted" style="font-size:0.75rem">{{ task.progress }}%</span>
+                </div>
+                @if (task.chainStepIndex != null && task.chainTotalSteps) {
+                  <div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem">
+                    Step {{ task.chainStepIndex! + 1 }} of {{ task.chainTotalSteps }}
+                  </div>
+                }
+              </div>
+            }
+            @if (task.errorMessage) {
+              <div style="margin-top:0.5rem;color:var(--danger);font-size:0.8125rem">
+                {{ task.errorMessage }}
+              </div>
+            }
           </div>
-          <div *ngIf="task.chainStepIndex != null && task.chainTotalSteps" class="text-muted" style="font-size:0.75rem;margin-top:0.25rem">
-            Step {{ task.chainStepIndex! + 1 }} of {{ task.chainTotalSteps }}
+        }
+        @if (currentTasks.length === 0) {
+          <div class="empty-state card">
+            <i class="bi bi-check-circle"></i>
+            <h3>No {{ tab }} tasks</h3>
           </div>
-        </div>
-        <div *ngIf="task.errorMessage" style="margin-top:0.5rem;color:var(--danger);font-size:0.8125rem">
-          {{ task.errorMessage }}
-        </div>
+        }
       </div>
-
-      <div *ngIf="currentTasks.length === 0" class="empty-state card">
-        <i class="bi bi-check-circle"></i>
-        <h3>No {{ tab }} tasks</h3>
-      </div>
-    </div>
-  `
+    }
+    `
 })
 export class TaskDashboardComponent implements OnInit, OnDestroy {
   tasks: IndexingTask[] = [];

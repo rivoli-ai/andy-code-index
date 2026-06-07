@@ -19,74 +19,91 @@ import { RepositorySparklineComponent } from '../repositories/repository-sparkli
         <i class="bi bi-folder2-open"></i> All Repositories
       </a>
     </div>
-
-    <div class="card" *ngIf="loading">
-      <div style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
-    </div>
-
-    <div class="empty-state card" *ngIf="!loading && pinnedRepos.length === 0">
-      <i class="bi bi-pin-angle"></i>
-      <h3>No pinned repositories</h3>
-      <p>Pin repositories from the <a routerLink="/repositories">repository list</a> for quick access.</p>
-    </div>
-
-    <div class="dashboard-grid" *ngIf="!loading && pinnedRepos.length > 0">
-      <div class="dashboard-card card" *ngFor="let repo of pinnedRepos">
-        <div class="card-header">
-          <div class="card-title-row">
-            <a [routerLink]="['/repositories', repo.id]" class="repo-name">{{ repo.name }}</a>
-            <span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span>
-          </div>
-          <div class="card-meta">
-            <span class="badge badge-muted">{{ repo.provider }}</span>
-            <span class="text-muted" *ngIf="repo.organization">{{ repo.organization }}</span>
-          </div>
-        </div>
-
-        <div class="card-stats">
-          <div class="stat">
-            <span class="stat-value">{{ repo.stats?.commitCount || 0 }}</span>
-            <span class="stat-label">Commits</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ repo.stats?.enrichmentCount || 0 }}</span>
-            <span class="stat-label">Enrichments</span>
-            <span class="stat-sub" *ngIf="repo.stats?.storageSizeBytes" style="font-size:var(--font-xs);color:var(--text-muted)">{{ formatBytes(repo.stats!.storageSizeBytes) }}</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ repo.stats?.hasEmbeddings ? (repo.stats?.embeddingCount || 0) : '--' }}</span>
-            <span class="stat-label">Embeddings</span>
-          </div>
-        </div>
-
-        <div class="card-activity" *ngIf="sparklines.get(repo.id)">
-          <app-repository-sparkline [weeklyData]="sparklines.get(repo.id)!.weeklyData"></app-repository-sparkline>
-        </div>
-
-        <div class="card-footer">
-          <span class="text-muted last-synced">
-            <i class="bi bi-clock"></i>
-            {{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'short') : 'Never synced' }}
-          </span>
-          <div class="card-actions">
-            <button class="btn btn-sm btn-secondary" (click)="sync(repo)" [disabled]="syncing[repo.id]"
-                    title="Sync repository">
-              <span *ngIf="!syncing[repo.id]"><i class="bi bi-arrow-repeat"></i></span>
-              <span *ngIf="syncing[repo.id]"><div class="spinner" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></div></span>
-            </button>
-            <a [routerLink]="['/repositories', repo.id]" class="btn btn-sm btn-secondary" title="View details">
-              <i class="bi bi-eye"></i>
-            </a>
-            <button class="btn btn-sm btn-secondary" (click)="unpin(repo.id)" title="Unpin from dashboard">
-              <i class="bi bi-pin-fill"></i>
-            </button>
-          </div>
-        </div>
+    
+    @if (loading) {
+      <div class="card">
+        <div style="display:flex;justify-content:center;padding:2rem"><div class="spinner"></div></div>
       </div>
-    </div>
-
-    <div class="error-message" *ngIf="error">{{ error }}</div>
-  `,
+    }
+    
+    @if (!loading && pinnedRepos.length === 0) {
+      <div class="empty-state card">
+        <i class="bi bi-pin-angle"></i>
+        <h3>No pinned repositories</h3>
+        <p>Pin repositories from the <a routerLink="/repositories">repository list</a> for quick access.</p>
+      </div>
+    }
+    
+    @if (!loading && pinnedRepos.length > 0) {
+      <div class="dashboard-grid">
+        @for (repo of pinnedRepos; track repo) {
+          <div class="dashboard-card card">
+            <div class="card-header">
+              <div class="card-title-row">
+                <a [routerLink]="['/repositories', repo.id]" class="repo-name">{{ repo.name }}</a>
+                <span class="badge" [ngClass]="statusClass(repo.status)">{{ repo.status }}</span>
+              </div>
+              <div class="card-meta">
+                <span class="badge badge-muted">{{ repo.provider }}</span>
+                @if (repo.organization) {
+                  <span class="text-muted">{{ repo.organization }}</span>
+                }
+              </div>
+            </div>
+            <div class="card-stats">
+              <div class="stat">
+                <span class="stat-value">{{ repo.stats?.commitCount || 0 }}</span>
+                <span class="stat-label">Commits</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value">{{ repo.stats?.enrichmentCount || 0 }}</span>
+                <span class="stat-label">Enrichments</span>
+                @if (repo.stats?.storageSizeBytes) {
+                  <span class="stat-sub" style="font-size:var(--font-xs);color:var(--text-muted)">{{ formatBytes(repo.stats!.storageSizeBytes) }}</span>
+                }
+              </div>
+              <div class="stat">
+                <span class="stat-value">{{ repo.stats?.hasEmbeddings ? (repo.stats?.embeddingCount || 0) : '--' }}</span>
+                <span class="stat-label">Embeddings</span>
+              </div>
+            </div>
+            @if (sparklines.get(repo.id)) {
+              <div class="card-activity">
+                <app-repository-sparkline [weeklyData]="sparklines.get(repo.id)!.weeklyData"></app-repository-sparkline>
+              </div>
+            }
+            <div class="card-footer">
+              <span class="text-muted last-synced">
+                <i class="bi bi-clock"></i>
+                {{ repo.lastSyncedAt ? (repo.lastSyncedAt | date:'short') : 'Never synced' }}
+              </span>
+              <div class="card-actions">
+                <button class="btn btn-sm btn-secondary" (click)="sync(repo)" [disabled]="syncing[repo.id]"
+                  title="Sync repository">
+                  @if (!syncing[repo.id]) {
+                    <span><i class="bi bi-arrow-repeat"></i></span>
+                  }
+                  @if (syncing[repo.id]) {
+                    <span><div class="spinner" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></div></span>
+                  }
+                </button>
+                <a [routerLink]="['/repositories', repo.id]" class="btn btn-sm btn-secondary" title="View details">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <button class="btn btn-sm btn-secondary" (click)="unpin(repo.id)" title="Unpin from dashboard">
+                  <i class="bi bi-pin-fill"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+    
+    @if (error) {
+      <div class="error-message">{{ error }}</div>
+    }
+    `,
   styles: [`
     .dashboard-grid {
       display: grid;

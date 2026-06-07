@@ -30,45 +30,57 @@ interface DocPage {
           <span>Documentation</span>
         </div>
         <nav class="docs-nav">
-          <a *ngFor="let page of pages"
-             [routerLink]="['/docs', page.slug]"
-             routerLinkActive="active"
-             class="docs-nav-item">
-            <i class="bi" [ngClass]="page.icon"></i>
-            <span>{{ page.title }}</span>
-          </a>
+          @for (page of pages; track page) {
+            <a
+              [routerLink]="['/docs', page.slug]"
+              routerLinkActive="active"
+              class="docs-nav-item">
+              <i class="bi" [ngClass]="page.icon"></i>
+              <span>{{ page.title }}</span>
+            </a>
+          }
         </nav>
       </aside>
-
+    
       <!-- Main content -->
       <main class="docs-content">
-        <div *ngIf="loading" class="docs-loading">
-          <i class="bi bi-arrow-repeat spin"></i> Loading...
-        </div>
-        <div *ngIf="error" class="docs-error">
-          <i class="bi bi-exclamation-triangle"></i> {{ error }}
-        </div>
-        <article *ngIf="!loading && !error"
-                 class="docs-article"
-                 [innerHTML]="renderedHtml">
-        </article>
+        @if (loading) {
+          <div class="docs-loading">
+            <i class="bi bi-arrow-repeat spin"></i> Loading...
+          </div>
+        }
+        @if (error) {
+          <div class="docs-error">
+            <i class="bi bi-exclamation-triangle"></i> {{ error }}
+          </div>
+        }
+        @if (!loading && !error) {
+          <article
+            class="docs-article"
+            [innerHTML]="renderedHtml">
+          </article>
+        }
       </main>
-
+    
       <!-- Page TOC (right sidebar) -->
-      <aside class="docs-page-toc" *ngIf="pageToc.length > 0">
-        <div class="page-toc-header">On this page</div>
-        <nav class="page-toc-nav">
-          <a *ngFor="let entry of pageToc"
-             [href]="'#' + entry.id"
-             class="page-toc-item"
-             [class.level-3]="entry.level === 3"
-             (click)="scrollToHeading($event, entry.id)">
-            {{ entry.text }}
-          </a>
-        </nav>
-      </aside>
+      @if (pageToc.length > 0) {
+        <aside class="docs-page-toc">
+          <div class="page-toc-header">On this page</div>
+          <nav class="page-toc-nav">
+            @for (entry of pageToc; track entry) {
+              <a
+                [href]="'#' + entry.id"
+                class="page-toc-item"
+                [class.level-3]="entry.level === 3"
+                (click)="scrollToHeading($event, entry.id)">
+                {{ entry.text }}
+              </a>
+            }
+          </nav>
+        </aside>
+      }
     </div>
-  `,
+    `,
   styles: [`
     .docs-layout {
       display: grid;

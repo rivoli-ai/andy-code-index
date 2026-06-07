@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { SidebarComponent } from './components/layout/sidebar.component';
 import { ApiService } from './services/api.service';
@@ -9,23 +9,29 @@ import { filter } from 'rxjs/operators';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, SidebarComponent],
+  imports: [RouterOutlet, RouterLink, SidebarComponent],
   template: `
-    <app-sidebar *ngIf="showChrome" />
+    @if (showChrome) {
+      <app-sidebar />
+    }
     <main [class.main-content]="showChrome" [class.main-content-full]="!showChrome">
-      <div *ngIf="showChrome && llmWarning" class="health-banner health-banner-warning">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        {{ llmWarning }}
-        <a routerLink="/settings">Check Settings</a>
-      </div>
-      <div *ngIf="showChrome && embeddingWarning" class="health-banner health-banner-warning">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        {{ embeddingWarning }}
-        <a routerLink="/settings">Check Settings</a>
-      </div>
+      @if (showChrome && llmWarning) {
+        <div class="health-banner health-banner-warning">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          {{ llmWarning }}
+          <a routerLink="/settings">Check Settings</a>
+        </div>
+      }
+      @if (showChrome && embeddingWarning) {
+        <div class="health-banner health-banner-warning">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          {{ embeddingWarning }}
+          <a routerLink="/settings">Check Settings</a>
+        </div>
+      }
       <router-outlet />
     </main>
-  `,
+    `,
   styles: [`
     .main-content {
       margin-left: var(--sidebar-width);
