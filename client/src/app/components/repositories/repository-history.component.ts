@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -145,7 +145,7 @@ interface GitLogCommit {
   `]
 })
 export class RepositoryHistoryComponent implements OnInit, OnChanges {
-  @Input() repositoryId!: string;
+  readonly repositoryId = input.required<string>();
   @Input() ref = '';
   runs: IndexingRun[] = [];
   gitCommits: GitLogCommit[] = [];
@@ -157,7 +157,7 @@ export class RepositoryHistoryComponent implements OnInit, OnChanges {
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
-    this.http.get<IndexingRun[]>(`${environment.apiUrl}/repositories/${this.repositoryId}/history`)
+    this.http.get<IndexingRun[]>(`${environment.apiUrl}/repositories/${this.repositoryId()}/history`)
       .subscribe({
         next: runs => { this.runs = runs; this.loading = false; },
         error: () => this.loading = false
@@ -184,7 +184,7 @@ export class RepositoryHistoryComponent implements OnInit, OnChanges {
       params = params.set('before', this.nextCursor);
     }
 
-    this.http.get<any>(`${environment.apiUrl}/repositories/${this.repositoryId}/git/log`, { params })
+    this.http.get<any>(`${environment.apiUrl}/repositories/${this.repositoryId()}/git/log`, { params })
       .subscribe({
         next: res => {
           this.gitCommits = [...this.gitCommits, ...(res.commits || [])];

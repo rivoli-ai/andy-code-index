@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges } from '@angular/core';
+import { Component, OnChanges, input } from '@angular/core';
 
 import { WeeklyActivity } from '../../models/repository.model';
 
@@ -39,7 +39,7 @@ interface DayCell {
   `]
 })
 export class RepositorySparklineComponent implements OnChanges {
-  @Input() weeklyData: WeeklyActivity[] = [];
+  readonly weeklyData = input<WeeklyActivity[]>([]);
 
   cells: DayCell[] = [];
   cellSize = 4;
@@ -62,7 +62,7 @@ export class RepositorySparklineComponent implements OnChanges {
 
   private buildGrid() {
     // Take the last numWeeks of weekly data and expand into daily cells
-    const weeks = this.weeklyData.slice(-this.numWeeks);
+    const weeks = this.weeklyData().slice(-this.numWeeks);
     if (weeks.length === 0) {
       this.cells = [];
       return;
