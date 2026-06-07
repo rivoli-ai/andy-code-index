@@ -126,7 +126,6 @@ export class AuthService {
     authUrl.searchParams.set('code_challenge_method', 'S256');
     authUrl.searchParams.set('state', state);
 
-    console.log('[AUTH] Redirecting to:', authUrl.toString());
     window.location.href = authUrl.toString();
   }
 
