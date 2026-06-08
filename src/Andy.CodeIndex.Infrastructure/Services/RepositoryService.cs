@@ -102,13 +102,34 @@ public class RepositoryService : IRepositoryService
             Name = t.Name,
             CommitSha = t.CommitSha
         }).ToList();
+        dto.Stats = await BuildStatsAsync(repo, ct);
+
+        return dto;
+    }
+
+    /// <summary>
+    /// Computes the full statistics for a repository. Shared by <see cref="GetDetailsByIdAsync"/>
+    /// and <see cref="ListAsync"/> so both endpoints report the same numbers.
+    /// </summary>
+    private async Task<RepositoryStatsDto> BuildStatsAsync(Repository repo, CancellationToken ct)
+    {
+        var id = repo.Id;
+
+        var enrichmentCount = await _enrichmentRepo.CountAsync(e => e.RepositoryId == id, ct);
         var embeddingCount = await _context.ContentEmbeddings
             .CountAsync(ce => _context.Enrichments
                 .Where(e => e.RepositoryId == id)
                 .Select(e => e.Id)
                 .Contains(ce.EnrichmentId), ct);
-
-        var enrichmentCount = await _enrichmentRepo.CountAsync(e => e.RepositoryId == id, ct);
+        var storageSizeBytes = await _context.Enrichments
+            .Where(e => e.RepositoryId == id)
+            .SumAsync(e => (long)e.Content.Length, ct);
+        var commitCount = await _commitRepo.CountAsync(c => c.RepositoryId == id, ct);
+        // RepositoryFiles link to a Commit, which links to the repository.
+        var fileCount = await _context.RepositoryFiles
+            .CountAsync(f => f.Commit.RepositoryId == id, ct);
+        var pendingTaskCount = await _taskRepo.CountAsync(
+            t => t.RepositoryId == id && t.Status == IndexingTaskStatus.Pending, ct);
         var hasInsights = await _context.Enrichments
             .AnyAsync(e => e.RepositoryId == id && e.Type == EnrichmentType.Insights, ct);
 
@@ -124,25 +145,19 @@ public class RepositoryService : IRepositoryService
         else if (enrichmentCount > 0 && !hasInsights)
         { needsAttention = true; attentionReason = "No insights generated"; }
 
-        var storageSizeBytes = await _context.Enrichments
-            .Where(e => e.RepositoryId == id)
-            .SumAsync(e => (long)e.Content.Length, ct);
-
-        dto.Stats = new RepositoryStatsDto
+        return new RepositoryStatsDto
         {
-            CommitCount = await _commitRepo.CountAsync(c => c.RepositoryId == id, ct),
+            CommitCount = commitCount,
+            FileCount = fileCount,
             EnrichmentCount = enrichmentCount,
             StorageSizeBytes = storageSizeBytes,
             EmbeddingCount = embeddingCount,
             HasEmbeddings = embeddingCount > 0,
-            PendingTaskCount = await _taskRepo.CountAsync(
-                t => t.RepositoryId == id && t.Status == IndexingTaskStatus.Pending, ct),
+            PendingTaskCount = pendingTaskCount,
             NeedsAttention = needsAttention,
             AttentionReason = attentionReason,
             HasInsights = hasInsights
         };
-
-        return dto;
     }
 
     public async Task<List<RepositoryDto>> ListAsync(GitProvider? provider = null, string? status = null, CancellationToken ct = default)
@@ -160,22 +175,7 @@ public class RepositoryService : IRepositoryService
         foreach (var repo in repos)
         {
             var dto = MapToDto(repo);
-            var enrichmentCount = await _enrichmentRepo.CountAsync(e => e.RepositoryId == repo.Id, ct);
-            var embeddingCount = await _context.ContentEmbeddings
-                .CountAsync(ce => _context.Enrichments
-                    .Where(e => e.RepositoryId == repo.Id)
-                    .Select(e => e.Id)
-                    .Contains(ce.EnrichmentId), ct);
-            var storageSizeBytes = await _context.Enrichments
-                .Where(e => e.RepositoryId == repo.Id)
-                .SumAsync(e => (long)e.Content.Length, ct);
-            dto.Stats = new RepositoryStatsDto
-            {
-                EnrichmentCount = enrichmentCount,
-                StorageSizeBytes = storageSizeBytes,
-                EmbeddingCount = embeddingCount,
-                HasEmbeddings = embeddingCount > 0
-            };
+            dto.Stats = await BuildStatsAsync(repo, ct);
             dtos.Add(dto);
         }
         return dtos;
