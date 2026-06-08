@@ -48,7 +48,12 @@ public class SearchService : ISearchService
         if (queryEmbedding.Length == 0)
             return EmptyResult("semantic", sw);
 
-        // Semantic search requires PostgreSQL with pgvector
+        // SQLite: no pgvector, so rank by cosine similarity computed in process.
+        if (_context.Database.IsSqlite())
+            return await SqliteSemanticSearchAsync(queryEmbedding[0], filter, limit, sw, ct);
+
+        // Otherwise semantic search requires PostgreSQL with pgvector (the
+        // InMemory test provider has no vector support).
         if (!_context.Database.IsNpgsql())
             return EmptyResult("semantic", sw);
 
@@ -132,6 +137,136 @@ public class SearchService : ISearchService
         public double Score { get; set; }
     }
 
+    // SQLite semantic search: load the embeddings for the filtered enrichments and
+    // rank by cosine similarity in process. Suitable for a single-project local
+    // index; for large corpora the pgvector backend should be used instead.
+    private async Task<SearchResultsDto> SqliteSemanticSearchAsync(
+        float[] query, SearchFilter? filter, int limit, Stopwatch sw, CancellationToken ct)
+    {
+        var filteredIds = ApplyEnrichmentFilters(_context.Enrichments.AsQueryable(), filter)
+            .Select(e => e.Id);
+
+        var candidates = await _context.ContentEmbeddings
+            .Include(ce => ce.Enrichment).ThenInclude(e => e.Repository)
+            .Where(ce => filteredIds.Contains(ce.EnrichmentId))
+            .ToListAsync(ct);
+
+        var results = candidates
+            .Select(ce => new SearchResultItem
+            {
+                EnrichmentId = ce.EnrichmentId,
+                Content = ce.Enrichment.Content,
+                Score = Cosine(query, ce.EmbeddingVector.ToArray()),
+                FilePath = ce.Enrichment.FilePath,
+                StartLine = ce.Enrichment.StartLine,
+                EndLine = ce.Enrichment.EndLine,
+                Language = ce.Enrichment.Language,
+                RepositoryId = ce.Enrichment.RepositoryId,
+                RepositoryName = ce.Enrichment.Repository.Name
+            })
+            .OrderByDescending(r => r.Score)
+            .Take(limit)
+            .ToList();
+
+        return new SearchResultsDto
+        {
+            Results = results,
+            TotalCount = results.Count,
+            SearchMode = "semantic",
+            DurationMs = sw.ElapsedMilliseconds
+        };
+    }
+
+    internal static double Cosine(float[] a, float[] b)
+    {
+        if (a.Length == 0 || a.Length != b.Length)
+            return 0;
+
+        double dot = 0, na = 0, nb = 0;
+        for (var i = 0; i < a.Length; i++)
+        {
+            dot += a[i] * b[i];
+            na += a[i] * a[i];
+            nb += b[i] * b[i];
+        }
+
+        if (na == 0 || nb == 0)
+            return 0;
+
+        return dot / (Math.Sqrt(na) * Math.Sqrt(nb));
+    }
+
+    // Row type for the FTS5 BM25 query.
+    internal class FtsHit
+    {
+        public string EnrichmentId { get; set; } = "";
+        public double Score { get; set; }
+    }
+
+    // SQLite keyword search via the FTS5 table with BM25 ranking. Returns hits
+    // intersected with the already-filtered enrichment query.
+    private async Task<List<SearchResultItem>> SqliteKeywordSearchAsync(
+        IQueryable<Enrichment> filtered, string keywords, int limit, CancellationToken ct)
+    {
+        var match = ToFtsMatch(keywords);
+        if (string.IsNullOrWhiteSpace(match))
+            return new List<SearchResultItem>();
+
+        // bm25() returns lower = better. Over-fetch so post-filtering by the
+        // SearchFilter still has enough candidates to fill `limit`.
+        var table = SqliteDatabaseInitializer.FtsTable;
+        var sql =
+            $"SELECT EnrichmentId AS \"EnrichmentId\", bm25(\"{table}\") AS \"Score\" " +
+            $"FROM \"{table}\" WHERE \"{table}\" MATCH {{0}} ORDER BY bm25(\"{table}\") LIMIT {{1}}";
+
+        var hits = await _context.Database
+            .SqlQueryRaw<FtsHit>(sql, match, limit * 4)
+            .ToListAsync(ct);
+
+        if (hits.Count == 0)
+            return new List<SearchResultItem>();
+
+        var scoreById = new Dictionary<Guid, double>();
+        foreach (var hit in hits)
+            if (Guid.TryParse(hit.EnrichmentId, out var id))
+                scoreById[id] = -hit.Score; // higher = better
+
+        var ids = scoreById.Keys.ToList();
+        var rows = await filtered
+            .Where(e => ids.Contains(e.Id))
+            .Select(e => new SearchResultItem
+            {
+                EnrichmentId = e.Id,
+                Content = e.Content,
+                FilePath = e.FilePath,
+                StartLine = e.StartLine,
+                EndLine = e.EndLine,
+                Language = e.Language,
+                RepositoryId = e.RepositoryId,
+                RepositoryName = e.Repository.Name
+            })
+            .ToListAsync(ct);
+
+        foreach (var row in rows)
+            row.Score = scoreById[row.EnrichmentId];
+
+        return rows.OrderByDescending(r => r.Score).Take(limit).ToList();
+    }
+
+    // Builds a safe FTS5 MATCH expression: each token becomes a quoted phrase so
+    // FTS5 operators in user input cannot cause syntax errors. Tokens are implicitly
+    // ANDed by FTS5.
+    private static string ToFtsMatch(string keywords)
+    {
+        var terms = keywords
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => new string(t.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray()))
+            .Where(t => t.Length > 0)
+            .Select(t => "\"" + t + "\"");
+
+        return string.Join(" ", terms);
+    }
+
     public async Task<SearchResultsDto> KeywordSearchAsync(string keywords, SearchFilter? filter = null, int limit = 10, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
@@ -172,6 +307,10 @@ public class SearchService : ISearchService
                     RepositoryName = e.Repository.Name
                 })
                 .ToListAsync(ct);
+        }
+        else if (_context.Database.IsSqlite())
+        {
+            results = await SqliteKeywordSearchAsync(enrichmentQuery, keywords, limit, ct);
         }
         else
         {

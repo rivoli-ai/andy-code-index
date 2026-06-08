@@ -1,4 +1,5 @@
 using Andy.CodeIndex.Domain.Entities;
+using Andy.CodeIndex.Infrastructure.Data.Converters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Andy.CodeIndex.Infrastructure.Data;
@@ -30,6 +31,7 @@ public class CodeIndexDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         var isNpgsql = Database.IsNpgsql();
+        var isSqlite = Database.IsSqlite();
 
         if (isNpgsql)
         {
@@ -42,7 +44,7 @@ public class CodeIndexDbContext : DbContext
         ConfigureTag(modelBuilder, isNpgsql);
         ConfigureRepositoryFile(modelBuilder, isNpgsql);
         ConfigureEnrichment(modelBuilder, isNpgsql);
-        ConfigureContentEmbedding(modelBuilder, isNpgsql);
+        ConfigureContentEmbedding(modelBuilder, isNpgsql, isSqlite);
         ConfigureIndexingTask(modelBuilder, isNpgsql);
         ConfigureChunkLineRange(modelBuilder, isNpgsql);
         ConfigureUserSettings(modelBuilder);
@@ -223,7 +225,7 @@ public class CodeIndexDbContext : DbContext
         });
     }
 
-    private static void ConfigureContentEmbedding(ModelBuilder modelBuilder, bool isNpgsql)
+    private static void ConfigureContentEmbedding(ModelBuilder modelBuilder, bool isNpgsql, bool isSqlite)
     {
         modelBuilder.Entity<ContentEmbedding>(builder =>
         {
@@ -244,8 +246,19 @@ public class CodeIndexDbContext : DbContext
                     .HasMethod("hnsw")
                     .HasOperators("vector_cosine_ops");
             }
+            else if (isSqlite)
+            {
+                // SQLite has no native vector type: persist the embedding as a
+                // little-endian float32 BLOB. Cosine similarity is computed in
+                // process in SearchService.SemanticSearchAsync.
+                builder.Property(e => e.EmbeddingVector)
+                    .IsRequired()
+                    .HasColumnType("BLOB")
+                    .HasConversion(new VectorBlobConverter());
+            }
             else
             {
+                // InMemory (unit tests) keeps the previous behaviour.
                 builder.Ignore(e => e.EmbeddingVector);
             }
 

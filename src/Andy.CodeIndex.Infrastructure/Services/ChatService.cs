@@ -690,7 +690,13 @@ IMPORTANT: Always use these tools to answer questions. Never say you don't have 
             .Where(f => f.Commit.RepositoryId == repoId.Value);
 
         if (!string.IsNullOrEmpty(pattern))
-            query = query.Where(f => EF.Functions.ILike(f.Path, $"%{pattern}%"));
+        {
+            // ILike is PostgreSQL-only; use a case-insensitive Contains on SQLite/other.
+            var loweredPattern = pattern.ToLower();
+            query = _context.Database.IsNpgsql()
+                ? query.Where(f => EF.Functions.ILike(f.Path, $"%{pattern}%"))
+                : query.Where(f => f.Path.ToLower().Contains(loweredPattern));
+        }
 
         var files = await query
             .OrderBy(f => f.Path)
