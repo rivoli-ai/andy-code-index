@@ -12,7 +12,24 @@
     <Product>Andy CodeIndex</Product>
     <Copyright>Copyright (c) Rivoli AI 2024</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/rivoli-ai/andy-code-index</PackageProjectUrl>
     <RepositoryUrl>https://github.com/rivoli-ai/andy-code-index</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+
+    <!-- Packaging / reproducible build defaults, matching the other andy-* libraries.
+         Library projects opt in by setting <IsPackable>true</IsPackable>; apps and
+         test projects leave the default (non-packable). The CI workflow packs the
+         library projects explicitly with an RC version. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <!-- Source Link for the published packages -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
 </Project>
