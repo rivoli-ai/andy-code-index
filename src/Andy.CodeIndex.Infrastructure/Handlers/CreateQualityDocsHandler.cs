@@ -91,11 +91,16 @@ public class CreateQualityDocsHandler : BaseLlmEnrichmentHandler
             catch { }
         }
 
-        var chunks = await Context.Enrichments
+        var chunksQuery = Context.Enrichments
             .Where(e => e.RepositoryId == repo.Id && e.Subtype == EnrichmentSubtype.Chunk)
-            .Where(e => e.FilePath != null && (
-                EF.Functions.ILike(e.FilePath!, "%test%") ||
-                EF.Functions.ILike(e.FilePath!, "%spec%")))
+            .Where(e => e.FilePath != null);
+
+        // ILike is PostgreSQL-only; use a case-insensitive Contains on SQLite/other.
+        chunksQuery = Context.Database.IsNpgsql()
+            ? chunksQuery.Where(e => EF.Functions.ILike(e.FilePath!, "%test%") || EF.Functions.ILike(e.FilePath!, "%spec%"))
+            : chunksQuery.Where(e => e.FilePath!.ToLower().Contains("test") || e.FilePath!.ToLower().Contains("spec"));
+
+        var chunks = await chunksQuery
             .OrderBy(e => e.FilePath)
             .Take(20)
             .ToListAsync(ct);

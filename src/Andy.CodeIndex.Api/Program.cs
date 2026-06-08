@@ -2,6 +2,7 @@ using Andy.Auth.Extensions;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Data;
+using Andy.CodeIndex.Infrastructure.Data.Interceptors;
 using Andy.CodeIndex.Infrastructure.Handlers;
 using Andy.CodeIndex.Infrastructure.Repositories;
 using Andy.CodeIndex.Infrastructure.Services;
@@ -26,8 +27,26 @@ var protectedResourceUrl = $"{serverUrl}/mcp";
 var andyAuthAuthority = builder.Configuration["AndyAuth:Authority"] ?? "";
 
 // --- Database ---
+// Default to an embedded SQLite database so the service runs with no external
+// dependencies; use PostgreSQL + pgvector when a connection string is provided.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (!string.IsNullOrEmpty(connectionString))
+var useSqlite = string.IsNullOrEmpty(connectionString);
+if (useSqlite)
+{
+    var dataSource = builder.Configuration["Sqlite:DataSource"];
+    if (string.IsNullOrWhiteSpace(dataSource))
+        dataSource = Path.Combine(".andy", "andy-code-index.db");
+
+    var dbDir = Path.GetDirectoryName(Path.GetFullPath(dataSource));
+    if (!string.IsNullOrEmpty(dbDir))
+        Directory.CreateDirectory(dbDir);
+
+    builder.Services.AddDbContext<CodeIndexDbContext>(options =>
+        options
+            .UseSqlite($"Data Source={dataSource}")
+            .AddInterceptors(new EnrichmentFtsInterceptor()));
+}
+else
 {
     builder.Services.AddDbContext<CodeIndexDbContext>(options =>
         options.UseNpgsql(connectionString, o => o.UseVector()));
@@ -452,12 +471,15 @@ app.MapAndyTelemetry();
 
 app.MapFallbackToFile("index.html");
 
-// --- Auto-migrate in development ---
-if (app.Environment.IsDevelopment() && !string.IsNullOrEmpty(connectionString))
+// --- Database schema init ---
+// SQLite (embedded) is created/initialized on every startup; PostgreSQL keeps the
+// development-only auto-migrate.
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<CodeIndexDbContext>();
-    if (db.Database.IsNpgsql())
+    if (db.Database.IsSqlite())
+        await SqliteDatabaseInitializer.InitializeAsync(db);
+    else if (db.Database.IsNpgsql() && app.Environment.IsDevelopment())
         await db.Database.MigrateAsync();
 }
 

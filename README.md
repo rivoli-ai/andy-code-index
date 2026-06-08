@@ -45,10 +45,19 @@ Andy.CodeIndex.sln
 ### Prerequisites
 
 - .NET 8 SDK
-- Docker (for PostgreSQL with pgvector)
+- Docker (optional — only for the PostgreSQL + pgvector backend)
 - Node.js 20+ (for Angular frontend)
 
-### Start the database
+### Database backend
+
+By default the service runs on an **embedded SQLite database** (created at
+`.andy/andy-code-index.db`), so no external database is required — semantic search
+uses in-process cosine similarity over BLOB-stored embeddings and keyword search uses
+SQLite FTS5 (BM25). Override `Sqlite:DataSource` to change the location.
+
+To use **PostgreSQL + pgvector** instead (recommended at larger scale, with HNSW vector
+indexes and native full-text), set `ConnectionStrings:DefaultConnection` and start the
+database:
 
 ```bash
 docker compose up postgres -d
