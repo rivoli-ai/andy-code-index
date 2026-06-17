@@ -19,10 +19,11 @@ This starts all required services: the API server, the web client, and the datab
 
 The application consists of these containers:
 
-- **api** -- Node.js API server (port 3000)
-- **client** -- Angular web application (port 4200)
-- **db** -- PostgreSQL with pgvector extension
-- **redis** -- Task queue and caching
+- **api** -- ASP.NET Core (.NET 8) API server, serving both REST and the Angular SPA (ports 7101 HTTPS, 7102 HTTP, 6201 docker client alias)
+- **postgres** -- PostgreSQL 16 with pgvector extension (port 7436 on host)
+- **ollama** -- Optional local embedding/LLM provider, enabled via the `ollama` profile
+
+The background task queue is database-backed (no Redis dependency).
 
 ### Custom Docker Compose
 
@@ -32,10 +33,10 @@ Override default settings with a `docker-compose.override.yml`:
 services:
   api:
     environment:
-      - NODE_ENV=production
-      - LOG_LEVEL=info
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Logging__LogLevel__Default=Information
     ports:
-      - "8080:3000"
+      - "8443:8443"
 ```
 
 ## Environment Variables
@@ -44,22 +45,24 @@ services:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://localhost:5432/codeindex` |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string | `Host=postgres;Port=5432;Database=andy_code_index;Username=andy_code_index;Password=...` |
 
 ### Optional
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PORT` | API server port | `3000` |
-| `EMBEDDING_API_KEY` | OpenAI-compatible embedding key | none |
-| `EMBEDDING_BASE_URL` | Embedding provider URL | `https://api.openai.com/v1` |
-| `LLM_API_KEY` | LLM provider key | none |
-| `LLM_BASE_URL` | LLM provider URL | `https://api.openai.com/v1` |
-| `AUTH_ENABLED` | Enable authentication | `false` |
-| `AUTH_PROVIDER` | Auth provider (github, azure) | `github` |
-| `MCP_ENABLED` | Enable MCP server | `true` |
-| `LOG_LEVEL` | Logging level | `info` |
+| `ASPNETCORE_URLS` | Kestrel listen URLs | `https://+:8443;http://+:8080` |
+| `Embedding__ApiKey` | OpenAI-compatible embedding key | none |
+| `Embedding__BaseUrl` | Embedding provider URL | `https://api.openai.com/v1` |
+| `Embedding__Model` | Embedding model | `text-embedding-3-small` |
+| `Enrichment__ApiKey` | LLM provider key | none |
+| `Enrichment__BaseUrl` | LLM provider URL | `https://api.openai.com/v1` |
+| `Enrichment__Model` | LLM model for enrichments | `gpt-4o-mini` |
+| `AndyAuth__Authority` | Andy.Auth OpenIddict authority URL (empty = anonymous dev mode) | empty |
+| `AndyAuth__Audience` | Token audience | `urn:andy-code-index-api` |
+| `Rbac__ApiBaseUrl` | Andy.Rbac base URL | none |
+| `Rbac__ApplicationCode` | Application code in RBAC | `code-index` |
+| `Indexing__DataDir` | Clone directory inside the container | `/data` |
 
 ## HTTPS Configuration
 
@@ -78,21 +81,18 @@ server {
     ssl_certificate_key /etc/ssl/private/key.pem;
 
     location / {
-        proxy_pass http://localhost:4200;
-    }
-
-    location /api {
-        proxy_pass http://localhost:3000;
+        proxy_pass https://localhost:7101;
     }
 }
 ```
+
+The API and SPA are served by the same ASP.NET Core process, so a single upstream is sufficient.
 
 #### Caddy Example
 
 ```
 codeindex.example.com {
-    reverse_proxy /api/* localhost:3000
-    reverse_proxy localhost:4200
+    reverse_proxy https://localhost:7101
 }
 ```
 
@@ -100,13 +100,13 @@ Caddy automatically provisions and renews TLS certificates.
 
 ## Production Checklist
 
-- [ ] Set `NODE_ENV=production`
+- [ ] Set `ASPNETCORE_ENVIRONMENT=Production`
 - [ ] Configure HTTPS via reverse proxy
-- [ ] Enable authentication
+- [ ] Configure Andy.Auth and Andy.Rbac for authentication and RBAC
 - [ ] Set strong database credentials
-- [ ] Configure backup for PostgreSQL data
+- [ ] Configure backup for PostgreSQL data and the Data Protection keys volume
 - [ ] Set appropriate resource limits on containers
-- [ ] Monitor container health with Docker healthchecks
+- [ ] Monitor container health with Docker healthchecks (`/health`)
 - [ ] Review and set log levels
 
 ## Scaling
@@ -114,9 +114,8 @@ Caddy automatically provisions and renews TLS certificates.
 For larger codebases, consider:
 
 - Increasing PostgreSQL shared buffers and work memory.
-- Running multiple API server instances behind a load balancer.
-- Using a dedicated Redis instance with persistence enabled.
-- Allocating more memory to embedding generation tasks.
+- Running multiple API server instances behind a load balancer (sticky sessions not required; tasks are claimed from the database queue).
+- Allocating more memory to embedding generation tasks and tuning `Indexing__WorkerCount`.
 
 ## Updating
 

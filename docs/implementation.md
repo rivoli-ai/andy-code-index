@@ -15,9 +15,8 @@
 | 9: Chat, Analytics, Discovery | 15 | Complete (RAG chat, repo discovery, analytics, settings, dependency parsing) |
 | 10: UI/UX Polish | 10 | Complete (enrichment totals, task descriptions, font alignment, subtype filtering, quality scoring, search feedback, repo filtering) |
 
-Tests: 449 total (330 backend unit + 58 integration + 61 frontend).
-Coverage: Domain 92.5%, Application 86.3%, Api 67.5%, Infrastructure 31.3% (excludes auto-generated migrations; LLM/git handlers tested manually).
-Issues: 162 closed, 0 open.
+Tests: xUnit unit + integration projects plus Jasmine/Karma frontend specs (run via `dotnet test` and `npx ng test`).
+Coverage targets: Domain ≥ 90%, Application ≥ 85%, Api ≥ 65% (excludes auto-generated migrations; LLM/git handlers exercised through integration tests).
 
 ### Bug Fixes
 

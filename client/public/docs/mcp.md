@@ -8,73 +8,79 @@ The Model Context Protocol is a standard for connecting AI models to external da
 
 ## Available Tools
 
-### search_code
+CodeIndex exposes 58 MCP tools, all prefixed with `code_index_`. They are grouped into Query/Search, Enrichments/Insights, Management, and Discovery. A representative subset:
 
-Search indexed code using semantic, keyword, or hybrid mode.
+### code_index_hybrid_search
+
+Search indexed code using Reciprocal Rank Fusion over semantic + BM25 results.
 
 ```json
 {
-  "name": "search_code",
+  "name": "code_index_hybrid_search",
   "parameters": {
     "query": "authentication middleware",
-    "mode": "hybrid",
     "limit": 10
   }
 }
 ```
 
-### read_file
+`code_index_semantic_search` and `code_index_keyword_search` are also available for single-mode search.
 
-Read the full contents of an indexed file.
+### code_index_fetch_file
+
+Read the full contents of an indexed file at a given ref.
 
 ```json
 {
-  "name": "read_file",
+  "name": "code_index_fetch_file",
   "parameters": {
-    "repositoryId": "repo-id",
-    "filePath": "src/auth/middleware.ts"
+    "repo_url": "https://github.com/org/repo",
+    "ref": "main",
+    "path": "src/auth/middleware.ts"
   }
 }
 ```
 
-### list_repositories
+### code_index_repositories
 
 List all indexed repositories.
 
 ```json
 {
-  "name": "list_repositories",
+  "name": "code_index_repositories",
   "parameters": {}
 }
 ```
 
-### list_files
+### code_index_ls
 
 Browse the file tree of a repository.
 
 ```json
 {
-  "name": "list_files",
+  "name": "code_index_ls",
   "parameters": {
-    "repositoryId": "repo-id",
-    "path": "src/"
+    "repo_url": "https://github.com/org/repo",
+    "pattern": "src/**"
   }
 }
 ```
 
-### get_enrichments
+### code_index_query_enrichments
 
-Retrieve LLM-generated documentation for a file.
+Retrieve LLM-generated documentation (architecture, API docs, wiki, cookbook, etc.).
 
 ```json
 {
-  "name": "get_enrichments",
+  "name": "code_index_query_enrichments",
   "parameters": {
-    "repositoryId": "repo-id",
-    "filePath": "src/auth/middleware.ts"
+    "repo_url": "https://github.com/org/repo",
+    "subtype": "APIDocs"
   }
 }
 ```
+
+The full tool list is documented in the project README (`MCP Tools` section) and discoverable via the MCP `tools/list` request.
 
 ## Integration with Claude
 
@@ -86,12 +92,13 @@ Add CodeIndex as an MCP server in your Claude Desktop configuration:
 {
   "mcpServers": {
     "code-index": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-client", "http://localhost:3000/mcp"]
+      "url": "https://localhost:7101/mcp"
     }
   }
 }
 ```
+
+CodeIndex implements the streamable-HTTP MCP transport, so any client that speaks HTTP MCP (including Claude Desktop and Claude Code) can connect directly to the `/mcp` endpoint.
 
 ### Claude Code
 
@@ -99,20 +106,18 @@ Configure the MCP server in your Claude Code settings to enable code-aware conve
 
 ## Server Configuration
 
-The MCP server runs on the same port as the main API (default 3000). The endpoint is:
+The MCP server runs on the same port as the main API. The default endpoints are:
 
 ```
-http://localhost:3000/mcp
+https://localhost:7101/mcp   (Docker)
+https://localhost:5101/mcp   (local .NET dev server)
 ```
 
-### Environment Variables
-
-- `MCP_ENABLED` -- Enable or disable the MCP server (default: true).
-- `MCP_MAX_RESULTS` -- Maximum search results returned per query (default: 20).
+OAuth Protected Resource Metadata for MCP clients is exposed at `/.well-known/oauth-protected-resource` (RFC 8707).
 
 ## Security
 
-The MCP server respects the same authentication settings as the REST API. When auth is enabled, MCP clients must provide valid credentials.
+The MCP server requires a JWT Bearer token issued by Andy.Auth when authentication is configured. The same RBAC permissions that gate the REST controllers also gate the corresponding MCP tools.
 
 ## Use Cases
 
