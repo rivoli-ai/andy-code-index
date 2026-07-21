@@ -17,9 +17,12 @@ public class SyncRepositoryHandlerTests : IDisposable
     private readonly Mock<IGitService> _gitServiceMock = new();
     private readonly SyncRepositoryHandler _handler;
     private readonly Repository _testRepo;
+    private readonly string _cloneDir;
 
     public SyncRepositoryHandlerTests()
     {
+        _cloneDir = Path.Combine(Path.GetTempPath(), $"andy-code-index-sync-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_cloneDir);
         _context = TestDbContextFactory.Create();
         _handler = new SyncRepositoryHandler(
             _context, _gitServiceMock.Object,
@@ -35,7 +38,12 @@ public class SyncRepositoryHandlerTests : IDisposable
         _context.SaveChanges();
     }
 
-    public void Dispose() => _context.Dispose();
+    public void Dispose()
+    {
+        _context.Dispose();
+        if (Directory.Exists(_cloneDir))
+            Directory.Delete(_cloneDir, recursive: true);
+    }
 
     [Fact]
     public void Operation_IsSyncRepository()
@@ -46,8 +54,8 @@ public class SyncRepositoryHandlerTests : IDisposable
     [Fact]
     public async Task HandleAsync_FetchesAndUpdatesTimestamp()
     {
-        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
-        _gitServiceMock.Setup(g => g.FetchAsync("/tmp/test/repos/x", null, It.IsAny<CancellationToken>()))
+        _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns(_cloneDir);
+        _gitServiceMock.Setup(g => g.FetchAsync(_cloneDir, null, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var task = new IndexingTask
@@ -60,7 +68,7 @@ public class SyncRepositoryHandlerTests : IDisposable
 
         var repo = await _context.Repositories.FindAsync(_testRepo.Id);
         repo!.LastSyncedAt.Should().NotBeNull();
-        _gitServiceMock.Verify(g => g.FetchAsync("/tmp/test/repos/x", null, It.IsAny<CancellationToken>()), Times.Once);
+        _gitServiceMock.Verify(g => g.FetchAsync(_cloneDir, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
 

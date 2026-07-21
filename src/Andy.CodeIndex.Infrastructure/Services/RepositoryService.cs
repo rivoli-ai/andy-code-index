@@ -339,9 +339,19 @@ public class RepositoryService : IRepositoryService
         if (trimmed.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
             trimmed = trimmed[..^4];
 
-        // Lowercase the scheme and host
+        // HTTP and HTTPS are repository-location aliases for supported hosted
+        // providers. Keep non-default ports because they distinguish self-hosted
+        // Git servers that share a hostname.
         var uri = new Uri(trimmed);
-        return $"{uri.Scheme}://{uri.Host.ToLowerInvariant()}{uri.AbsolutePath.TrimEnd('/')}";
+        var scheme = uri.Scheme is "http" or "https"
+            ? Uri.UriSchemeHttps
+            : uri.Scheme.ToLowerInvariant();
+        var host = uri.IdnHost.ToLowerInvariant();
+        if (uri.HostNameType == UriHostNameType.IPv6)
+            host = $"[{host}]";
+        var authority = uri.IsDefaultPort ? host : $"{host}:{uri.Port}";
+
+        return $"{scheme}://{authority}{uri.AbsolutePath.TrimEnd('/')}";
     }
 
     internal static GitProvider ParseProvider(string url)

@@ -50,9 +50,10 @@ public class CloneRepositoryHandler : ITaskHandler
             await _context.SaveChangesAsync(ct);
 
             var cloneDir = _gitService.GetCloneDir(_options.DataDir, repo.Id);
-            _logger.LogInformation("Cloning {Url} to {Dir}", repo.Url, cloneDir);
+            var cloneUrl = repo.CloneUrl ?? repo.Url;
+            _logger.LogInformation("Cloning {Url} to {Dir}", cloneUrl, cloneDir);
 
-            await _gitService.CloneAsync(repo.Url, cloneDir, repo.PersonalAccessToken, ct);
+            await _gitService.CloneAsync(cloneUrl, cloneDir, repo.PersonalAccessToken, ct);
             _logger.LogInformation("Clone completed for {Name}", repo.Name);
 
             // Update branches

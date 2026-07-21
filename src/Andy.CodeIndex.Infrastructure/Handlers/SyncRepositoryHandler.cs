@@ -51,7 +51,7 @@ public class SyncRepositoryHandler : ITaskHandler
                 trackedTask.ProgressMessage = "Clone directory missing, re-cloning...";
                 await _context.SaveChangesAsync(ct);
             }
-            await _gitService.CloneAsync(repo.Url, cloneDir, repo.PersonalAccessToken, ct);
+            await _gitService.CloneAsync(repo.CloneUrl ?? repo.Url, cloneDir, repo.PersonalAccessToken, ct);
         }
         else
         {

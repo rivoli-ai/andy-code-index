@@ -500,10 +500,24 @@ public class GitService : IGitService
         using var process = Process.Start(psi)
             ?? throw new InvalidOperationException("Failed to start git process");
 
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
+        // Drain both redirected pipes concurrently. Reading either one to EOF
+        // first can deadlock when Git fills the other OS pipe buffer.
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = process.StandardError.ReadToEndAsync(ct);
 
-        await process.WaitForExitAsync(ct);
+        try
+        {
+            await process.WaitForExitAsync(ct);
+            await Task.WhenAll(stdoutTask, stderrTask);
+        }
+        catch (OperationCanceledException)
+        {
+            TryTerminate(process);
+            throw;
+        }
+
+        var stdout = await stdoutTask;
+        var stderr = await stderrTask;
 
         if (process.ExitCode != 0)
         {
@@ -536,10 +550,21 @@ public class GitService : IGitService
             ?? throw new InvalidOperationException("Failed to start git process");
 
         using var ms = new MemoryStream();
-        await process.StandardOutput.BaseStream.CopyToAsync(ms, ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
+        var stdoutTask = process.StandardOutput.BaseStream.CopyToAsync(ms, ct);
+        var stderrTask = process.StandardError.ReadToEndAsync(ct);
 
-        await process.WaitForExitAsync(ct);
+        try
+        {
+            await process.WaitForExitAsync(ct);
+            await Task.WhenAll(stdoutTask, stderrTask);
+        }
+        catch (OperationCanceledException)
+        {
+            TryTerminate(process);
+            throw;
+        }
+
+        var stderr = await stderrTask;
 
         if (process.ExitCode != 0)
         {
@@ -550,5 +575,31 @@ public class GitService : IGitService
         }
 
         return ms.ToArray();
+    }
+
+    private static void TryTerminate(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+            // The process exited between HasExited and Kill.
+        }
+        catch (NotSupportedException)
+        {
+            // Some platforms do not support killing an entire process tree.
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill();
+            }
+            catch (InvalidOperationException)
+            {
+                // The process already exited.
+            }
+        }
     }
 }

@@ -2,7 +2,6 @@ using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Domain.Entities;
 using Andy.CodeIndex.Domain.Enums;
 using Andy.CodeIndex.Infrastructure.Data;
-using Andy.CodeIndex.Infrastructure.Data.Interceptors;
 using Andy.CodeIndex.Infrastructure.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +32,6 @@ public class SqliteSearchTests : IDisposable
 
         var options = new DbContextOptionsBuilder<CodeIndexDbContext>()
             .UseSqlite(_connection)
-            .AddInterceptors(new EnrichmentFtsInterceptor())
             .Options;
 
         _context = new CodeIndexDbContext(options);
@@ -130,6 +128,78 @@ public class SqliteSearchTests : IDisposable
 
         Assert.NotEmpty(results.Results);
         Assert.Contains(results.Results, r => r.EnrichmentId == target);
+    }
+
+    [Fact]
+    public async Task KeywordSearch_AppliesRepositoryFilterBeforeBm25Limit()
+    {
+        var noisyRepoId = Guid.NewGuid();
+        SeedRepo(_repoId, "target-repo");
+        SeedRepo(noisyRepoId, "noisy-repo");
+
+        var target = SeedEnrichment(_repoId, "database target implementation", "csharp");
+        for (var i = 0; i < 50; i++)
+            SeedEnrichment(noisyRepoId, "database database database database", "csharp");
+
+        await _context.SaveChangesAsync();
+
+        var results = await _search.KeywordSearchAsync(
+            "database",
+            new SearchFilter { RepositoryIds = new() { _repoId } },
+            limit: 10);
+
+        Assert.Single(results.Results);
+        Assert.Equal(target, results.Results[0].EnrichmentId);
+    }
+
+    [Fact]
+    public async Task FtsTriggers_RemoveRowsAfterBulkAndCascadeDeletes()
+    {
+        var cascadeRepoId = Guid.NewGuid();
+        SeedRepo(_repoId, "bulk-repo");
+        SeedRepo(cascadeRepoId, "cascade-repo");
+        SeedEnrichment(_repoId, "bulk delete marker", "csharp");
+        SeedEnrichment(cascadeRepoId, "cascade delete marker", "csharp");
+        await _context.SaveChangesAsync();
+
+        Assert.Equal(2, CountFtsRows());
+
+        await _context.Enrichments
+            .Where(e => e.RepositoryId == _repoId)
+            .ExecuteDeleteAsync();
+        Assert.Equal(1, CountFtsRows());
+
+        var cascadeRepo = await _context.Repositories.FindAsync(cascadeRepoId);
+        _context.Repositories.Remove(cascadeRepo!);
+        await _context.SaveChangesAsync();
+
+        Assert.Equal(0, CountFtsRows());
+    }
+
+    [Fact]
+    public async Task FtsTrigger_UpdatesIndexedContent()
+    {
+        SeedRepo(_repoId, "repo1");
+        var enrichmentId = SeedEnrichment(_repoId, "before marker", "csharp");
+        await _context.SaveChangesAsync();
+
+        var enrichment = await _context.Enrichments.FindAsync(enrichmentId);
+        enrichment!.Content = "after marker";
+        await _context.SaveChangesAsync();
+
+        var before = await _search.KeywordSearchAsync("before", limit: 10);
+        var after = await _search.KeywordSearchAsync("after", limit: 10);
+
+        Assert.Empty(before.Results);
+        Assert.Contains(after.Results, r => r.EnrichmentId == enrichmentId);
+        Assert.Equal(1, CountFtsRows());
+    }
+
+    private long CountFtsRows()
+    {
+        using var command = _connection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM \"{SqliteDatabaseInitializer.FtsTable}\"";
+        return (long)command.ExecuteScalar()!;
     }
 
     private void SeedRepo(Guid id, string name)

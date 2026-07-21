@@ -34,12 +34,13 @@ public class ChatApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task GetSuggestions_Returns10Dimensions()
+    public async Task GetSuggestions_ReturnsAllOntologyDimensions()
     {
         var response = await _client.GetAsync("/api/v1/chat/suggestions");
         var result = await response.Content.ReadFromJsonAsync<SuggestionsResponse>(TestJson.Options);
         result.Should().NotBeNull();
-        result!.Dimensions.Should().HaveCount(10);
+        result!.Dimensions.Should().HaveCount(11);
+        result.Dimensions.Should().Contain(d => d.Id == "operations");
     }
 
     [Fact]
