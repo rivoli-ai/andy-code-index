@@ -2,7 +2,6 @@ using Andy.Auth.Extensions;
 using Andy.CodeIndex.Application.Interfaces;
 using Andy.CodeIndex.Application.Options;
 using Andy.CodeIndex.Infrastructure.Data;
-using Andy.CodeIndex.Infrastructure.Data.Interceptors;
 using Andy.CodeIndex.Infrastructure.Handlers;
 using Andy.CodeIndex.Infrastructure.Repositories;
 using Andy.CodeIndex.Infrastructure.Services;
@@ -42,9 +41,7 @@ if (useSqlite)
         Directory.CreateDirectory(dbDir);
 
     builder.Services.AddDbContext<CodeIndexDbContext>(options =>
-        options
-            .UseSqlite($"Data Source={dataSource}")
-            .AddInterceptors(new EnrichmentFtsInterceptor()));
+        options.UseSqlite($"Data Source={dataSource}"));
 }
 else
 {

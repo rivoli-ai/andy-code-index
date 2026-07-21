@@ -324,7 +324,8 @@ public class RepositoryServiceTests
     [InlineData("https://github.com/test/repo/", "https://github.com/test/repo")]
     [InlineData("https://GitHub.COM/test/repo", "https://github.com/test/repo")]
     [InlineData("  https://github.com/test/repo  ", "https://github.com/test/repo")]
-    [InlineData("http://github.com/test/repo", "http://github.com/test/repo")]
+    [InlineData("http://github.com/test/repo", "https://github.com/test/repo")]
+    [InlineData("https://gitea.example.com:8443/test/repo.git", "https://gitea.example.com:8443/test/repo")]
     public void NormalizeUrl_ReturnsConsistentForm(string input, string expected)
     {
         RepositoryService.NormalizeUrl(input).Should().Be(expected);

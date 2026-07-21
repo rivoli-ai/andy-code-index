@@ -29,6 +29,7 @@ public class CloneRepositoryHandlerTests : IDisposable
         _testRepo = new Repository
         {
             Id = Guid.NewGuid(), Name = "test-repo", Url = "https://github.com/t/r",
+            CloneUrl = "http://github.com/t/r.git",
             Provider = GitProvider.GitHub, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
         };
         _context.Repositories.Add(_testRepo);
@@ -47,7 +48,7 @@ public class CloneRepositoryHandlerTests : IDisposable
     public async Task HandleAsync_ClonesAndUpdatesBranches()
     {
         _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
-        _gitServiceMock.Setup(g => g.CloneAsync(_testRepo.Url, "/tmp/test/repos/x", null, It.IsAny<CancellationToken>()))
+        _gitServiceMock.Setup(g => g.CloneAsync(_testRepo.CloneUrl!, "/tmp/test/repos/x", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync("/tmp/test/repos/x");
         _gitServiceMock.Setup(g => g.GetBranchesAsync("/tmp/test/repos/x", It.IsAny<CancellationToken>()))
             .ReturnsAsync([
@@ -173,7 +174,7 @@ public class ScanCommitHandlerTests : IDisposable
         _repoRepoMock.Setup(r => r.GetByIdAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(_testRepo);
         _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
-        _gitServiceMock.Setup(g => g.GetCommitsAsync("/tmp/test/repos/x", 100, null, It.IsAny<CancellationToken>()))
+        _gitServiceMock.Setup(g => g.GetCommitsAsync("/tmp/test/repos/x", 10000, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new GitCommitInfo { Sha = "abc123", Message = "First", AuthorName = "Test", CommittedAt = DateTime.UtcNow },
                 new GitCommitInfo { Sha = "def456", Message = "Second", AuthorName = "Test", CommittedAt = DateTime.UtcNow }
@@ -201,7 +202,7 @@ public class ScanCommitHandlerTests : IDisposable
         _repoRepoMock.Setup(r => r.GetByIdAsync(_testRepo.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(_testRepo);
         _gitServiceMock.Setup(g => g.GetCloneDir("/tmp/test", _testRepo.Id)).Returns("/tmp/test/repos/x");
-        _gitServiceMock.Setup(g => g.GetCommitsAsync("/tmp/test/repos/x", 100, null, It.IsAny<CancellationToken>()))
+        _gitServiceMock.Setup(g => g.GetCommitsAsync("/tmp/test/repos/x", 10000, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([new GitCommitInfo { Sha = "existing", Message = "Old", CommittedAt = DateTime.UtcNow }]);
         _commitRepoMock.Setup(r => r.ExistsAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Commit, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);

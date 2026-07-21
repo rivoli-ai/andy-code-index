@@ -188,8 +188,20 @@ public class RepoDiscoveryService : IRepoDiscoveryService
     private async Task MarkTracked(List<DiscoveredRepo> repos, CancellationToken ct)
     {
         var tracked = await _repoRepo.GetAllAsync(ct);
-        var trackedUrls = new HashSet<string>(
-            tracked.Select(r => r.Url), StringComparer.OrdinalIgnoreCase);
+        var trackedUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var trackedRepo in tracked)
+        {
+            try
+            {
+                trackedUrls.Add(RepositoryService.NormalizeUrl(trackedRepo.Url));
+            }
+            catch
+            {
+                // Preserve comparison support for malformed legacy rows without
+                // allowing one bad URL to break the entire discovery response.
+                trackedUrls.Add(trackedRepo.Url.Trim().TrimEnd('/'));
+            }
+        }
 
         foreach (var repo in repos)
         {
@@ -201,7 +213,7 @@ public class RepoDiscoveryService : IRepoDiscoveryService
             catch
             {
                 // If normalization fails, fall back to direct comparison
-                repo.AlreadyTracked = trackedUrls.Contains(repo.CloneUrl);
+                repo.AlreadyTracked = trackedUrls.Contains(repo.CloneUrl.Trim().TrimEnd('/'));
             }
         }
     }

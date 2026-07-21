@@ -28,11 +28,11 @@ Andy.CodeIndex.sln
     Andy.CodeIndex.Infrastructure EF Core, repositories, services, handlers
     Andy.CodeIndex.Shared         Shared models for API and frontend
   tests/
-    Andy.CodeIndex.Tests.Unit         327 unit tests
-    Andy.CodeIndex.Tests.Integration  58 integration tests
+    Andy.CodeIndex.Tests.Unit         835 unit tests
+    Andy.CodeIndex.Tests.Integration  103 integration tests
   tools/
     Andy.CodeIndex.Cli            Command-line tool
-  client/                         Angular 20 frontend (61 tests)
+  client/                         Angular 20 frontend (114 tests)
   docs/
     requirements.md               Functional and non-functional requirements
     design.md                     Architecture, domain model, API, search
@@ -168,10 +168,10 @@ See [docs/security.md](docs/security.md) for the full security reference.
 ## Testing
 
 ```bash
-# Backend (327 unit + 58 integration = 385 tests)
+# Backend (835 unit + 103 integration = 938 tests)
 dotnet test
 
-# Frontend (61 tests)
+# Frontend (114 tests)
 cd client && npx ng test --watch=false --browsers=ChromeHeadless
 ```
 

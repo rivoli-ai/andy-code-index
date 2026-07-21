@@ -206,21 +206,71 @@ public class SearchService : ISearchService
     // SQLite keyword search via the FTS5 table with BM25 ranking. Returns hits
     // intersected with the already-filtered enrichment query.
     private async Task<List<SearchResultItem>> SqliteKeywordSearchAsync(
-        IQueryable<Enrichment> filtered, string keywords, int limit, CancellationToken ct)
+        IQueryable<Enrichment> filtered, SearchFilter? filter, string keywords, int limit, CancellationToken ct)
     {
         var match = ToFtsMatch(keywords);
         if (string.IsNullOrWhiteSpace(match))
             return new List<SearchResultItem>();
 
-        // bm25() returns lower = better. Over-fetch so post-filtering by the
-        // SearchFilter still has enough candidates to fill `limit`.
+        // bm25() returns lower = better. Apply every filter inside the FTS query
+        // before LIMIT; globally limiting first can hide all valid matches when
+        // another repository has enough higher-ranked documents.
         var table = SqliteDatabaseInitializer.FtsTable;
+        var parameters = new List<object> { match };
+        var where = new StringBuilder();
+
+        if (filter?.Languages is { Count: > 0 })
+        {
+            var placeholders = new List<string>();
+            foreach (var language in filter.Languages)
+            {
+                placeholders.Add($"{{{parameters.Count}}}");
+                parameters.Add(language);
+            }
+            where.Append($" AND e.\"Language\" IN ({string.Join(", ", placeholders)})");
+        }
+
+        if (filter?.RepositoryIds is { Count: > 0 })
+        {
+            var placeholders = new List<string>();
+            foreach (var repositoryId in filter.RepositoryIds)
+            {
+                placeholders.Add($"{{{parameters.Count}}}");
+                parameters.Add(repositoryId);
+            }
+            where.Append($" AND e.\"RepositoryId\" IN ({string.Join(", ", placeholders)})");
+        }
+
+        if (!string.IsNullOrEmpty(filter?.FilePath))
+        {
+            where.Append($" AND e.\"FilePath\" IS NOT NULL AND instr(e.\"FilePath\", {{{parameters.Count}}}) > 0");
+            parameters.Add(filter.FilePath);
+        }
+
+        if (filter?.CreatedAfter is { } createdAfter)
+        {
+            where.Append($" AND e.\"CreatedAt\" >= {{{parameters.Count}}}");
+            parameters.Add(createdAfter);
+        }
+
+        if (filter?.CreatedBefore is { } createdBefore)
+        {
+            where.Append($" AND e.\"CreatedAt\" <= {{{parameters.Count}}}");
+            parameters.Add(createdBefore);
+        }
+
+        var limitIndex = parameters.Count;
+        parameters.Add(limit);
+
         var sql =
-            $"SELECT EnrichmentId AS \"EnrichmentId\", bm25(\"{table}\") AS \"Score\" " +
-            $"FROM \"{table}\" WHERE \"{table}\" MATCH {{0}} ORDER BY bm25(\"{table}\") LIMIT {{1}}";
+            $"SELECT \"{table}\".EnrichmentId AS \"EnrichmentId\", bm25(\"{table}\") AS \"Score\" " +
+            $"FROM \"{table}\" JOIN \"Enrichments\" e " +
+            $"ON lower(CAST(e.\"Id\" AS TEXT)) = lower(\"{table}\".EnrichmentId) " +
+            $"WHERE \"{table}\" MATCH {{0}}{where} " +
+            $"ORDER BY bm25(\"{table}\") LIMIT {{{limitIndex}}}";
 
         var hits = await _context.Database
-            .SqlQueryRaw<FtsHit>(sql, match, limit * 4)
+            .SqlQueryRaw<FtsHit>(sql, parameters.ToArray())
             .ToListAsync(ct);
 
         if (hits.Count == 0)
@@ -310,7 +360,7 @@ public class SearchService : ISearchService
         }
         else if (_context.Database.IsSqlite())
         {
-            results = await SqliteKeywordSearchAsync(enrichmentQuery, keywords, limit, ct);
+            results = await SqliteKeywordSearchAsync(enrichmentQuery, filter, keywords, limit, ct);
         }
         else
         {
