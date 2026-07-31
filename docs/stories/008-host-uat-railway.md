@@ -31,7 +31,7 @@ Deploy andy-code-index to a UAT (User Acceptance Testing) environment on Railway
 ### CI/CD
 - [ ] GitHub Actions workflow builds and deploys on push to `main`
 - [ ] Build includes running unit tests before deployment
-- [ ] Dockerfile or Railway nixpacks configuration for .NET 8 + Angular build
+- [x] Dockerfile or Railway nixpacks configuration for .NET 10 + Angular build
 
 ### OAuth Integration
 - [ ] andy-auth UAT has `andy-code-index-web` client registered with UAT redirect URIs
