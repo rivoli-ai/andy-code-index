@@ -20,25 +20,22 @@
          Andy.Telemetry (which also adds OTLP, Prometheus, Http and
          Runtime instrumentation). -->
     <PackageReference Include="Andy.Telemetry" Version="0.2.9" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.29" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.29" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.29">
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <!-- #237 — ModelContextProtocol 0.4.0-preview.3 brings in
-         Microsoft.Extensions.AI.Abstractions 9.10.0, whose net8.0 DLL
-         has an AssemblyRef to Microsoft.Extensions.Logging.Abstractions
-         9.0.0.0. The ASP.NET Core 8 shared framework only ships the
-         8.x DLL, so Program.Main blows up with FileNotFoundException
-         before any host setup runs. Pin the 9.0 floor explicitly so
-         publish copies the matching DLL into the bundle. -->
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.4.0-preview.3" />
+    <!-- Override Andy.Telemetry's older transitive OpenTelemetry floor with the
+         current non-vulnerable release supported by .NET 10. -->
+    <PackageReference Include="OpenTelemetry.Api" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
     <!-- OT4 (rivoli-ai/conductor#1262) — service-specific EF Core tracing; not bundled in Andy.Telemetry. -->
-    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.12" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.17.0-beta.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
   </ItemGroup>
 
   <ItemGroup>

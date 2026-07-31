@@ -42,7 +42,7 @@ A **semantic code search and understanding service**. Clone any Git repo (GitHub
 
 | Layer | Technology |
 |-------|-----------|
-| Runtime | .NET 8.0 |
+| Runtime | .NET 10.0 |
 | API | REST + MCP |
 | Frontend | Angular 20 (RxJS, PrismJS, Marked) |
 | Database | **PostgreSQL 16 + pgvector + tsvector** |

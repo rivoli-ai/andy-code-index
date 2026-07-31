@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             // Remove real DbContext registration
             var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<CodeIndexDbContext>));
+                d => d.ServiceType == typeof(IDbContextOptionsConfiguration<CodeIndexDbContext>));
             if (descriptor != null)
                 services.Remove(descriptor);
 

@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Andy.CodeIndex is a semantic code indexing service for the rivoli-ai ecosystem, ported from [Kodit](https://github.com/helixml/kodit) (Go) to .NET 8. It provides AI-powered code understanding, hybrid search, and MCP tool access for agentic workflows.
+Andy.CodeIndex is a semantic code indexing service for the rivoli-ai ecosystem, ported from [Kodit](https://github.com/helixml/kodit) (Go) to .NET 10. It provides AI-powered code understanding, hybrid search, and MCP tool access for agentic workflows.
 
 ## 2. Goals
 
@@ -152,13 +152,13 @@ All 14 Kodit MCP tools must be ported with `code_index_` prefix:
 | NFR-07 | Startup time | < 10 seconds to healthy state |
 | NFR-08 | Concurrent users | Support 50+ concurrent API clients |
 | NFR-09 | Database | PostgreSQL 16+ with pgvector extension |
-| NFR-10 | Runtime | .NET 8 LTS |
+| NFR-10 | Runtime | .NET 10 LTS |
 | NFR-11 | Security | No OWASP Top 10 vulnerabilities |
 | NFR-12 | Deployment | Docker container, Railway-compatible |
 
 ## 5. Constraints
 
-- **Must use .NET 8** — matches andy-docs, andy-auth, andy-rbac.
+- **Must use .NET 10** — the supported LTS baseline for this service.
 - **Must use PostgreSQL with pgvector** — vector storage and similarity search.
 - **Must integrate with Andy.Auth** — no standalone auth implementation.
 - **Must integrate with Andy.RBAC** — no standalone permission system.

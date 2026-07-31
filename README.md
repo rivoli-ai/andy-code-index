@@ -1,6 +1,6 @@
 # Andy.CodeIndex
 
-Semantic code indexing service for the Andy ecosystem, ported from [Kodit](https://github.com/helixml/kodit) to .NET 8.
+Semantic code indexing service for the Andy ecosystem, ported from [Kodit](https://github.com/helixml/kodit) to .NET 10.
 
 ## What it does
 
@@ -44,7 +44,7 @@ Andy.CodeIndex.sln
 
 ### Prerequisites
 
-- .NET 8 SDK
+- .NET 10 SDK
 - Docker (optional — only for the PostgreSQL + pgvector backend)
 - Node.js 20+ (for Angular frontend)
 
